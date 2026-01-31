@@ -61,17 +61,26 @@ export const voiceCommand = {
     const guildId = interaction.guildId;
     const sub = interaction.options.getSubcommand();
 
+// SUBCOMMAND HANDLERS
+
     if (sub === "lobby-add") {
-      const channel = interaction.options.getChannel("channel");
-      const category = interaction.options.getChannel("category");
+  const channel = interaction.options.getChannel("channel");
+  const category = interaction.options.getChannel("category");
 
-      await addLobby(guildId, channel.id, category.id);
+  const added = await addLobby(guildId, channel.id, category.id);
 
-      return interaction.reply({
-        content: "Voice lobby added",
-        ephemeral: true
-      });
-    }
+  if (!added) {
+    return interaction.reply({
+      content: "That voice lobby is already registered",
+      flags: 64
+    });
+  }
+
+  return interaction.reply({
+    content: "Voice lobby added",
+    flags: 64
+  });
+}
 
     if (sub === "lobby-remove") {
       const channel = interaction.options.getChannel("channel");
@@ -81,13 +90,13 @@ export const voiceCommand = {
       if (!removed) {
         return interaction.reply({
           content: "No voice lobby configured",
-          ephemeral: true
+          flags: 64
         });
       }
 
       return interaction.reply({
         content: "Voice lobby removed",
-        ephemeral: true
+        flags: 64
       });
     }
 
@@ -96,7 +105,7 @@ export const voiceCommand = {
 
       return interaction.reply({
         content: "Voice configuration reset",
-        ephemeral: true
+        flags: 64
       });
     }
 
@@ -105,7 +114,7 @@ export const voiceCommand = {
 
       return interaction.reply({
         content: "```json\n" + JSON.stringify(status, null, 2) + "\n```",
-        ephemeral: true
+        flags: 64
       });
     }
   }

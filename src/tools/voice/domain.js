@@ -13,6 +13,10 @@ export async function addLobby(guildId, channelId, categoryId, template, opts = 
   voice.lobbies ??= {};
   voice.tempChannels ??= {};
 
+  if (voice.lobbies[channelId]) {
+    return { ok: true, action: "exists", channelId };
+  }
+
   voice.lobbies[channelId] = {
     channelId,
     categoryId,

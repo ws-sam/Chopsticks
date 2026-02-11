@@ -1,100 +1,83 @@
-import {
-  getVoiceState,
-  saveVoiceState
-} from "./schema.js";
+// Voice state management - process memory + database sync
 
-/* ---------- LOCKS (PROCESS-LOCAL) ---------- */
+import { saveVoiceState } from "./schema.js";
 
-const creationLocks = new Map();
-const creationCooldowns = new Map();
+const tempChannelCache = new Map(); // guildId -> Map<channelId, {ownerId, lobbyId, createdAt}>
+const creationLocks = new Map(); // guildId -> Set<lockId>
+const creationCooldowns = new Map(); // guildId -> Map<userId, timestamp>
 
-function lockKey(guildId, lockId) {
-  return `${guildId}:${lockId}`;
+function ensureCache(guildId, voice) {
+  if (tempChannelCache.has(guildId)) return tempChannelCache.get(guildId);
+  const cache = new Map();
+  if (voice?.tempChannels && typeof voice.tempChannels === "object") {
+    for (const [channelId, data] of Object.entries(voice.tempChannels)) {
+      if (data?.ownerId && data?.lobbyId) cache.set(channelId, data);
+    }
+  }
+  tempChannelCache.set(guildId, cache);
+  return cache;
+}
+
+export function registerTempChannel(guildId, channelId, ownerId, lobbyId, voice) {
+  const cache = ensureCache(guildId, voice);
+  const data = { ownerId, lobbyId, createdAt: Date.now() };
+  cache.set(channelId, data);
+
+  voice.tempChannels[channelId] = data;
+  return saveVoiceState(guildId, voice);
+}
+
+export function removeTempChannel(guildId, channelId, voice) {
+  const cache = ensureCache(guildId, voice);
+  cache.delete(channelId);
+  delete voice.tempChannels[channelId];
+  return saveVoiceState(guildId, voice);
+}
+
+export async function findUserTempChannel(guildId, userId, lobbyId, voice) {
+  const channels = ensureCache(guildId, voice);
+
+  for (const [channelId, data] of channels) {
+    if (data.ownerId === userId && data.lobbyId === lobbyId) {
+      return channelId;
+    }
+  }
+  return null;
 }
 
 export function acquireCreationLock(guildId, lockId) {
-  const key = lockKey(guildId, lockId);
-  if (creationLocks.has(key)) return false;
-  creationLocks.set(key, true);
+  if (!creationLocks.has(guildId)) {
+    creationLocks.set(guildId, new Set());
+  }
+  const locks = creationLocks.get(guildId);
+  if (locks.has(lockId)) return false;
+  locks.add(lockId);
   return true;
 }
 
 export function releaseCreationLock(guildId, lockId) {
-  creationLocks.delete(lockKey(guildId, lockId));
+  creationLocks.get(guildId)?.delete(lockId);
 }
 
 export function canCreateTempChannel(guildId, userId, cooldownMs) {
-  const ms = Number(cooldownMs);
-  if (!Number.isFinite(ms) || ms <= 0) return true;
-  const key = `${guildId}:${userId}`;
-  const last = creationCooldowns.get(key) ?? 0;
+  if (cooldownMs <= 0) return true;
+  
+  if (!creationCooldowns.has(guildId)) {
+    creationCooldowns.set(guildId, new Map());
+  }
+  const cooldowns = creationCooldowns.get(guildId);
+  const lastCreated = cooldowns.get(userId);
   const now = Date.now();
-  if (now - last < ms) return false;
+  
+  if (lastCreated && (now - lastCreated) < cooldownMs) {
+    return false;
+  }
   return true;
 }
 
 export function markTempChannelCreated(guildId, userId) {
-  const key = `${guildId}:${userId}`;
-  creationCooldowns.set(key, Date.now());
-}
-
-/* ---------- STATE ACCESS ---------- */
-
-export function ensureVoiceState(_) {
-  // NO-OP BY DESIGN
-  // Schema is authoritative
-}
-
-/* ---------- TEMP CHANNEL MUTATION (SCHEMA-SAFE) ---------- */
-
-export async function registerTempChannel(
-  guildId,
-  channelId,
-  ownerId,
-  lobbyId,
-  voiceOverride = null
-) {
-  const voice = await (voiceOverride ?? getVoiceState(guildId));
-  if (!voice.lobbies[lobbyId]) return;
-
-  voice.tempChannels[channelId] = {
-    ownerId,
-    lobbyId
-  };
-
-  await saveVoiceState(guildId, voice);
-}
-
-export async function removeTempChannel(
-  guildId,
-  channelId,
-  voiceOverride = null
-) {
-  const voice = await (voiceOverride ?? getVoiceState(guildId));
-
-  if (voice.tempChannels[channelId]) {
-    delete voice.tempChannels[channelId];
-    await saveVoiceState(guildId, voice);
+  if (!creationCooldowns.has(guildId)) {
+    creationCooldowns.set(guildId, new Map());
   }
-}
-
-export async function findUserTempChannel(
-  guildId,
-  userId,
-  lobbyId,
-  voiceOverride = null
-) {
-  const voice = await (voiceOverride ?? getVoiceState(guildId));
-  for (const [channelId, temp] of Object.entries(
-    voice.tempChannels
-  )) {
-    if (
-      temp.ownerId === userId &&
-      temp.lobbyId === lobbyId
-    ) {
-      return channelId;
-    }
-  }
-
-  return null;
+  creationCooldowns.get(guildId).set(userId, Date.now());
 }

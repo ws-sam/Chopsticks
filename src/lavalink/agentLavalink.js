@@ -10,6 +10,7 @@ export function createAgentLavalink(agentClient) {
 
   const ctxBySession = new Map(); // sessionKey -> ctx
   const locks = new Map(); // sessionKey -> Promise chain
+  const fallbackAttempts = new Map(); // key -> timestamp
 
   // Track Discord voice readiness for THIS agent user (per guild)
   const voiceStateByGuild = new Map(); // guildId -> { channelId, sessionId }
@@ -22,7 +23,7 @@ export function createAgentLavalink(agentClient) {
     return Math.min(max, Math.max(min, Math.trunc(n)));
   }
 
-  const STOP_GRACE_MS = clampMs(process.env.MUSIC_STOP_GRACE_MS, 15_000, 0, 300_000);
+  const DEFAULT_STOP_GRACE_MS = clampMs(process.env.MUSIC_STOP_GRACE_MS, 30_000, 0, 300_000);
   const DEFAULT_VOLUME = clampMs(process.env.MUSIC_DEFAULT_VOLUME, 100, 0, 150);
   const DEFAULT_MAX_QUEUE = clampMs(process.env.MUSIC_MAX_QUEUE, 100, 1, 10_000);
   const DEFAULT_MAX_TRACK_MINUTES = clampMs(process.env.MUSIC_MAX_TRACK_MINUTES, 20, 1, 24 * 60);
@@ -34,6 +35,24 @@ export function createAgentLavalink(agentClient) {
     const maxTrackMinutes = clampMs(l.maxTrackMinutes, DEFAULT_MAX_TRACK_MINUTES, 1, 24 * 60);
     const maxQueueMinutes = clampMs(l.maxQueueMinutes, DEFAULT_MAX_QUEUE_MINUTES, 1, 24 * 60);
     return { maxQueue, maxTrackMinutes, maxQueueMinutes };
+  }
+
+  function normalizeControlMode(value) {
+    const v = String(value ?? "").toLowerCase();
+    return v === "voice" ? "voice" : "owner";
+  }
+
+  function normalizeProviders(value) {
+    if (Array.isArray(value)) return value.map(v => String(v).trim()).filter(Boolean);
+    const raw = String(value ?? "").trim();
+    if (!raw) return [];
+    return raw.split(",").map(v => v.trim()).filter(Boolean);
+  }
+
+  function stopGraceMs(ctx) {
+    const v = Number(ctx?.stopGraceMs);
+    if (Number.isFinite(v)) return clampMs(v, DEFAULT_STOP_GRACE_MS, 0, 300_000);
+    return DEFAULT_STOP_GRACE_MS;
   }
 
   function sleep(ms) {
@@ -121,6 +140,56 @@ export function createAgentLavalink(agentClient) {
         );
       });
     } catch {}
+
+    const fallbackFromTrack = (player, track, reason) => {
+      const source = String(track?.info?.sourceName ?? track?.sourceName ?? "").toLowerCase();
+      if (!source.includes("youtube")) return;
+      const guildId = player?.guildId;
+      const voiceChannelId = player?.voiceChannelId;
+      const ctx = guildId && voiceChannelId ? getSession(guildId, voiceChannelId) : null;
+      if (!ctx) return;
+
+      const id = String(track?.info?.identifier ?? track?.identifier ?? track?.encoded ?? track?.info?.title ?? "");
+      const attemptKey = `${guildId}:${voiceChannelId}:${id}`;
+      const lastAttempt = fallbackAttempts.get(attemptKey);
+      if (lastAttempt && Date.now() - lastAttempt < 5 * 60_000) return;
+      fallbackAttempts.set(attemptKey, Date.now());
+
+      const query = [track?.info?.title, track?.info?.author].filter(Boolean).join(" ").trim();
+      if (!query) return;
+
+      const providersRaw = String(process.env.MUSIC_FALLBACK_PROVIDERS || "scsearch").trim();
+      const ctxProviders = Array.isArray(ctx?.fallbackProviders) && ctx.fallbackProviders.length
+        ? ctx.fallbackProviders
+        : null;
+      const providers = ctxProviders ?? providersRaw.split(",").map(s => s.trim()).filter(Boolean);
+
+      console.warn("[agent:lavalink:fallback] attempting", { reason, query, providers });
+
+      withCtxLock(ctx, async () => {
+        try {
+          const res = await search(ctx, query, track?.requester ?? null, providers);
+          const fallback = res?.tracks?.[0];
+          if (!fallback) return;
+          await softStopPlayback(ctx);
+          await enqueueAndPlay(ctx, fallback);
+        } catch (err) {
+          console.warn("[agent:lavalink:fallback] failed:", err?.message ?? err);
+        }
+      }).catch(() => {});
+    };
+
+    try {
+      manager.on("trackError", (player, track, payload) => {
+        fallbackFromTrack(player, track, payload?.exception?.message ?? "trackError");
+      });
+      manager.on("trackEnd", (player, track, payload) => {
+        const reason = String(payload?.reason ?? "");
+        if (reason === "LOAD_FAILED") {
+          fallbackFromTrack(player, track, reason);
+        }
+      });
+    } catch {}
   }
 
   async function start() {
@@ -189,7 +258,8 @@ export function createAgentLavalink(agentClient) {
     const q = String(input ?? "").trim();
     if (!q) return "";
     if (/^https?:\/\//i.test(q)) return q;
-    return `ytsearch:${q}`;
+    if (/^[a-z0-9]+search:/i.test(q)) return q;
+    return q;
   }
 
   function withSessionLock(key, fn) {
@@ -291,27 +361,55 @@ export function createAgentLavalink(agentClient) {
     }
   }
 
-  function removeTrackAt(player, index) {
+  function getQueueArray(player) {
     const q = player?.queue;
-    const i = Math.trunc(Number(index));
-    if (!Number.isFinite(i) || i < 0) return false;
+    if (Array.isArray(q?.tracks)) return q.tracks;
+    if (Array.isArray(q?.items)) return q.items;
+    if (Array.isArray(q)) return q;
+    return null;
+  }
 
-    if (Array.isArray(q?.tracks)) {
-      if (i >= q.tracks.length) return false;
-      q.tracks.splice(i, 1);
-      return true;
+  function removeTrackAt(player, index) {
+    const list = getQueueArray(player);
+    const i = Math.trunc(Number(index));
+    if (!list || !Number.isFinite(i) || i < 0 || i >= list.length) return false;
+    list.splice(i, 1);
+    return true;
+  }
+
+  function moveTrack(player, from, to) {
+    const list = getQueueArray(player);
+    const a = Math.trunc(Number(from));
+    const b = Math.trunc(Number(to));
+    if (!list || !Number.isFinite(a) || !Number.isFinite(b)) return false;
+    if (a < 0 || b < 0 || a >= list.length || b >= list.length) return false;
+    if (a === b) return true;
+    const [item] = list.splice(a, 1);
+    list.splice(b, 0, item);
+    return true;
+  }
+
+  function swapTracks(player, a, b) {
+    const list = getQueueArray(player);
+    const i = Math.trunc(Number(a));
+    const j = Math.trunc(Number(b));
+    if (!list || !Number.isFinite(i) || !Number.isFinite(j)) return false;
+    if (i < 0 || j < 0 || i >= list.length || j >= list.length) return false;
+    if (i === j) return true;
+    const tmp = list[i];
+    list[i] = list[j];
+    list[j] = tmp;
+    return true;
+  }
+
+  function shuffleTracks(player) {
+    const list = getQueueArray(player);
+    if (!list || list.length < 2) return false;
+    for (let i = list.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [list[i], list[j]] = [list[j], list[i]];
     }
-    if (Array.isArray(q?.items)) {
-      if (i >= q.items.length) return false;
-      q.items.splice(i, 1);
-      return true;
-    }
-    if (Array.isArray(q)) {
-      if (i >= q.length) return false;
-      q.splice(i, 1);
-      return true;
-    }
-    return false;
+    return true;
   }
 
   function bestEffortClearQueue(player) {
@@ -515,7 +613,11 @@ export function createAgentLavalink(agentClient) {
     ownerId,
     defaultMode,
     defaultVolume,
-    limits
+    limits,
+    controlMode,
+    searchProviders,
+    fallbackProviders,
+    stopGraceMs: stopGraceMsOverride
   }) {
     if (!manager) throw new Error("lavalink-not-ready");
     if (!guildId || !voiceChannelId) throw new Error("missing-session");
@@ -530,6 +632,10 @@ export function createAgentLavalink(agentClient) {
         }
         if (textChannelId) existing.textChannelId = textChannelId;
         if (limits) existing.limits = normalizeLimits(limits);
+        if (controlMode) existing.controlMode = normalizeControlMode(controlMode);
+        if (searchProviders) existing.searchProviders = normalizeProviders(searchProviders);
+        if (fallbackProviders) existing.fallbackProviders = normalizeProviders(fallbackProviders);
+        if (stopGraceMsOverride !== undefined) existing.stopGraceMs = clampMs(stopGraceMsOverride, DEFAULT_STOP_GRACE_MS, 0, 300_000);
         existing.lastActive = Date.now();
 
         clearStopping(existing);
@@ -564,6 +670,12 @@ export function createAgentLavalink(agentClient) {
         textChannelId,
         ownerId,
         mode: String(defaultMode ?? "open").toLowerCase() === "dj" ? "dj" : "open",
+        controlMode: normalizeControlMode(controlMode),
+        searchProviders: normalizeProviders(searchProviders),
+        fallbackProviders: normalizeProviders(fallbackProviders),
+        stopGraceMs: stopGraceMsOverride !== undefined
+          ? clampMs(stopGraceMsOverride, DEFAULT_STOP_GRACE_MS, 0, 300_000)
+          : DEFAULT_STOP_GRACE_MS,
         lastActive: Date.now(),
         volume: Number.isFinite(defaultVolume)
           ? Math.min(150, Math.max(0, Math.trunc(defaultVolume)))
@@ -590,11 +702,43 @@ export function createAgentLavalink(agentClient) {
     return null;
   }
 
-  async function search(ctx, query, requester) {
+  async function search(ctx, query, requester, providersOverride = null) {
     const identifier = normalizeSearchQuery(query);
     if (!identifier) return { tracks: [] };
     if (typeof ctx?.player?.search !== "function") throw new Error("player-search-missing");
-    return ctx.player.search({ query: identifier }, requester);
+
+    if (/^https?:\/\//i.test(identifier) || /^[a-z0-9]+search:/i.test(identifier)) {
+      return ctx.player.search({ query: identifier }, requester);
+    }
+
+    const providersRaw = String(process.env.MUSIC_SEARCH_PROVIDERS || "").trim();
+    const ctxProviders = Array.isArray(ctx?.searchProviders) && ctx.searchProviders.length
+      ? ctx.searchProviders
+      : null;
+    const providers = Array.isArray(providersOverride) && providersOverride.length
+      ? providersOverride
+      : (ctxProviders ?? (providersRaw
+        ? providersRaw.split(",").map(s => s.trim()).filter(Boolean)
+        : ["scsearch", "ytmsearch", "ytsearch"]));
+
+    let lastErr = null;
+    for (const provider of providers) {
+      try {
+        const res = await ctx.player.search({ query: `${provider}:${identifier}` }, requester);
+        if (res?.tracks?.length) return res;
+      } catch (err) {
+        lastErr = err;
+        const msg = String(err?.message ?? err);
+        const ignorable = msg.includes("not") && msg.includes("enabled");
+        if (!ignorable) throw err;
+      }
+    }
+
+    if (lastErr) {
+      const msg = String(lastErr?.message ?? lastErr);
+      console.warn("[agent:lavalink:search] fallback exhausted:", msg);
+    }
+    return { tracks: [] };
   }
 
   async function forceStart(ctx) {
@@ -665,8 +809,9 @@ export function createAgentLavalink(agentClient) {
 
       // End of queue: hard stop current track (REST), then grace timer.
       await softStopPlayback(ctx);
-      markStopping(ctx, STOP_GRACE_MS);
-      return { ok: true, action: "stopped", disconnectInMs: STOP_GRACE_MS };
+      const graceMs = stopGraceMs(ctx);
+      markStopping(ctx, graceMs);
+      return { ok: true, action: "stopped", disconnectInMs: graceMs };
     });
   }
 
@@ -726,8 +871,9 @@ export function createAgentLavalink(agentClient) {
       }
 
       await softStopPlayback(ctx);
-      markStopping(ctx, STOP_GRACE_MS);
-      return { ok: true, action: "stopped", disconnectInMs: STOP_GRACE_MS };
+      const graceMs = stopGraceMs(ctx);
+      markStopping(ctx, graceMs);
+      return { ok: true, action: "stopped", disconnectInMs: graceMs };
     });
   }
 
@@ -759,6 +905,44 @@ export function createAgentLavalink(agentClient) {
       ctx.lastActive = Date.now();
       const ok = removeTrackAt(ctx.player, index);
       if (!ok) throw new Error("bad-index");
+      return { ok: true };
+    });
+  }
+
+  function moveInQueue(ctx, actorUserId, from, to, requireOwnerMode = false) {
+    return withCtxLock(ctx, async () => {
+      if (requireOwnerMode) assertOwner(ctx, actorUserId);
+      ctx.lastActive = Date.now();
+      const ok = moveTrack(ctx.player, from, to);
+      if (!ok) throw new Error("bad-index");
+      return { ok: true };
+    });
+  }
+
+  function swapInQueue(ctx, actorUserId, a, b, requireOwnerMode = false) {
+    return withCtxLock(ctx, async () => {
+      if (requireOwnerMode) assertOwner(ctx, actorUserId);
+      ctx.lastActive = Date.now();
+      const ok = swapTracks(ctx.player, a, b);
+      if (!ok) throw new Error("bad-index");
+      return { ok: true };
+    });
+  }
+
+  function shuffleQueue(ctx, actorUserId, requireOwnerMode = false) {
+    return withCtxLock(ctx, async () => {
+      if (requireOwnerMode) assertOwner(ctx, actorUserId);
+      ctx.lastActive = Date.now();
+      shuffleTracks(ctx.player);
+      return { ok: true };
+    });
+  }
+
+  function clearQueue(ctx, actorUserId, requireOwnerMode = false) {
+    return withCtxLock(ctx, async () => {
+      if (requireOwnerMode) assertOwner(ctx, actorUserId);
+      ctx.lastActive = Date.now();
+      bestEffortClearQueue(ctx.player);
       return { ok: true };
     });
   }
@@ -860,6 +1044,10 @@ export function createAgentLavalink(agentClient) {
     setVolume,
     queue,
     removeFromQueue,
+    moveInQueue,
+    swapInQueue,
+    shuffleQueue,
+    clearQueue,
     setPreset
   };
 }

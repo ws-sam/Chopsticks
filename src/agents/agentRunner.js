@@ -23,12 +23,32 @@ import { randomUUID } from "node:crypto";
 // Unique ID for this runner instance
 const RUNNER_ID = process.env.RUNNER_ID || randomUUID();
 const CONTROL_URL = process.env.AGENT_CONTROL_URL || "ws://127.0.0.1:8787"; // Agent-specific WS URL for AgentManager
+const MUSIC_CONTROL_LOCKED = String(process.env.MUSIC_CONTROL_LOCKED ?? "true") === "true";
 
 // Polling interval for DB changes
 const POLL_INTERVAL_MS = Number(process.env.AGENT_RUNNER_POLL_INTERVAL_MS) || 10_000;
 
 // Map to keep track of active agent instances managed by this runner
 const activeAgents = new Map(); // agentId -> { client, stopFn, agentConfig }
+
+function normalizeControlMode(value) {
+  const v = String(value ?? "").toLowerCase();
+  return v === "voice" ? "voice" : "owner";
+}
+
+function normalizeProviders(value) {
+  if (Array.isArray(value)) return value.map(v => String(v).trim()).filter(Boolean);
+  const raw = String(value ?? "").trim();
+  if (!raw) return [];
+  return raw.split(",").map(v => v.trim()).filter(Boolean);
+}
+
+function requireOwnerControl(ctx, controlMode) {
+  const mode = normalizeControlMode(
+    controlMode ?? ctx?.controlMode ?? (MUSIC_CONTROL_LOCKED ? "owner" : "voice")
+  );
+  return mode === "owner" || ctx?.mode === "dj";
+}
 
 function safeJsonParse(input) {
   try {
@@ -172,6 +192,7 @@ async function startAgent(agentConfig) {
 
     ws.on("open", () => {
       wsReady = true;
+      console.log(`[agent:${agentId}] Connected to control plane at ${CONTROL_URL}`);
       sendHello();
       sendGuilds();
 
@@ -828,10 +849,14 @@ async function startAgent(agentConfig) {
 
     const mgr = await ensureLavalink();
 
-    if (op === "play") {
+    if (op === "search") {
       const defaultMode = String(payload.defaultMode ?? "open").toLowerCase() === "dj" ? "dj" : "open";
       const defaultVolume = payload.defaultVolume;
       const limits = payload.limits ?? null;
+      const controlMode = payload.controlMode ?? null;
+      const searchProviders = payload.searchProviders ?? null;
+      const fallbackProviders = payload.fallbackProviders ?? null;
+      const stopGraceMs = payload.stopGraceMs ?? null;
 
       const ctx = await mgr.createOrGetSession({
         guildId,
@@ -840,8 +865,54 @@ async function startAgent(agentConfig) {
         ownerId: actorUserId,
         defaultMode,
         defaultVolume,
-        limits
+        limits,
+        controlMode,
+        searchProviders,
+        fallbackProviders,
+        stopGraceMs
       });
+
+      const actorIsAdmin = adminOverride ? true : isAdmin(actorMember);
+      const requireOwnerMode = requireOwnerControl(ctx, controlMode);
+      if (requireOwnerMode && ctx.ownerId && ctx.ownerId !== actorUserId && !actorIsAdmin) {
+        throw new Error("not-owner");
+      }
+
+      const query = payload.query;
+      const requester = payload.requester ?? null;
+      const res = await mgr.search(ctx, query, requester);
+      const tracks = Array.isArray(res?.tracks) ? res.tracks.map(serializeTrack) : [];
+      return { tracks };
+    }
+
+    if (op === "play") {
+      const defaultMode = String(payload.defaultMode ?? "open").toLowerCase() === "dj" ? "dj" : "open";
+      const defaultVolume = payload.defaultVolume;
+      const limits = payload.limits ?? null;
+      const controlMode = payload.controlMode ?? null;
+      const searchProviders = payload.searchProviders ?? null;
+      const fallbackProviders = payload.fallbackProviders ?? null;
+      const stopGraceMs = payload.stopGraceMs ?? null;
+
+      const ctx = await mgr.createOrGetSession({
+        guildId,
+        voiceChannelId,
+        textChannelId,
+        ownerId: actorUserId,
+        defaultMode,
+        defaultVolume,
+        limits,
+        controlMode,
+        searchProviders,
+        fallbackProviders,
+        stopGraceMs
+      });
+
+      const actorIsAdmin = adminOverride ? true : isAdmin(actorMember);
+      const requireOwnerMode = requireOwnerControl(ctx, controlMode);
+      if (requireOwnerMode && ctx.ownerId && ctx.ownerId !== actorUserId && !actorIsAdmin) {
+        throw new Error("not-owner");
+      }
 
       const query = payload.query;
       const requester = payload.requester ?? null;
@@ -863,7 +934,12 @@ async function startAgent(agentConfig) {
     const ctx = mgr.getSession(guildId, voiceChannelId);
     if (!ctx) throw new Error("no-session");
 
-    const requireOwnerMode = ctx.mode === "dj";
+    if (payload?.controlMode) ctx.controlMode = normalizeControlMode(payload.controlMode);
+    if (payload?.searchProviders) ctx.searchProviders = normalizeProviders(payload.searchProviders);
+    if (payload?.fallbackProviders) ctx.fallbackProviders = normalizeProviders(payload.fallbackProviders);
+    if (payload?.stopGraceMs !== undefined) ctx.stopGraceMs = payload.stopGraceMs;
+
+    const requireOwnerMode = requireOwnerControl(ctx, payload?.controlMode);
     const actorIsAdmin = adminOverride ? true : isAdmin(actorMember);
 
     if (op === "status") {
@@ -919,6 +995,10 @@ async function startAgent(agentConfig) {
 
     if (op === "volume") return mgr.setVolume(ctx, actorUserId, payload.volume, requireOwnerMode && !actorIsAdmin);
     if (op === "remove") return mgr.removeFromQueue(ctx, actorUserId, payload.index, requireOwnerMode && !actorIsAdmin);
+    if (op === "move") return mgr.moveInQueue(ctx, actorUserId, payload.from, payload.to, requireOwnerMode && !actorIsAdmin);
+    if (op === "swap") return mgr.swapInQueue(ctx, actorUserId, payload.a, payload.b, requireOwnerMode && !actorIsAdmin);
+    if (op === "shuffle") return mgr.shuffleQueue(ctx, actorUserId, requireOwnerMode && !actorIsAdmin);
+    if (op === "clear") return mgr.clearQueue(ctx, actorUserId, requireOwnerMode && !actorIsAdmin);
     if (op === "preset") return mgr.setPreset(ctx, actorUserId, payload.preset, requireOwnerMode && !actorIsAdmin);
 
     throw new Error("unknown-op");

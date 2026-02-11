@@ -10,6 +10,8 @@ services:
     environment:
       # Discord Bot Token (REQUIRED)
       - DISCORD_TOKEN=${DISCORD_TOKEN}
+      # Storage driver
+      - STORAGE_DRIVER=postgres
       # Agent Manager Host and Port (for internal communication with agent-runners)
       - AGENT_CONTROL_HOST=0.0.0.0 # Listen on all interfaces inside the container
       - AGENT_CONTROL_PORT=8787
@@ -18,11 +20,11 @@ services:
       - HEALTH_SERVER_PORT=8080
       # Database connection details (from docker-compose.stack.yml)
       - POSTGRES_URL=postgresql://chopsticks:chopsticks@postgres:5432/chopsticks
+      - DATABASE_URL=postgresql://chopsticks:chopsticks@postgres:5432/chopsticks
       # Redis connection details (from docker-compose.stack.yml)
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       # Lavalink connection details (from docker-compose.stack.yml)
-      # Assuming default Lavalink password 'youshallnotpass' if not specified
       - LAVALINK_HOST=lavalink
       - LAVALINK_PORT=2333
       - LAVALINK_PASSWORD=${LAVALINK_PASSWORD:-youshallnotpass}
@@ -37,6 +39,7 @@ services:
     ports:
       - "8080:8080" # Expose health server
       - "3002:3002" # Expose Development API
+      - "8787:8787" # Expose Agent Control WebSocket (so agent-runner can connect)
     depends_on:
       - postgres
       - redis
@@ -58,18 +61,26 @@ services:
     environment:
       # Agent Manager URL for the runner to connect to the main bot
       - AGENT_CONTROL_URL=ws://main-bot:8787
+      # Storage driver
+      - STORAGE_DRIVER=postgres
       # Database connection details
       - POSTGRES_URL=postgresql://chopsticks:chopsticks@postgres:5432/chopsticks
+      - DATABASE_URL=postgresql://chopsticks:chopsticks@postgres:5432/chopsticks
       # Redis connection details
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      # Lavalink connection (REQUIRED for agents)
+      - LAVALINK_HOST=lavalink
+      - LAVALINK_PORT=2333
+      - LAVALINK_PASSWORD=${LAVALINK_PASSWORD:-youshallnotpass}
+      # Agent encryption key
+      - AGENT_TOKEN_KEY=882fa533ccceb75afd234e5b46036a13eb594c100b2136c6d9e68fd08c6bc68b
       # Unique ID for the runner, useful for tracking in DB
       - RUNNER_ID=${HOSTNAME} # Docker sets HOSTNAME to container ID by default
       # Polling interval for DB changes (e.g., agent status updates)
       - AGENT_RUNNER_POLL_INTERVAL_MS=10000
       # Agent Invite Permissions (from AgentManager config)
       - AGENT_INVITE_PERMS=${AGENT_INVITE_PERMS:-3147776}
-      - AGENT_TOKEN_KEY=882fa533ccceb75afd234e5b46036a13eb594c100b2136c6d9e68fd08c6bc68b
       # Voice service URLs (agents spawned by runner might need these)
       - VOICE_ASSIST_STT_URL=http://voice-stt:9000
       - VOICE_ASSIST_LLM_URL=http://voice-llm:9001

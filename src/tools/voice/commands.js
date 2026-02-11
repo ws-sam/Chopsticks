@@ -144,10 +144,22 @@ export async function execute(interaction) {
   const sub = interaction.options.getSubcommand();
 
   if (sub === "add") {
+    const category = interaction.options.getChannel("category");
+    const me = interaction.guild?.members?.me ?? (await interaction.guild?.members?.fetchMe().catch(() => null));
+    if (me) {
+      const perms = category.permissionsFor(me);
+      if (!perms?.has(PermissionFlagsBits.ManageChannels) || !perms?.has(PermissionFlagsBits.MoveMembers)) {
+        await interaction.reply({
+          content: "❌ Missing permissions in that category (Manage Channels + Move Members required).",
+          ephemeral: true
+        });
+        return;
+      }
+    }
     const res = await VoiceDomain.addLobby(
       guildId,
       interaction.options.getChannel("channel").id,
-      interaction.options.getChannel("category").id,
+      category.id,
       interaction.options.getString("template") ?? "{user}'s room",
       {
         userLimit: interaction.options.getInteger("user_limit"),

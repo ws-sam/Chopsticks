@@ -18,6 +18,8 @@ export default {
   name: "voiceStateUpdate",
 
   async execute(oldState, newState) {
+    const debug = process.env.VOICE_DEBUG === "true";
+    const log = (...args) => debug && console.log("[voiceStateUpdate]", ...args);
     const guild = newState.guild ?? oldState.guild;
     if (!guild) return;
 
@@ -29,6 +31,10 @@ export default {
     const newChannel = newState.channel ?? null;
 
     if (oldChannel?.id === newChannel?.id) return;
+    log(
+      "state",
+      { old: oldChannel?.id ?? null, next: newChannel?.id ?? null, user: member.id }
+    );
 
     const voice = await getVoiceState(guild.id);
     if (!voice) return;
@@ -39,15 +45,29 @@ export default {
     /* ---------- LEAVE TEMP ---------- */
 
     if (oldChannel && voice.tempChannels[oldChannel.id]) {
-      const channel = guild.channels.cache.get(oldChannel.id) ?? null;
-      const empty = channel ? channel.members.size === 0 : true;
-
-      if (!channel || empty) {
-        await removeTempChannel(guild.id, oldChannel.id, voice);
-        if (channel) {
-          await channel.delete().catch(() => {});
+      const channelId = oldChannel.id;
+      const cleanup = async () => {
+        const channel =
+          guild.channels.cache.get(channelId) ??
+          (await guild.channels.fetch(channelId).catch(() => null));
+        if (!channel) {
+          await removeTempChannel(guild.id, channelId, voice);
+          log("temp channel missing, cleaned", { channelId });
+          return;
         }
-      }
+        const humans = Array.from(channel.members.values()).filter(m => !m.user?.bot).length;
+        if (humans > 0) {
+          log("temp channel not empty", { channelId, humans });
+          return;
+        }
+        await removeTempChannel(guild.id, channelId, voice);
+        await channel.delete().catch(() => {});
+        log("temp channel deleted", { channelId });
+      };
+
+      setTimeout(() => {
+        cleanup().catch(err => log("cleanup failed", { channelId, error: err?.message }));
+      }, 1000);
     }
 
     /* ---------- JOIN LOBBY ---------- */
@@ -55,20 +75,37 @@ export default {
     if (!newChannel) return;
 
     const lobby = voice.lobbies[newChannel.id];
-    if (!lobby || lobby.enabled !== true) return;
+    if (!lobby || lobby.enabled !== true) {
+      log("no lobby or disabled", { channelId: newChannel.id });
+      return;
+    }
 
-    const category = guild.channels.cache.get(lobby.categoryId) ?? null;
-    if (!category || category.type !== ChannelType.GuildCategory) return;
+    const category =
+      guild.channels.cache.get(lobby.categoryId) ??
+      (await guild.channels.fetch(lobby.categoryId).catch(() => null));
+    if (!category || category.type !== ChannelType.GuildCategory) {
+      log("missing category", { categoryId: lobby.categoryId });
+      return;
+    }
     const me = guild.members.me;
     if (me) {
       const perms = category.permissionsFor(me);
-      if (!perms?.has(PermissionsBitField.Flags.ManageChannels)) return;
-      if (!perms?.has(PermissionsBitField.Flags.MoveMembers)) return;
+      if (!perms?.has(PermissionsBitField.Flags.ManageChannels)) {
+        log("missing ManageChannels", { categoryId: category.id });
+        return;
+      }
+      if (!perms?.has(PermissionsBitField.Flags.MoveMembers)) {
+        log("missing MoveMembers", { categoryId: category.id });
+        return;
+      }
     }
 
     const lockId = `${newChannel.id}:${member.id}`;
     const acquired = acquireCreationLock(guild.id, lockId);
-    if (!acquired) return;
+    if (!acquired) {
+      log("lock busy", { lockId });
+      return;
+    }
 
     try {
       const existing = await findUserTempChannel(
@@ -82,6 +119,7 @@ export default {
         const ch = guild.channels.cache.get(existing) ?? null;
         if (ch) {
           await member.voice.setChannel(ch).catch(() => {});
+          log("moved to existing temp", { tempChannelId: ch.id });
           return;
         }
         // stale record
@@ -89,7 +127,10 @@ export default {
       }
 
       const cooldownMs = Number(process.env.VOICE_CREATE_COOLDOWN_MS ?? 0);
-      if (!canCreateTempChannel(guild.id, member.id, cooldownMs)) return;
+      if (!canCreateTempChannel(guild.id, member.id, cooldownMs)) {
+        log("cooldown active", { userId: member.id, cooldownMs });
+        return;
+      }
 
       const nameRaw =
         typeof lobby.nameTemplate === "string"
@@ -110,7 +151,10 @@ export default {
         for (const temp of Object.values(voice.tempChannels)) {
           if (temp.lobbyId === newChannel.id) count++;
         }
-        if (count >= lobby.maxChannels) return;
+        if (count >= lobby.maxChannels) {
+          log("max channels reached", { lobbyId: newChannel.id, count });
+          return;
+        }
       }
 
       const channel = await guild.channels
@@ -130,7 +174,10 @@ export default {
             }
           ]
         })
-        .catch(() => null);
+        .catch(err => {
+          log("failed to create temp channel", { error: err?.message });
+          return null;
+        });
 
       if (!channel) return;
 
@@ -142,6 +189,7 @@ export default {
         voice
       );
       markTempChannelCreated(guild.id, member.id);
+      log("created temp channel", { tempChannelId: channel.id });
 
       await member.voice.setChannel(channel).catch(() => {});
     } finally {

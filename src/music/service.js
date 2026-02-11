@@ -27,7 +27,7 @@ export function formatMusicError(reasonOrErr) {
   const msg = String(reasonOrErr?.message ?? reasonOrErr);
 
   if (msg === "no-agents-in-guild" || msg === "no-free-agents") {
-    return "No music agents available. Server owner must deploy/invite agents to enable multi-channel playback.";
+    return "No music agents available. Chopsticks never plays music directly — deploy/invite agents to enable playback.";
   }
   if (msg === "agents-not-ready") return "Music agents are still starting up.";
   if (msg === "not-owner") return "This voice channel is in DJ mode and is owned by someone else.";
@@ -47,5 +47,8 @@ export function formatMusicError(reasonOrErr) {
   if (msg === "bad-index") return "Queue index is invalid.";
   if (msg === "bad-preset" || msg === "preset-failed") return "Audio preset failed.";
 
+  if (process.env.NODE_ENV === "development") {
+    return `Command failed: ${msg || "unknown error"}`;
+  }
   return "Command failed.";
 }

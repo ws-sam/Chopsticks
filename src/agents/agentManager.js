@@ -2,6 +2,7 @@
 import { WebSocketServer } from "ws";
 import { randomUUID } from "node:crypto";
 import { fetchAgentBots, fetchAgentRunners, updateAgentBotStatus } from "../utils/storage.js";
+import { logger } from "../utils/logger.js";
 
 function sessionKey(guildId, voiceChannelId) {
   return `${guildId}:${voiceChannelId}`;
@@ -57,6 +58,10 @@ export class AgentManager {
     this.pruneEveryMs = safeInt(process.env.AGENT_PRUNE_EVERY_MS, 10_000);
     this._pruneTimer = null;
 
+    // Reconciliation
+    this.reconcileEveryMs = safeInt(process.env.AGENT_RECONCILE_EVERY_MS, 300_000); // 5 minutes
+    this._reconcileTimer = null;
+
     // Invite perms for agents (connect/speak/read history)
     // Conservative by default. Override with AGENT_INVITE_PERMS if you want.
     this.invitePerms = BigInt(process.env.AGENT_INVITE_PERMS || "3147776");
@@ -69,7 +74,7 @@ export class AgentManager {
     this.wss = new WebSocketServer({ host: this.host, port: this.port });
     this.wss.on("connection", ws => this.handleConnection(ws));
     this.wss.on("error", err => {
-      console.error("[agent:control:server:error]", err?.message ?? err);
+      logger.error("[agent:control:server:error]", { error: err?.message ?? err });
     });
 
     await new Promise(resolve => {
@@ -78,12 +83,19 @@ export class AgentManager {
 
     this._pruneTimer = setInterval(() => this.pruneStaleAgents(), this.pruneEveryMs);
     this._pruneTimer.unref?.();
+    
+    // Start reconciliation loop
+    this._reconcileTimer = setInterval(() => this.reconcileAgents(), this.reconcileEveryMs);
+    this._reconcileTimer.unref?.();
+    await this.reconcileAgents(); // Run once on startup
   }
 
   stop() {
     try {
       if (this._pruneTimer) clearInterval(this._pruneTimer);
+      if (this._reconcileTimer) clearInterval(this._reconcileTimer);
       this._pruneTimer = null;
+      this._reconcileTimer = null;
       this.wss?.close?.();
     } catch {}
   }
@@ -93,7 +105,7 @@ export class AgentManager {
     ws.on("message", data => this.handleMessage(ws, data));
     ws.on("close", () => this.handleClose(ws));
     ws.on("error", (err) => {
-      console.error(`[AgentManager] Agent WS error:`, err?.message ?? err);
+      logger.error(`[AgentManager] Agent WS error:`, { error: err?.message ?? err });
     });
   }
 
@@ -215,14 +227,14 @@ export class AgentManager {
             // Potentially update state or log a warning. For now, proceed cautiously.
           }
           this.bindAgentToAssistant(agent, { guildId, voiceChannelId, textChannelId, ownerUserId });
-          console.log(`[AgentManager] Agent ${agentId} reported adding to assistant session ${key} on channel ${msg.channelId}.`);
+          logger.info(`[AgentManager] Agent ${agentId} reported adding to assistant session ${key} on channel ${msg.channelId}.`);
         } else {
           const key = sessionKey(guildId, voiceChannelId);
           if (this.sessions.get(key) !== agentId) {
             // Agent is reporting "add" for a session it's not assigned to, or session doesn't exist.
           }
           this.bindAgentToSession(agent, { guildId, voiceChannelId, textChannelId, ownerUserId });
-          console.log(`[AgentManager] Agent ${agentId} reported adding to session ${key} on channel ${msg.channelId}.`);
+          logger.info(`[AgentManager] Agent ${agentId} reported adding to session ${key} on channel ${msg.channelId}.`);
         }
         // Update agent's last seen and busy status
         agent.lastSeen = now();
@@ -234,7 +246,7 @@ export class AgentManager {
         agent.ownerUserId = ownerUserId ?? null;
         agent.lastActive = now();
       } else {
-        console.warn(`[AgentManager] Agent ${agentId} reported "add" event failure for channel ${msg?.channelId}. Reason: ${msg?.error || 'unknown'}`);
+        logger.warn(`[AgentManager] Agent ${agentId} reported "add" event failure for channel ${msg?.channelId}. Reason: ${msg?.error || 'unknown'}`);
         // If the agent reported failure, we might need to unbind it or handle it.
         // For now, just log the warning.
       }
@@ -379,7 +391,7 @@ export class AgentManager {
         tag: a.tag ?? null,
         botUserId: a.botUserId,
         inviteUrl: (() => {
-          console.log(`[DEBUG] Building invite for agent: ${a.agentId}, botUserId: ${a.botUserId}`);
+          logger.info(`[DEBUG] Building invite for agent: ${a.agentId}, botUserId: ${a.botUserId}`);
           return this.buildInviteForAgent(a);
         })()
       }))
@@ -444,7 +456,7 @@ export class AgentManager {
     const key = sessionKey(guildId, voiceChannelId);
     const agentId = this.sessions.get(key);
     if (agentId) {
-      const agent = this.activeAgents.get(agentId); // Get from activeAgents
+      const agent = this.liveAgents.get(agentId);
       if (agent && agent.busyKey === key) {
         agent.busyKey = null;
         agent.busyKind = null;
@@ -469,52 +481,25 @@ export class AgentManager {
       return { ok: true, agent: preferred };
     }
 
-    // 3. Find an idle *active* agent already in the guild
-    const idleActiveAgentInGuild = this.findIdleAgentInGuildRoundRobin(guildId);
-    if (idleActiveAgentInGuild) {
-      this.bindAgentToSession(idleActiveAgentInGuild, { guildId, voiceChannelId, textChannelId, ownerUserId });
-      return { ok: true, agent: idleActiveAgentInGuild };
+    // 3. Find an idle agent already in the guild
+    const idleAgentInGuild = this.findIdleAgentInGuildRoundRobin(guildId);
+    if (idleAgentInGuild) {
+      this.bindAgentToSession(idleAgentInGuild, { guildId, voiceChannelId, textChannelId, ownerUserId });
+      return { ok: true, agent: idleAgentInGuild };
     }
 
-    // 4. If no idle active agent, try to start a new one
-    // Find a registered agent that is not currently active and not in the guild
-    const registeredAgentToStart = this._findInactiveRegisteredAgentForGuild(guildId);
-    if (registeredAgentToStart) {
-      const availableRunner = this._findAvailableRunner();
-      if (availableRunner) {
-        console.log(`[AgentManager] Attempting to start agent ${registeredAgentToStart.agentId} on runner ${availableRunner.ws.__runnerId}`);
-        try {
-          await this.sendRunnerCommand(availableRunner.ws, "start_agent", {
-            token: registeredAgentToStart.token,
-            agentId: registeredAgentToStart.agentId,
-            index: availableRunner.activeAgentIds.size // Simple index for now
-          });
-
-          // Wait for the agent to send its hello message and become ready
-          const startedAgent = await this._waitForAgentReady(registeredAgentToStart.agentId);
-
-          this.bindAgentToSession(startedAgent, { guildId, voiceChannelId, textChannelId, ownerUserId });
-          return { ok: true, agent: startedAgent };
-
-        } catch (err) {
-          console.error(`[AgentManager] Failed to start agent ${registeredAgentToStart.agentId} on runner ${availableRunner.ws.__runnerId}:`, err?.message ?? err);
-          return { ok: false, reason: "failed-to-start-agent" };
-        }
-      } else {
-        return { ok: false, reason: "no-free-runners" };
-      }
-    }
-
-    // Fallback to original errors if no agents can be found or started
+    // 4. No idle agents in guild - check if we have any agents at all
     const present = this.countPresentInGuild(guildId);
     if (present === 0) return { ok: false, reason: "no-agents-in-guild" };
+    
+    // All agents are busy
     return { ok: false, reason: "no-free-agents" };
   }
 
   listIdleAgentsInGuild(guildId) {
     const out = [];
-    for (const agent of this.activeAgents.values()) { // Iterate activeAgents
-      if (!agent.ready || !agent.runnerWs) continue; // Must be ready and connected to a runner
+    for (const agent of this.liveAgents.values()) {
+      if (!agent.ready || !agent.ws) continue;
       if (agent.busyKey) continue;
       if (!agent.guildIds.has(guildId)) continue;
       out.push(agent);
@@ -536,7 +521,7 @@ export class AgentManager {
 
   countPresentInGuild(guildId) {
     let count = 0;
-    for (const agent of this.activeAgents.values()) { // Iterate activeAgents
+    for (const agent of this.liveAgents.values()) {
       if (agent.guildIds.has(guildId)) count++;
     }
     return count;
@@ -550,8 +535,8 @@ export class AgentManager {
     const key = assistantKey(guildId, voiceChannelId);
     const agentId = this.assistantSessions.get(key);
     if (!agentId) return { ok: false, reason: "no-session" };
-    const agent = this.activeAgents.get(agentId); // Get from activeAgents
-    if (!agent?.ready || !agent.runnerWs) { // Check runnerWs
+    const agent = this.liveAgents.get(agentId);
+    if (!agent?.ready || !agent.ws) {
       this.assistantSessions.delete(key);
       return { ok: false, reason: "agent-offline" };
     }
@@ -571,8 +556,8 @@ export class AgentManager {
       this.assistantPreferred.delete(key);
       return null;
     }
-    const agent = this.activeAgents.get(pref.agentId); // Get from activeAgents
-    if (!agent?.ready || !agent.runnerWs) return null; // Check runnerWs
+    const agent = this.liveAgents.get(pref.agentId);
+    if (!agent?.ready || !agent.ws) return null;
     return agent;
   }
 
@@ -593,7 +578,7 @@ export class AgentManager {
     const key = assistantKey(guildId, voiceChannelId);
     const agentId = this.assistantSessions.get(key);
     if (agentId) {
-      const agent = this.activeAgents.get(agentId); // Get from activeAgents
+      const agent = this.liveAgents.get(agentId);
       if (agent && agent.busyKey === key) {
         agent.busyKey = null;
         agent.busyKind = null;
@@ -618,43 +603,18 @@ export class AgentManager {
       return { ok: true, agent: preferred };
     }
 
-    // 3. Find an idle *active* agent already in the guild
-    const idleActiveAgentInGuild = this.findIdleAgentInGuildRoundRobin(guildId);
-    if (idleActiveAgentInGuild) {
-      this.bindAgentToAssistant(idleActiveAgentInGuild, { guildId, voiceChannelId, textChannelId, ownerUserId });
-      return { ok: true, agent: idleActiveAgentInGuild };
+    // 3. Find an idle agent already in the guild
+    const idleAgentInGuild = this.findIdleAgentInGuildRoundRobin(guildId);
+    if (idleAgentInGuild) {
+      this.bindAgentToAssistant(idleAgentInGuild, { guildId, voiceChannelId, textChannelId, ownerUserId });
+      return { ok: true, agent: idleAgentInGuild };
     }
 
-    // 4. If no idle active agent, try to start a new one
-    const registeredAgentToStart = this._findInactiveRegisteredAgentForGuild(guildId);
-    if (registeredAgentToStart) {
-      const availableRunner = this._findAvailableRunner();
-      if (availableRunner) {
-        console.log(`[AgentManager] Attempting to start assistant agent ${registeredAgentToStart.agentId} on runner ${availableRunner.ws.__runnerId}`);
-        try {
-          await this.sendRunnerCommand(availableRunner.ws, "start_agent", {
-            token: registeredAgentToStart.token,
-            agentId: registeredAgentToStart.agentId,
-            index: availableRunner.activeAgentIds.size
-          });
-
-          const startedAgent = await this._waitForAgentReady(registeredAgentToStart.agentId);
-
-          this.bindAgentToAssistant(startedAgent, { guildId, voiceChannelId, textChannelId, ownerUserId });
-          return { ok: true, agent: startedAgent };
-
-        } catch (err) {
-          console.error(`[AgentManager] Failed to start assistant agent ${registeredAgentToStart.agentId} on runner ${availableRunner.ws.__runnerId}:`, err?.message ?? err);
-          return { ok: false, reason: "failed-to-start-agent" };
-        }
-      } else {
-        return { ok: false, reason: "no-free-runners" };
-      }
-    }
-
-    // Fallback to original errors
+    // 4. No idle agents in guild - check if we have any agents at all
     const present = this.countPresentInGuild(guildId);
     if (present === 0) return { ok: false, reason: "no-agents-in-guild" };
+    
+    // All agents are busy
     return { ok: false, reason: "no-free-agents" };
   }
 
@@ -673,7 +633,7 @@ export class AgentManager {
     }
 
     this.liveAgents.delete(agentId);
-    console.log(`[AgentManager] Cleaned up disconnected agent ${agentId}.`);
+    logger.info(`[AgentManager] Cleaned up disconnected agent ${agentId}.`);
   }
 
   pruneStaleAgents() {
@@ -682,16 +642,16 @@ export class AgentManager {
     for (const agent of this.liveAgents.values()) {
       if (!agent.ws) continue; // Agent is not associated with a WebSocket
       if ((agent.lastSeen ?? 0) >= cutoff) {
-        // console.log(`[AgentManager] Agent ${agent.agentId} is active. Last seen: ${new Date(agent.lastSeen).toISOString()}`);
+        // logger.info(`[AgentManager] Agent ${agent.agentId} is active. Last seen: ${new Date(agent.lastSeen).toISOString()}`);
         continue; // Not stale
       }
 
       const agentId = agent.agentId;
-      console.warn(`[AgentManager] Terminating stale agent WS connection: ${agentId}. Last seen: ${new Date(agent.lastSeen).toISOString()}`);
+      logger.warn(`[AgentManager] Terminating stale agent WS connection: ${agentId}. Last seen: ${new Date(agent.lastSeen).toISOString()}`);
       try {
         agent.ws.terminate(); // Terminate the WebSocket connection
       } catch (err) {
-        console.error(`[AgentManager] Error terminating WS for stale agent ${agentId}:`, err?.message ?? err);
+        logger.error(`[AgentManager] Error terminating WS for stale agent ${agentId}:`, { error: err?.message ?? err });
       }
       // handleClose will take care of cleaning up the liveAgents map
     }
@@ -728,4 +688,45 @@ export class AgentManager {
 
     return response;
   }
+
+  // ===== Reconciliation =====
+
+  async reconcileAgents() {
+    logger.info("Starting agent reconciliation...");
+    try {
+      const dbAgents = await fetchAgentBots();
+      const liveAgentIds = new Set(this.liveAgents.keys());
+      const dbAgentMap = new Map(dbAgents.map(a => [a.agent_id, a]));
+
+      // Check 1: Find live agents that are not in the DB or are marked inactive
+      for (const liveAgent of this.liveAgents.values()) {
+        const dbRecord = dbAgentMap.get(liveAgent.agentId);
+        if (!dbRecord) {
+          logger.warn(`Reconciliation: Live agent ${liveAgent.agentId} is not in the database. It may need to be terminated.`, { agentId: liveAgent.agentId });
+        } else if (dbRecord.status !== 'active') {
+          logger.warn(`Reconciliation: Live agent ${liveAgent.agentId} is marked as '${dbRecord.status}' in the DB but is connected.`, { agentId: liveAgent.agentId, status: dbRecord.status });
+        }
+      }
+
+      // Check 2: Find active DB agents that are not live
+      for (const dbAgent of dbAgents) {
+        if (dbAgent.status === 'active' && !liveAgentIds.has(dbAgent.agent_id)) {
+          logger.warn(`Reconciliation: Agent ${dbAgent.agent_id} is 'active' in the DB but is not connected.`, { agentId: dbAgent.agent_id });
+        }
+      }
+    } catch (error) {
+      logger.error("Agent reconciliation failed", { error: error.message });
+    }
+    logger.info("Agent reconciliation finished.");
+  }
 }
+
+// Enhanced logging for debugging
+const originalRequest = AgentManager.prototype.request;
+AgentManager.prototype.request = function(agent, op, data) {
+  console.log(`[AgentManager] RPC request: ${op} to agent ${agent.agentId}`);
+  return originalRequest.call(this, agent, op, data).catch(err => {
+    console.error(`[AgentManager] RPC failed: ${op}`, err.message);
+    throw err;
+  });
+};

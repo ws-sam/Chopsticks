@@ -1,25 +1,26 @@
 import { Pool } from "pg";
 import crypto from "node:crypto"; // Added for encryption
+import { logger } from "./logger.js";
 
 let pool = null;
 
 function getPool() {
-  console.log("--> getPool() called in storage_pg.js");
+  logger.info("--> getPool() called in storage_pg.js");
   if (pool) return pool;
   const url = process.env.POSTGRES_URL || process.env.DATABASE_URL;
   if (!url) {
     const error = new Error("POSTGRES_URL missing");
-    console.error("Error in getPool():", error.message);
+    logger.error("Error in getPool():", { error: error.message });
     throw error;
   }
   try {
     pool = new Pool({ connectionString: url });
     pool.on("error", (err) => {
-      console.error("PostgreSQL pool error (from event listener):", err.message);
+      logger.error("PostgreSQL pool error (from event listener):", { error: err.message });
     });
-    console.log("PostgreSQL connection pool initialized.");
+    logger.info("PostgreSQL connection pool initialized.");
   } catch (err) {
-    console.error("Error initializing PostgreSQL connection pool:", err.message);
+    logger.error("Error initializing PostgreSQL connection pool:", { error: err.message });
     throw err;
   }
   return pool;
@@ -32,20 +33,20 @@ const TAG_LENGTH = 16; // Authentication tag length
 const ENCRYPTION_KEY = process.env.AGENT_TOKEN_KEY; // Must be 32 bytes (256 bits)
 
 if (!ENCRYPTION_KEY || ENCRYPTION_KEY.length !== 64) {
-  console.warn("AGENT_TOKEN_KEY environment variable is missing or not 32 bytes. Agent tokens will NOT be encrypted at rest.");
+  logger.warn("AGENT_TOKEN_KEY environment variable is missing or not 32 bytes. Agent tokens will NOT be encrypted at rest.");
 }
 
 function encrypt(text) {
   if (!ENCRYPTION_KEY) return text; // If no key, return original text
   try {
     const iv = crypto.randomBytes(IV_LENGTH);
-    const cipher = crypto.createCipheriv(ALGORITHM, Buffer.from(ENCRYPTION_KEY), iv);
+    const cipher = crypto.createCipheriv(ALGORITHM, Buffer.from(ENCRYPTION_KEY, 'hex'), iv);
     let encrypted = cipher.update(text, 'utf8', 'hex');
     encrypted += cipher.final('hex');
     const tag = cipher.getAuthTag();
     return iv.toString('hex') + ':' + encrypted + ':' + tag.toString('hex');
   } catch (err) {
-    console.error("Encryption failed:", err);
+    logger.error("Encryption failed:", { error: err });
     return text; // Fallback to unencrypted if error
   }
 }
@@ -65,26 +66,26 @@ function decrypt(text) {
     const encryptedText = parts[1];
     const tag = Buffer.from(parts[2], 'hex');
 
-    const decipher = crypto.createDecipheriv(ALGORITHM, Buffer.from(ENCRYPTION_KEY), iv);
+    const decipher = crypto.createDecipheriv(ALGORITHM, Buffer.from(ENCRYPTION_KEY, 'hex'), iv);
     decipher.setAuthTag(tag); // Set the authentication tag
 
     let decrypted = decipher.update(encryptedText, 'hex', 'utf8');
     decrypted += decipher.final('utf8');
     return decrypted;
   } catch (err) {
-    console.error("Decryption failed:", err);
+    logger.error("Decryption failed:", { error: err });
     return text; // Fallback to original text if error
   }
 }
 // --- End Encryption Configuration ---
 
 export async function ensureSchema() {
-  console.log("--> ensureSchema() called in storage_pg.js");
-  console.log("--> Calling getPool() from ensureSchema()"); // New diagnostic log
+  logger.info("--> ensureSchema() called in storage_pg.js");
+  logger.info("--> Calling getPool() from ensureSchema()"); // New diagnostic log
   const p = getPool();
 
   try {
-    console.log("Attempting to create guild_settings table...");
+    logger.info("Attempting to create guild_settings table...");
     await p.query(`
       CREATE TABLE IF NOT EXISTS guild_settings (
         guild_id TEXT PRIMARY KEY,
@@ -93,14 +94,14 @@ export async function ensureSchema() {
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
     `);
-    console.log("guild_settings table created or already exists.");
+    logger.info("guild_settings table created or already exists.");
   } catch (err) {
-    console.error("Error creating guild_settings table:", err.message);
+    logger.error("Error creating guild_settings table:", { error: err.message });
     throw err;
   }
 
   try {
-    console.log("Attempting to create audit_log table...");
+    logger.info("Attempting to create audit_log table...");
     await p.query(`
       CREATE TABLE IF NOT EXISTS audit_log (
         id BIGSERIAL PRIMARY KEY,
@@ -111,14 +112,14 @@ export async function ensureSchema() {
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
     `);
-    console.log("audit_log table created or already exists.");
+    logger.info("audit_log table created or already exists.");
   } catch (err) {
-    console.error("Error creating audit_log table:", err.message);
+    logger.error("Error creating audit_log table:", { error: err.message });
     throw err;
   }
 
   try {
-    console.log("Attempting to create command_stats table...");
+    logger.info("Attempting to create command_stats table...");
     await p.query(`
       CREATE TABLE IF NOT EXISTS command_stats (
         guild_id TEXT NOT NULL,
@@ -131,14 +132,14 @@ export async function ensureSchema() {
         PRIMARY KEY (guild_id, command)
       );
     `);
-    console.log("command_stats table created or already exists.");
+    logger.info("command_stats table created or already exists.");
   } catch (err) {
-    console.error("Error creating command_stats table:", err.message);
+    logger.error("Error creating command_stats table:", { error: err.message });
     throw err;
   }
 
   try {
-    console.log("Attempting to create command_stats_daily table...");
+    logger.info("Attempting to create command_stats_daily table...");
     await p.query(`
       CREATE TABLE IF NOT EXISTS command_stats_daily (
         day DATE NOT NULL,
@@ -152,15 +153,15 @@ export async function ensureSchema() {
         PRIMARY KEY (day, guild_id, command)
       );
     `);
-    console.log("command_stats_daily table created or already exists.");
+    logger.info("command_stats_daily table created or already exists.");
   } catch (err) {
-    console.error("Error creating command_stats_daily table:", err.message);
+    logger.error("Error creating command_stats_daily table:", { error: err.message });
     throw err;
   }
 
   // New agent_bots table (renamed from agent_tokens, timestamps as BIGINT)
   try {
-    console.log("Attempting to create agent_bots table...");
+    logger.info("Attempting to create agent_bots table...");
     const createTableSql = `
       CREATE TABLE IF NOT EXISTS agent_bots (
         id SERIAL PRIMARY KEY,
@@ -173,17 +174,17 @@ export async function ensureSchema() {
         updated_at BIGINT NOT NULL
       );
     `;
-    console.log("ensureSchema: Executing SQL:", createTableSql);
+    logger.info("ensureSchema: Executing SQL:", { sql: createTableSql });
     await p.query(createTableSql);
-    console.log("agent_bots table created or already exists.");
+    logger.info("agent_bots table created or already exists.");
   } catch (err) {
-    console.error("Error creating agent_bots table:", err.message);
+    logger.error("Error creating agent_bots table:", { error: err.message });
     throw err;
   }
 
   // New agent_runners table
   try {
-    console.log("Attempting to create agent_runners table...");
+    logger.info("Attempting to create agent_runners table...");
     const createRunnerTableSql = `
       CREATE TABLE IF NOT EXISTS agent_runners (
         runner_id TEXT PRIMARY KEY,
@@ -191,11 +192,25 @@ export async function ensureSchema() {
         meta JSONB
       );
     `;
-    console.log("ensureSchema: Executing SQL:", createRunnerTableSql);
+    logger.info("ensureSchema: Executing SQL:", { sql: createRunnerTableSql });
     await p.query(createRunnerTableSql);
-    console.log("agent_runners table created or already exists.");
+    logger.info("agent_runners table created or already exists.");
   } catch (err) {
-    console.error("Error creating agent_runners table:", err.message);
+    logger.error("Error creating agent_runners table:", { error: err.message });
+    throw err;
+  }
+  
+  try {
+    logger.info("Attempting to alter agent_bots table to add profile column...");
+    const alterTableSql = `
+      ALTER TABLE agent_bots
+      ADD COLUMN IF NOT EXISTS profile JSONB;
+    `;
+    logger.info("ensureSchema: Executing SQL:", { sql: alterTableSql });
+    await p.query(alterTableSql);
+    logger.info("agent_bots table altered or already up-to-date.");
+  } catch (err) {
+    logger.error("Error altering agent_bots table:", { error: err.message });
     throw err;
   }
 }
@@ -203,7 +218,7 @@ export async function ensureSchema() {
 export async function insertAuditLog(entry) {
   const p = getPool();
   const insertAuditSql = "INSERT INTO audit_log (guild_id, user_id, action, details) VALUES ($1, $2, $3, $4)";
-  console.log("insertAuditLog: Executing SQL:", insertAuditSql);
+  logger.info("insertAuditLog: Executing SQL", { sql: insertAuditSql });
   await p.query(
     insertAuditSql,
     [entry.guildId, entry.userId, entry.action, entry.details ?? null]
@@ -237,7 +252,7 @@ export async function fetchAuditLog(guildId, limit = 50, beforeId = null, action
 
   params.push(lim);
   const fetchAuditSql = `SELECT id, guild_id, user_id, action, details, created_at FROM audit_log WHERE ${where} ORDER BY id DESC LIMIT $${idx}`;
-  console.log("fetchAuditLog: Executing SQL:", fetchAuditSql);
+  logger.info("fetchAuditLog: Executing SQL", { sql: fetchAuditSql });
   const res = await p.query(
     fetchAuditSql,
     params
@@ -267,7 +282,7 @@ export async function upsertCommandStats(rows) {
       count = command_stats.count + EXCLUDED.count,
       updated_at = NOW()
   `;
-  console.log("upsertCommandStats: Executing SQL:", sql);
+  logger.info("upsertCommandStats: Executing SQL", { sql });
   await p.query(sql, params);
 }
 
@@ -294,7 +309,7 @@ export async function upsertCommandStatsDaily(rows, day) {
       count = command_stats_daily.count + EXCLUDED.count,
       updated_at = NOW()
   `;
-  console.log("upsertCommandStatsDaily: Executing SQL:", sql);
+  logger.info("upsertCommandStatsDaily: Executing SQL", { sql });
   await p.query(sql, params);
 }
 
@@ -316,7 +331,7 @@ export async function fetchCommandStats(guildId = null, limit = 50) {
      LIMIT $1`;
     params = [lim];
   }
-  console.log("fetchCommandStats: Executing SQL:", sql, "with params:", params);
+  logger.info("fetchCommandStats: Executing SQL", { sql, params });
   const res = await p.query(
     sql,
     params
@@ -340,7 +355,7 @@ export async function fetchCommandStatsDaily(guildId, days = 7, limit = 50) {
      GROUP BY command
      ORDER BY (SUM(ok) + SUM(err)) DESC
      LIMIT $3`;
-  console.log("fetchCommandStatsDaily: Executing SQL:", sql, "with params:", [gid, d, lim]);
+  logger.info("fetchCommandStatsDaily: Executing SQL", { sql, params: [gid, d, lim] });
   const res = await p.query(
     sql,
     [gid, d, lim]
@@ -367,7 +382,7 @@ export async function insertAgentBot(agentId, token, clientId, tag) {
       updated_at = EXCLUDED.updated_at
     RETURNING agent_id, token, client_id, tag, status, created_at, updated_at;
   `;
-  console.log("insertAgentBot: Executing UPSERT SQL:", upsertSql, "with values:", agentId, "****", clientId, tag);
+  logger.info("insertAgentBot: Executing UPSERT", { sql: upsertSql, agentId, clientId, tag });
   const res = await p.query(
     upsertSql,
     [agentId, encryptedToken, clientId, tag, now, now]
@@ -387,8 +402,8 @@ export async function insertAgentBot(agentId, token, clientId, tag) {
 
 export async function fetchAgentBots() {
   const p = getPool();
-  const fetchSql = "SELECT agent_id, token, client_id, tag, status, created_at, updated_at FROM agent_bots";
-  console.log("fetchAgentBots: Executing SQL:", fetchSql);
+  const fetchSql = "SELECT agent_id, token, client_id, tag, status, created_at, updated_at, profile FROM agent_bots";
+  logger.info("fetchAgentBots: Executing SQL", { sql: fetchSql });
   const res = await p.query(fetchSql);
   return res.rows.map(row => ({
     ...row,
@@ -401,17 +416,33 @@ export async function fetchAgentBots() {
 export async function updateAgentBotStatus(agentId, status) {
   const p = getPool();
   const updateSql = "UPDATE agent_bots SET status = $1, updated_at = $2 WHERE agent_id = $3 RETURNING agent_id"; // RETURNING agent_id to check for affected rows
-  console.log("updateAgentBotStatus: Executing SQL:", updateSql, "with values:", status, agentId);
+  logger.info("updateAgentBotStatus: Executing SQL", { sql: updateSql, agentId, status });
   const res = await p.query(updateSql, [status, Date.now(), agentId]);
   return res.rowCount > 0; // Return true if updated, false if not found
+}
+
+export async function updateAgentBotProfile(agentId, profile) {
+  const p = getPool();
+  const updateSql = "UPDATE agent_bots SET profile = $1, updated_at = $2 WHERE agent_id = $3 RETURNING agent_id";
+  logger.info("updateAgentBotProfile: Executing SQL", { sql: updateSql, agentId });
+  const res = await p.query(updateSql, [profile, Date.now(), agentId]);
+  return res.rowCount > 0;
+}
+
+export async function fetchAgentBotProfile(agentId) {
+  const p = getPool();
+  const fetchSql = "SELECT profile FROM agent_bots WHERE agent_id = $1";
+  logger.info("fetchAgentBotProfile: Executing SQL", { sql: fetchSql, agentId });
+  const res = await p.query(fetchSql, [agentId]);
+  return res.rows[0]?.profile ?? null;
 }
 
 export async function deleteAgentBot(agentId) {
   const p = getPool();
   const deleteSql = "DELETE FROM agent_bots WHERE agent_id = $1 RETURNING agent_id";
-  console.log("deleteAgentBot: Executing SQL:", deleteSql, "with values:", agentId);
+  logger.info("deleteAgentBot: Executing SQL", { sql: deleteSql, agentId });
   const res = await p.query(deleteSql, [agentId]);
-  console.log("deleteAgentBot: Query result - rowCount:", res.rowCount); // Add this log
+  logger.info("deleteAgentBot: Query result", { rowCount: res.rowCount }); // Add this log
   return res.rowCount > 0; // Return true if an agent was deleted, false otherwise
 }
 
@@ -422,7 +453,7 @@ export async function upsertAgentRunner(runnerId, lastSeen, meta) {
      ON CONFLICT (runner_id) DO UPDATE SET
        last_seen = EXCLUDED.last_seen,
        meta = EXCLUDED.meta`;
-  console.log("upsertAgentRunner: Executing SQL:", upsertSql, "with values:", runnerId, lastSeen, meta);
+  logger.info("upsertAgentRunner: Executing SQL", { sql: upsertSql, runnerId, lastSeen });
   await p.query(
     upsertSql,
     [runnerId, lastSeen, meta]
@@ -432,7 +463,7 @@ export async function upsertAgentRunner(runnerId, lastSeen, meta) {
 export async function fetchAgentRunners() {
   const p = getPool();
   const fetchSql = "SELECT runner_id, last_seen, meta FROM agent_runners";
-  console.log("fetchAgentRunners: Executing SQL:", fetchSql);
+  logger.info("fetchAgentRunners: Executing SQL", { sql: fetchSql });
   const res = await p.query(fetchSql);
   return res.rows.map(row => ({
     ...row,
@@ -443,7 +474,7 @@ export async function fetchAgentRunners() {
 export async function deleteAgentRunner(runnerId) {
   const p = getPool();
   const deleteSql = "DELETE FROM agent_runners WHERE runner_id = $1 RETURNING runner_id"; // RETURNING runner_id to check for affected rows
-  console.log("deleteAgentRunner: Executing SQL:", deleteSql, "with values:", runnerId);
+  logger.info("deleteAgentRunner: Executing SQL", { sql: deleteSql, runnerId });
   const res = await p.query(deleteSql, [runnerId]);
   return res.rowCount > 0; // Return true if a runner was deleted, false otherwise
 }
@@ -451,12 +482,12 @@ export async function deleteAgentRunner(runnerId) {
 export async function loadGuildDataPg(guildId, fallbackFactory) {
   const p = getPool();
   const selectSql = "SELECT data, rev FROM guild_settings WHERE guild_id = $1";
-  console.log("loadGuildDataPg: Executing SQL:", selectSql, "with values:", guildId);
+  logger.info("loadGuildDataPg: Executing SQL", { sql: selectSql, guildId });
   const res = await p.query(selectSql, [guildId]);
   if (!res.rowCount) {
     const base = fallbackFactory();
     const insertSql = "INSERT INTO guild_settings (guild_id, data, rev) VALUES ($1, $2, $3) ON CONFLICT (guild_id) DO NOTHING";
-    console.log("loadGuildDataPg (insert fallback): Executing SQL:", insertSql, "with values:", guildId, base, base.rev ?? 0);
+    logger.info("loadGuildDataPg (insert fallback): Executing SQL", { sql: insertSql, guildId });
     await p.query(
       insertSql,
       [guildId, base, base.rev ?? 0]
@@ -473,13 +504,13 @@ export async function saveGuildDataPg(guildId, data, normalizeFn, mergeOnConflic
   const p = getPool();
   const normalized = normalizeFn(data);
   const selectSql = "SELECT data, rev FROM guild_settings WHERE guild_id = $1";
-  console.log("saveGuildDataPg (select current): Executing SQL:", selectSql, "with values:", guildId);
+  logger.info("saveGuildDataPg (select current): Executing SQL", { sql: selectSql, guildId });
   const currentRes = await p.query(selectSql, [guildId]);
 
   if (!currentRes.rowCount) {
     const toWrite = { ...normalized, rev: (normalized.rev ?? 0) + 1 };
     const insertSql = "INSERT INTO guild_settings (guild_id, data, rev) VALUES ($1, $2, $3)";
-    console.log("saveGuildDataPg (insert new): Executing SQL:", insertSql, "with values:", guildId, toWrite, toWrite.rev);
+    logger.info("saveGuildDataPg (insert new): Executing SQL", { sql: insertSql, guildId });
     await p.query(
       insertSql,
       [guildId, toWrite, toWrite.rev]
@@ -499,7 +530,7 @@ export async function saveGuildDataPg(guildId, data, normalizeFn, mergeOnConflic
 
   const toWrite = { ...next, rev: currentRev + 1 };
   const updateSql = "UPDATE guild_settings SET data = $2, rev = $3, updated_at = NOW() WHERE guild_id = $1 AND rev = $4";
-  console.log("saveGuildDataPg (update): Executing SQL:", updateSql, "with values:", guildId, toWrite, toWrite.rev, currentRev);
+  logger.info("saveGuildDataPg (update): Executing SQL", { sql: updateSql, guildId, newRev: toWrite.rev, oldRev: currentRev });
   const update = await p.query(
     updateSql,
     [guildId, toWrite, toWrite.rev, currentRev]
@@ -508,7 +539,7 @@ export async function saveGuildDataPg(guildId, data, normalizeFn, mergeOnConflic
   if (update.rowCount === 0) {
     // Retry once by reloading and merging
     const retrySelectSql = "SELECT data, rev FROM guild_settings WHERE guild_id = $1";
-    console.log("saveGuildDataPg (retry select): Executing SQL:", retrySelectSql, "with values:", guildId);
+    logger.info("saveGuildDataPg (retry select): Executing SQL", { sql: retrySelectSql, guildId });
     const retryCurrent = await p.query(retrySelectSql, [guildId]);
     const cur = retryCurrent.rows[0]?.data || current;
     const curRev = Number.isInteger(retryCurrent.rows[0]?.rev) ? retryCurrent.rows[0].rev : currentRev;
@@ -516,7 +547,7 @@ export async function saveGuildDataPg(guildId, data, normalizeFn, mergeOnConflic
     merged.rev = curRev;
     const final = { ...merged, rev: curRev + 1 };
     const finalUpdateSql = "UPDATE guild_settings SET data = $2, rev = $3, updated_at = NOW() WHERE guild_id = $1";
-    console.log("saveGuildDataPg (final update): Executing SQL:", finalUpdateSql, "with values:", guildId, final, final.rev);
+    logger.info("saveGuildDataPg (final update): Executing SQL", { sql: finalUpdateSql, guildId, newRev: final.rev });
     await p.query(
       finalUpdateSql,
       [guildId, final, final.rev]

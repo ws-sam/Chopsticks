@@ -2,12 +2,28 @@
 // ENTRY
 
 import "dotenv/config";
+
+// ===================== CONFIGURATION VALIDATION =====================
+if (process.env.STORAGE_DRIVER !== 'postgres') {
+  console.error("FATAL: STORAGE_DRIVER environment variable must be set to 'postgres'.");
+  process.exit(1);
+}
+
+if (!process.env.AGENT_TOKEN_KEY || process.env.AGENT_TOKEN_KEY.length !== 64) {
+  console.error("FATAL: AGENT_TOKEN_KEY environment variable is missing or is not a 64-character (32-byte) hex key.");
+  process.exit(1);
+}
+console.log("✅ Configuration validated.");
+// ====================================================================
+
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { Client, Collection, GatewayIntentBits, Events } from "discord.js";
 import { AgentManager } from "./agents/agentManager.js";
 // import { spawnAgentsProcess } from "./agents/spawn.js"; // No longer directly spawning agents
+import { handleButton as handleMusicButton, handleSelect as handleMusicSelect } from "./commands/music.js";
+import { handleButton as handleAssistantButton } from "./commands/assistant.js";
 import {
   startHealthServer,
   metricCommand,
@@ -448,23 +464,61 @@ client.on(Events.MessageCreate, async message => {
 /* ===================== INTERACTIONS ===================== */
 
 client.on(Events.InteractionCreate, async interaction => {
+  if (interaction.isStringSelectMenu?.()) {
+    try {
+      if (await handleMusicSelect(interaction)) return;
+    } catch (err) {
+      console.error("[select]", err?.stack ?? err?.message ?? err);
+      try {
+        if (!interaction.replied && !interaction.deferred) {
+          await interaction.reply({ content: "Selection failed.", ephemeral: true });
+        }
+      } catch {}
+    }
+  }
+
+  if (interaction.isButton?.()) {
+    try {
+      if (await handleMusicButton(interaction)) return;
+      if (await handleAssistantButton(interaction)) return;
+    } catch (err) {
+      console.error("[button]", err?.stack ?? err?.message ?? err);
+      try {
+        if (!interaction.replied && !interaction.deferred) {
+          await interaction.reply({ content: "Button action failed.", ephemeral: true });
+        }
+      } catch {}
+    }
+  }
+
   if (!interaction.isChatInputCommand()) return;
 
-  const command = client.commands.get(interaction.commandName);
+  const commandName = interaction.commandName;
+  console.log(`[command:${commandName}] Received from user ${interaction.user.id} in guild ${interaction.guildId}`);
+
+  const command = client.commands.get(commandName);
 
   if (!command) {
-    console.error(`No command matching ${interaction.commandName} was found.`);
+    console.error(`No command matching ${commandName} was found.`);
     return;
   }
 
   try {
     await command.execute(interaction);
   } catch (error) {
-    console.error(error);
-    if (interaction.replied || interaction.deferred) {
-      await interaction.followUp({ content: 'There was an error while executing this command!', ephemeral: true });
-    } else {
-      await interaction.reply({ content: 'There was an error while executing this command!', ephemeral: true });
+    console.error(`[command:${commandName}] Execution error:`, error?.stack ?? error?.message ?? error);
+    const errorMsg = process.env.NODE_ENV === 'development' 
+      ? `Command failed: ${error?.message ?? String(error)}`
+      : 'There was an error while executing this command!';
+    
+    try {
+      if (interaction.replied || interaction.deferred) {
+        await interaction.followUp({ content: errorMsg, ephemeral: true });
+      } else {
+        await interaction.reply({ content: errorMsg, ephemeral: true });
+      }
+    } catch (replyError) {
+      console.error(`[command:${commandName}] Failed to send error response:`, replyError?.message);
     }
   }
 });

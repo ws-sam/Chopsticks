@@ -29,6 +29,7 @@ services:
       - "2333:2333"
     volumes:
       - ./lavalink/config/application.yml:/opt/Lavalink/application.yml:ro
+      - ./lavalink/config/plugins:/opt/Lavalink/plugins:ro
 
   prometheus:
     image: prom/prometheus:latest

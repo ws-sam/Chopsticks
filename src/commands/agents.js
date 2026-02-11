@@ -3,13 +3,20 @@ import {
   PermissionFlagsBits,
   MessageFlags,
   PermissionsBitField,
-  ChannelType
+  ChannelType,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ComponentType,
+  EmbedBuilder
 } from "discord.js";
 import {
   insertAgentBot,
   fetchAgentBots,
   updateAgentBotStatus,
-  deleteAgentBot
+  deleteAgentBot,
+  updateAgentBotProfile,
+  fetchAgentBotProfile
 } from "../utils/storage.js";
 
 export const meta = {
@@ -138,6 +145,19 @@ export const data = new SlashCommandBuilder()
       .setName("delete_token")
       .setDescription("Delete an agent token from the system")
       .addStringOption(o => o.setName("agent_id").setDescription("Agent ID (e.g., agent0001)").setRequired(true))
+  )
+  .addSubcommand(s =>
+    s
+      .setName("set_profile")
+      .setDescription("Set the AI profile for an agent.")
+      .addStringOption(o => o.setName("agent_id").setDescription("The ID of the agent to update").setRequired(true))
+      .addStringOption(o => o.setName("profile").setDescription("The JSON profile string for the agent").setRequired(true))
+  )
+  .addSubcommand(s =>
+    s
+      .setName("get_profile")
+      .setDescription("Get the AI profile for an agent.")
+      .addStringOption(o => o.setName("agent_id").setDescription("The ID of the agent").setRequired(true))
   );
 
 export async function execute(interaction) {
@@ -150,9 +170,30 @@ export async function execute(interaction) {
   const sub = interaction.options.getSubcommand();
   const guildId = interaction.guildId;
 
+  // --- Bot Owner Permissions ---
+  const ownerIds = (process.env.BOT_OWNER_IDS || "").split(",").filter(id => id.length > 0);
+  const isBotOwner = ownerIds.includes(interaction.user.id);
+  const ownerOnlySubcommands = new Set([
+    "add_token",
+    "delete_token",
+    "set_profile",
+    "update_token_status",
+    "scale",
+    "restart"
+  ]);
+
+  if (ownerOnlySubcommands.has(sub) && !isBotOwner) {
+    await interaction.reply({
+      flags: MessageFlags.Ephemeral,
+      content: "❌ This command is restricted to the Bot Owner."
+    });
+    return;
+  }
+  // -----------------------------
+
   if (sub === "status") {
     const allAgents = await fetchAgentBots(); // Fetch all registered agents from DB
-    const liveAgents = mgr.listAgents(); // Currently connected agents
+    const liveAgents = await mgr.listAgents(); // Currently connected agents
     const liveAgentIds = new Set(liveAgents.map(a => a.agentId));
 
     const inGuild = liveAgents.filter(a => a.guildIds.includes(guildId));
@@ -162,52 +203,66 @@ export async function execute(interaction) {
     const registeredButNotInGuild = allAgents.filter(a => !liveAgentIds.has(a.agent_id) || !liveAgents.find(la => la.agentId === a.agent_id)?.guildIds.includes(guildId));
     const invitable = registeredButNotInGuild.filter(a => a.status === 'active'); // Only active registered agents are invitable
 
-    const lines = [];
-    lines.push(`Registered agents: ${allAgents.length}`);
-    lines.push(`Live (connected) agents: ${liveAgents.length}`);
-    lines.push(`Agents present in this guild: ${inGuild.length}`);
-    lines.push(`Idle agents in this guild: ${idleInGuild.length}`);
-    lines.push(`Busy agents in this guild: ${busyInGuild.length}`);
-    lines.push(`Invitable (active, not in guild) agents: ${invitable.length}`);
-    lines.push("");
+    const embed = new EmbedBuilder()
+      .setTitle("Agent Status")
+      .setColor(0x00ff00)
+      .setTimestamp()
+      .addFields(
+        { name: "Summary", value: `Registered: **${allAgents.length}**\nLive: **${liveAgents.length}**\nInvitable: **${invitable.length}**` },
+        { name: `Agents in this Guild (${inGuild.length})`, value: `Idle: **${idleInGuild.length}**\nBusy: **${busyInGuild.length}**` }
+      );
 
-    lines.push("__Live Agents in Guild:__");
-    if (inGuild.length === 0) lines.push("  None");
-    for (const a of inGuild.sort((x, y) => String(x.agentId).localeCompare(String(y.agentId)))) {
-      const state = a.ready ? (a.busyKey ? `busy(${a.busyKind || "?"})` : "idle") : "down";
-      const ident = a.tag ? `${a.tag} (${a.botUserId})` : (a.botUserId ? String(a.botUserId) : "unknown-id");
-      lines.push(`  ${a.agentId} — ${state} — seen ${fmtTs(a.lastSeen)} — ${ident}`);
-    }
-    lines.push("");
+    const liveInGuildText = inGuild
+      .sort((x, y) => String(x.agentId).localeCompare(String(y.agentId)))
+      .map(a => {
+        const state = a.ready ? (a.busyKey ? `busy(${a.busyKind || "?"})` : "idle") : "down";
+        const ident = a.tag ? `${a.tag} (${a.botUserId})` : (a.botUserId ? String(a.botUserId) : "unknown-id");
+        return `\`${a.agentId}\` — ${state} — seen ${fmtTs(a.lastSeen)} — ${ident}`;
+      })
+      .join("\n");
 
-    lines.push("__Invitable Agents:__");
-    if (invitable.length === 0) lines.push("  None");
-    for (const a of invitable.sort((x, y) => String(x.agent_id).localeCompare(String(y.agent_id)))) {
-      lines.push(`  ${a.agent_id} — ${a.tag} (${a.client_id}) — Status: ${a.status}`);
+    if (liveInGuildText) {
+      embed.addFields({ name: "Live Agents in Guild", value: liveInGuildText.slice(0, 1024) });
     }
 
-    await interaction.reply({ flags: MessageFlags.Ephemeral, content: lines.join("\n").slice(0, 1900) });
+    const invitableText = invitable
+      .sort((x, y) => String(x.agent_id).localeCompare(String(y.agent_id)))
+      .map(a => `\`${a.agent_id}\` — ${a.tag} (${a.client_id}) — Status: ${a.status}`)
+      .join("\n");
+
+    if (invitableText) {
+      embed.addFields({ name: "Invitable Agents", value: invitableText.slice(0, 1024) });
+    }
+
+    await interaction.reply({ flags: MessageFlags.Ephemeral, embeds: [embed] });
     return;
   }
 
   if (sub === "manifest") {
     const agents = await fetchAgentBots(); // Fetch all registered agents from DB
-    const liveAgents = mgr.listAgents(); // Currently connected agents
+    const liveAgents = await mgr.listAgents(); // Currently connected agents
     const liveAgentMap = new Map(liveAgents.map(a => [a.agentId, a]));
 
-    const lines = [];
-    lines.push("__Registered Agents:__");
-    if (agents.length === 0) lines.push("  None");
-    for (const a of agents.sort((x, y) => String(x.agent_id).localeCompare(String(y.agent_id)))) {
-      const liveStatus = liveAgentMap.get(a.agent_id);
-      const state = liveStatus ? (liveStatus.ready ? (liveStatus.busyKey ? `busy(${liveStatus.busyKind || "?"})` : "idle") : "down (not connected)") : "offline (not connected)";
-      const inGuildState = liveStatus?.guildIds.includes(guildId) ? "in-guild" : "not-in-guild";
-      lines.push(`  ${a.agent_id} — Tag: ${a.tag} — Client ID: ${a.client_id} — DB Status: ${a.status} — Live Status: ${state} — ${inGuildState}`);
-    }
+    const embed = new EmbedBuilder()
+      .setTitle("Agent Manifest")
+      .setColor(0x0099ff)
+      .setTimestamp();
+      
+    const descriptionLines = agents
+      .sort((x, y) => String(x.agent_id).localeCompare(String(y.agent_id)))
+      .map(a => {
+        const liveStatus = liveAgentMap.get(a.agent_id);
+        const state = liveStatus ? (liveStatus.ready ? (liveStatus.busyKey ? `busy(${liveStatus.busyKind || "?"})` : "idle") : "down") : "offline";
+        const inGuildState = liveStatus?.guildIds.includes(guildId) ? "in-guild" : "not-in-guild";
+        const profileState = a.profile ? "Yes" : "No";
+        return `**${a.agent_id}** (${a.tag})\nDB: \`${a.status}\` | Live: \`${state}\` | Guild: \`${inGuildState}\` | Profile: \`${profileState}\``;
+      });
+
+    embed.setDescription(descriptionLines.join("\n\n").slice(0, 4096));
 
     await interaction.reply({
       flags: MessageFlags.Ephemeral,
-      content: lines.join("\n").slice(0, 1900)
+      embeds: [embed]
     });
     return;
   }
@@ -384,14 +439,24 @@ export async function execute(interaction) {
 
   if (sub === "list_tokens") {
     try {
-      const tokens = await fetchAgentBots(); // Use mgr method
+      const tokens = await fetchAgentBots();
       if (tokens.length === 0) {
         await interaction.reply({ flags: MessageFlags.Ephemeral, content: "No agent tokens registered." });
         return;
       }
 
-      const lines = tokens.map(t => `ID: ${t.agent_id}, Client ID: ${t.client_id}, Tag: ${t.tag}, Status: ${t.status}`);
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: lines.join("\n").slice(0, 1900) });
+      const embed = new EmbedBuilder()
+        .setTitle("Registered Agent Tokens")
+        .setColor(0x0099ff)
+        .setTimestamp();
+        
+      const description = tokens
+        .map(t => `**${t.agent_id}** (${t.tag})\nClient ID: \`${t.client_id}\` | Status: \`${t.status}\``)
+        .join("\n\n");
+
+      embed.setDescription(description.slice(0, 4096));
+
+      await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
     } catch (error) {
       console.error(`Error listing agent tokens: ${error}`);
       await interaction.reply({ flags: MessageFlags.Ephemeral, content: `Failed to list agent tokens: ${error.message}` });
@@ -421,15 +486,108 @@ export async function execute(interaction) {
     const agentId = interaction.options.getString("agent_id", true);
 
     try {
-      const deleted = await deleteAgentBot(agentId); // Await the boolean return
-      if (deleted) {
-        await interaction.reply({ flags: MessageFlags.Ephemeral, content: `Agent token ${agentId} deleted.` });
+      const allAgents = await fetchAgentBots();
+      const agentToDelete = allAgents.find(a => a.agent_id === agentId);
+
+      if (!agentToDelete) {
+        await interaction.reply({ flags: MessageFlags.Ephemeral, content: `Agent token ${agentId} not found.` });
+        return;
+      }
+
+      const confirmId = `confirm_delete_${agentId}_${Date.now()}`;
+      const cancelId = `cancel_delete_${agentId}_${Date.now()}`;
+
+      const row = new ActionRowBuilder()
+        .addComponents(
+          new ButtonBuilder()
+            .setCustomId(cancelId)
+            .setLabel("Cancel")
+            .setStyle(ButtonStyle.Secondary),
+          new ButtonBuilder()
+            .setCustomId(confirmId)
+            .setLabel("Confirm Delete")
+            .setStyle(ButtonStyle.Danger),
+        );
+
+      const reply = await interaction.reply({
+        flags: MessageFlags.Ephemeral,
+        content: `Are you sure you want to delete agent **${agentToDelete.tag}** (\`${agentId}\`)?\nThis action cannot be undone.`,
+        components: [row]
+      });
+
+      const collector = reply.createMessageComponentCollector({
+        componentType: ComponentType.Button,
+        time: 15000,
+        filter: i => i.user.id === interaction.user.id,
+      });
+
+      collector.on('collect', async i => {
+        if (i.customId === confirmId) {
+          const deleted = await deleteAgentBot(agentId);
+          if (deleted) {
+            await i.update({ content: `✅ Agent token **${agentToDelete.tag}** (\`${agentId}\`) has been deleted.`, components: [] });
+          } else {
+            await i.update({ content: `❌ Failed to delete agent token ${agentId}. It may have already been deleted.`, components: [] });
+          }
+        } else {
+          await i.update({ content: "Deletion cancelled.", components: [] });
+        }
+        collector.stop();
+      });
+
+      collector.on('end', collected => {
+        if (collected.size === 0) {
+          interaction.editReply({ content: "Confirmation timed out. Deletion cancelled.", components: [] });
+        }
+      });
+
+    } catch (error) {
+      console.error(`Error during agent token deletion process: ${error}`);
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: `An error occurred: ${error.message}` });
+    }
+    return;
+  }
+
+  if (sub === "set_profile") {
+    const agentId = interaction.options.getString("agent_id", true);
+    const profileString = interaction.options.getString("profile", true);
+
+    let profileJson;
+    try {
+      profileJson = JSON.parse(profileString);
+    } catch (error) {
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: `❌ Invalid JSON provided for profile: ${error.message}` });
+      return;
+    }
+
+    try {
+      const updated = await updateAgentBotProfile(agentId, profileJson);
+      if (updated) {
+        await interaction.reply({ flags: MessageFlags.Ephemeral, content: `✅ Profile for agent ${agentId} has been updated.` });
       } else {
-        await interaction.reply({ flags: MessageFlags.Ephemeral, content: `Agent token ${agentId} not found or already deleted.` });
+        await interaction.reply({ flags: MessageFlags.Ephemeral, content: `❌ Agent ${agentId} not found.` });
       }
     } catch (error) {
-      console.error(`Error deleting agent token: ${error}`);
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: `Failed to delete agent token: ${error.message}` });
+      console.error(`Error setting agent profile: ${error}`);
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: `An error occurred while setting the profile: ${error.message}` });
+    }
+    return;
+  }
+
+  if (sub === "get_profile") {
+    const agentId = interaction.options.getString("agent_id", true);
+
+    try {
+      const profile = await fetchAgentBotProfile(agentId);
+      if (profile) {
+        const profileString = JSON.stringify(profile, null, 2);
+        await interaction.reply({ flags: MessageFlags.Ephemeral, content: `Profile for **${agentId}**:\n\`\`\`json\n${profileString}\n\`\`\`` });
+      } else {
+        await interaction.reply({ flags: MessageFlags.Ephemeral, content: `No profile set for agent ${agentId}.` });
+      }
+    } catch (error) {
+      console.error(`Error fetching agent profile: ${error}`);
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: `An error occurred while fetching the profile: ${error.message}` });
     }
     return;
   }

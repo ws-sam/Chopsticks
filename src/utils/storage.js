@@ -411,6 +411,16 @@ export async function deleteAgentBot(agentId) {
   return pg.deleteAgentBot(agentId);
 }
 
+export async function updateAgentBotProfile(agentId, profile) {
+  const pg = await getPg();
+  return pg.updateAgentBotProfile(agentId, profile);
+}
+
+export async function fetchAgentBotProfile(agentId) {
+  const pg = await getPg();
+  return pg.fetchAgentBotProfile(agentId);
+}
+
 export async function upsertAgentRunner(runnerId, lastSeen, meta) {
   const pg = await getPg();
   return pg.upsertAgentRunner(runnerId, lastSeen, meta);

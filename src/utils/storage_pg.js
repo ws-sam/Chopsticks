@@ -460,24 +460,25 @@ export async function fetchCommandStatsDaily(guildId, days = 7, limit = 50) {
   }));
 }
 
-export async function insertAgentBot(agentId, token, clientId, tag) {
+export async function insertAgentBot(agentId, token, clientId, tag, poolId = 'pool_goot27') {
   const p = getPool();
   const encryptedToken = encrypt(token);
   const now = Date.now();
   const upsertSql = `
-    INSERT INTO agent_bots (agent_id, token, client_id, tag, created_at, updated_at)
-    VALUES ($1, $2, $3, $4, $5, $6)
+    INSERT INTO agent_bots (agent_id, token, client_id, tag, pool_id, created_at, updated_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7)
     ON CONFLICT (agent_id) DO UPDATE SET
       token = EXCLUDED.token,
       client_id = EXCLUDED.client_id,
       tag = EXCLUDED.tag,
+      pool_id = EXCLUDED.pool_id,
       updated_at = EXCLUDED.updated_at
-    RETURNING agent_id, token, client_id, tag, status, created_at, updated_at;
+    RETURNING agent_id, token, client_id, tag, status, pool_id, created_at, updated_at;
   `;
-  logger.info("insertAgentBot: Executing UPSERT", { sql: upsertSql, agentId, clientId, tag });
+  logger.info("insertAgentBot: Executing UPSERT", { sql: upsertSql, agentId, clientId, tag, poolId });
   const res = await p.query(
     upsertSql,
-    [agentId, encryptedToken, clientId, tag, now, now]
+    [agentId, encryptedToken, clientId, tag, poolId, now, now]
   );
   const row = res.rows[0];
   return {
@@ -486,6 +487,7 @@ export async function insertAgentBot(agentId, token, clientId, tag) {
     clientId: row.client_id,
     tag: row.tag,
     status: row.status,
+    poolId: row.pool_id,
     createdAt: Number(row.created_at),
     updatedAt: Number(row.updated_at),
     operation: (row.created_at === now) ? 'inserted' : 'updated'
@@ -494,7 +496,7 @@ export async function insertAgentBot(agentId, token, clientId, tag) {
 
 export async function fetchAgentBots() {
   const p = getPool();
-  const fetchSql = "SELECT agent_id, token, client_id, tag, status, created_at, updated_at, profile FROM agent_bots";
+  const fetchSql = "SELECT agent_id, token, client_id, tag, status, pool_id, created_at, updated_at, profile FROM agent_bots";
   logger.info("fetchAgentBots: Executing SQL", { sql: fetchSql });
   const res = await p.query(fetchSql);
   return res.rows.map(row => ({
@@ -770,4 +772,13 @@ export async function setGuildSelectedPool(guildId, poolId) {
     d => d,
     (current, incoming) => ({ ...current, selectedPoolId: incoming.selectedPoolId })
   );
+}
+
+// Alias functions for pools.js compatibility
+export async function listPools() {
+  return fetchPools();
+}
+
+export async function fetchPoolAgents(poolId) {
+  return fetchAgentsByPool(poolId);
 }

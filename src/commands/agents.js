@@ -16,7 +16,11 @@ import {
   updateAgentBotStatus,
   deleteAgentBot,
   updateAgentBotProfile,
-  fetchAgentBotProfile
+  fetchAgentBotProfile,
+  fetchPool,
+  fetchPoolsByOwner,
+  getGuildSelectedPool,
+  fetchPoolAgents
 } from "../utils/storage.js";
 
 export const meta = {
@@ -125,6 +129,7 @@ export const data = new SlashCommandBuilder()
       .addStringOption(o => o.setName("token").setDescription("Discord Bot Token").setRequired(true))
       .addStringOption(o => o.setName("client_id").setDescription("Discord Bot Client ID").setRequired(true))
       .addStringOption(o => o.setName("tag").setDescription("Bot Tag (e.g., BotName#1234)").setRequired(true))
+      .addStringOption(o => o.setName("pool").setDescription("Pool ID (defaults to your pool or pool_goot27)").setRequired(false))
   )
   .addSubcommand(s => s.setName("list_tokens").setDescription("List all registered agent tokens"))
   .addSubcommand(s =>
@@ -281,9 +286,14 @@ export async function execute(interaction) {
     // Defer reply because verification may take time
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-    const plan = await mgr.buildDeployPlan(guildId, desiredTotal); // Now async
+    // Get guild's selected pool
+    const selectedPoolId = await getGuildSelectedPool(guildId);
+    const pool = await fetchPool(selectedPoolId);
+    
+    const plan = await mgr.buildDeployPlan(guildId, desiredTotal, selectedPoolId); // Now async with poolId
 
     const lines = [];
+    lines.push(`**Pool:** ${pool ? pool.name : selectedPoolId} (\`${selectedPoolId}\`)`);
     lines.push(`Desired total agents in this guild: ${plan.desired}`);
     lines.push(`Currently present: ${plan.presentCount}`);
     lines.push(`Need invites: ${plan.needInvites}`);
@@ -308,6 +318,8 @@ export async function execute(interaction) {
         lines.push("2. Ensure registered agents are marked `active` using `/agents update_token_status`.");
         lines.push("3. Start `chopsticks-agent-runner` processes (e.g., via PM2) to bring agents online.");
         lines.push("4. Rerun `/agents deploy`.");
+        lines.push("");
+        lines.push(`Or use \`/pools select\` to choose a different pool.`);
     }
 
     await interaction.editReply({ content: lines.join("\n").slice(0, 1900) });
@@ -427,15 +439,53 @@ export async function execute(interaction) {
     const token = interaction.options.getString("token", true);
     const clientId = interaction.options.getString("client_id", true);
     const tag = interaction.options.getString("tag", true);
+    const poolOption = interaction.options.getString("pool", false);
     const agentId = `agent${clientId}`; // Use client ID to form a unique agent ID
+    const userId = interaction.user.id;
+    const BOT_OWNER_ID = process.env.BOT_OWNER_ID || '1122800062628634684';
 
     try {
-      const result = await insertAgentBot(agentId, token, clientId, tag);
+      // Determine pool
+      let poolId;
+      
+      if (poolOption) {
+        // User specified a pool - verify it exists and they own it
+        const specifiedPool = await fetchPool(poolOption);
+        if (!specifiedPool) {
+          return await interaction.reply({ 
+            flags: MessageFlags.Ephemeral, 
+            content: `❌ Pool \`${poolOption}\` not found.` 
+          });
+        }
+        if (specifiedPool.owner_user_id !== userId && userId !== BOT_OWNER_ID) {
+          return await interaction.reply({ 
+            flags: MessageFlags.Ephemeral, 
+            content: `❌ You don't own pool \`${poolOption}\`.` 
+          });
+        }
+        poolId = poolOption;
+      } else {
+        // Auto-assign to user's pool or goot27's pool
+        const userPools = await fetchPoolsByOwner(userId);
+        if (userPools && userPools.length > 0) {
+          poolId = userPools[0].pool_id;
+        } else {
+          poolId = 'pool_goot27'; // Default pool
+        }
+      }
+
+      const result = await insertAgentBot(agentId, token, clientId, tag, poolId);
       const operationMsg = result.operation === 'inserted' ? 'added' : 'updated';
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: `Agent token ${agentId} ${operationMsg} successfully. AgentRunner will attempt to start it.` });
+      await interaction.reply({ 
+        flags: MessageFlags.Ephemeral, 
+        content: `✅ Agent token ${agentId} ${operationMsg} successfully to pool \`${poolId}\`. AgentRunner will attempt to start it.` 
+      });
     } catch (error) {
-      console.error(`Error adding/updating agent token: ${error}`); // Updated log message
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: `Failed to add/update agent token: ${error.message}` }); // Updated reply message
+      console.error(`Error adding/updating agent token: ${error}`);
+      await interaction.reply({ 
+        flags: MessageFlags.Ephemeral, 
+        content: `Failed to add/update agent token: ${error.message}` 
+      });
     }
     return;
   }
@@ -448,14 +498,33 @@ export async function execute(interaction) {
         return;
       }
 
+      // Group by pool
+      const poolMap = new Map();
+      for (const token of tokens) {
+        const poolId = token.pool_id || 'pool_goot27';
+        if (!poolMap.has(poolId)) {
+          poolMap.set(poolId, []);
+        }
+        poolMap.get(poolId).push(token);
+      }
+
       const embed = new EmbedBuilder()
         .setTitle("Registered Agent Tokens")
         .setColor(0x0099ff)
         .setTimestamp();
         
-      const description = tokens
-        .map(t => `**${t.agent_id}** (${t.tag})\nClient ID: \`${t.client_id}\` | Status: \`${t.status}\``)
-        .join("\n\n");
+      let description = '';
+      for (const [poolId, poolTokens] of poolMap) {
+        const pool = await fetchPool(poolId);
+        const poolName = pool ? pool.name : poolId;
+        const visIcon = pool?.visibility === 'public' ? '🌐' : '🔒';
+        
+        description += `\n**${visIcon} ${poolName}** (\`${poolId}\`)\n`;
+        const tokenList = poolTokens
+          .map(t => `**${t.agent_id}** (${t.tag})\nClient ID: \`${t.client_id}\` | Status: \`${t.status}\``)
+          .join("\n");
+        description += tokenList + '\n';
+      }
 
       embed.setDescription(description.slice(0, 4096));
 

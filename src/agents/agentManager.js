@@ -342,12 +342,15 @@ export class AgentManager {
 
   // ===== invite helpers / deploy =====
 
-  async listInvitableAgentsForGuild(guildId) {
+  async listInvitableAgentsForGuild(guildId, poolId = null) {
     const registeredAgents = await fetchAgentBots();
     const out = [];
     for (const regAgent of registeredAgents) {
       if (!regAgent?.client_id) continue; // Must have a client ID to be invitable
       if (regAgent.status !== 'active') continue; // Only consider active registered agents
+      
+      // Filter by pool if specified
+      if (poolId && regAgent.pool_id !== poolId) continue;
 
       const liveAgent = this.liveAgents.get(regAgent.agent_id);
       if (liveAgent) {
@@ -372,7 +375,7 @@ export class AgentManager {
     return buildInviteUrl({ clientId: agent.botUserId, permissions: this.invitePerms });
   }
 
-  async buildDeployPlan(guildId, desiredCount) {
+  async buildDeployPlan(guildId, desiredCount, poolId = null) {
     const desired = Math.max(0, Number(desiredCount || 0) || 0);
 
     const present = [];
@@ -380,7 +383,7 @@ export class AgentManager {
       if (agent.guildIds?.has?.(guildId)) present.push(agent);
     }
 
-    const invitable = await this.listInvitableAgentsForGuild(guildId); // Now async
+    const invitable = await this.listInvitableAgentsForGuild(guildId, poolId); // Now async with poolId
 
     const need = Math.max(0, desired - present.length);
     const picks = invitable.slice(0, need);
@@ -403,7 +406,8 @@ export class AgentManager {
       presentCount: present.length,
       invitableCount: invitable.length,
       needInvites: need,
-      invites
+      invites,
+      poolId
     };
   }
 

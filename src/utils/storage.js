@@ -391,9 +391,9 @@ export async function saveGuildData(guildId, data) {
   throw new Error("save-conflict");
 }
 
-export async function insertAgentBot(agentId, token, clientId, tag) {
+export async function insertAgentBot(agentId, token, clientId, tag, poolId) {
   const pg = await getPg();
-  return pg.insertAgentBot(agentId, token, clientId, tag);
+  return pg.insertAgentBot(agentId, token, clientId, tag, poolId);
 }
 
 export async function fetchAgentBots() {
@@ -434,5 +434,51 @@ export async function fetchAgentRunners() {
 export async function deleteAgentRunner(runnerId) {
   const pg = await getPg();
   return pg.deleteAgentRunner(runnerId);
+}
+
+// Pool management exports
+export async function createPool(poolId, ownerUserId, name, visibility) {
+  const pg = await getPg();
+  return pg.createPool(poolId, ownerUserId, name, visibility);
+}
+
+export async function fetchPool(poolId) {
+  const pg = await getPg();
+  return pg.fetchPool(poolId);
+}
+
+export async function listPools() {
+  const pg = await getPg();
+  return pg.listPools();
+}
+
+export async function fetchPoolsByOwner(ownerUserId) {
+  const pg = await getPg();
+  return pg.fetchPoolsByOwner(ownerUserId);
+}
+
+export async function updatePool(poolId, updates) {
+  const pg = await getPg();
+  return pg.updatePool(poolId, updates);
+}
+
+export async function deletePool(poolId) {
+  const pg = await getPg();
+  return pg.deletePool(poolId);
+}
+
+export async function fetchPoolAgents(poolId) {
+  const pg = await getPg();
+  return pg.fetchPoolAgents(poolId);
+}
+
+export async function getGuildSelectedPool(guildId) {
+  const pg = await getPg();
+  return pg.getGuildSelectedPool(guildId);
+}
+
+export async function setGuildSelectedPool(guildId, poolId) {
+  const pg = await getPg();
+  return pg.setGuildSelectedPool(guildId, poolId);
 }
 

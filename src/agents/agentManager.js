@@ -134,11 +134,14 @@ export class AgentManager {
     const agentId = String(msg?.agentId ?? "").trim();
     if (!agentId) return;
 
+    console.log(`[HANDSHAKE] Received HELLO from agent ${agentId}`);
+
     // Attach agentId to WebSocket for future messages
     ws.__agentId = agentId;
 
     let agent = this.liveAgents.get(agentId);
     if (!agent) {
+      console.log(`[HANDSHAKE] Registering new agent ${agentId} in liveAgents`);
       agent = {
         agentId,
         ws,
@@ -158,6 +161,7 @@ export class AgentManager {
       };
       this.liveAgents.set(agentId, agent);
     } else {
+      console.log(`[HANDSHAKE] Reconnecting agent ${agentId}, updating WebSocket`);
       // If agent reconnected, update its WebSocket
       if (agent.ws !== ws) {
         // Optionally terminate old WS if it's still alive to ensure clean state

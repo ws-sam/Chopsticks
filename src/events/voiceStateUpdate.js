@@ -18,6 +18,7 @@ import {
 } from "../tools/voice/state.js";
 import { ownerPermissionFlags, ownerPermissionOverwrite } from "../tools/voice/ownerPerms.js";
 import { deliverVoiceRoomDashboard } from "../tools/voice/panel.js";
+import { refreshRegisteredRoomPanelsForRoom } from "../tools/voice/ui.js";
 
 export default {
   name: "voiceStateUpdate",
@@ -116,16 +117,19 @@ export default {
                   modeOverride: null,
                   reason: "ownership-transfer"
                 }).catch(() => {});
+                await refreshRegisteredRoomPanelsForRoom(guild, channelId, "ownership-transfer").catch(() => {});
               }
             }
           }
 
           log("temp channel not empty", { channelId, humans: humans.length });
+          await refreshRegisteredRoomPanelsForRoom(guild, channelId, "member-change").catch(() => {});
           return;
         }
         await removeTempChannel(guild.id, channelId, voice);
         await channel.delete().catch(() => {});
         log("temp channel deleted", { channelId });
+        await refreshRegisteredRoomPanelsForRoom(guild, channelId, "deleted").catch(() => {});
       };
 
       setTimeout(() => {
@@ -154,6 +158,7 @@ export default {
             await removeTempChannel(guild.id, tempId, voice);
             await temp.delete().catch(() => {});
             log("cleaned up orphaned temp channel", { tempId });
+            await refreshRegisteredRoomPanelsForRoom(guild, tempId, "deleted").catch(() => {});
           }
         }
       }
@@ -329,6 +334,7 @@ export default {
           modeOverride: null,
           reason: "created"
         }).catch(() => {});
+        await refreshRegisteredRoomPanelsForRoom(guild, channel.id, "created").catch(() => {});
       } else {
         log("user left voice during creation", { userId: member.id });
         // User left - cleanup the just-created channel
@@ -337,6 +343,7 @@ export default {
           await removeTempChannel(guild.id, channel.id, voice);
           await channel.delete().catch(() => {});
           log("deleted unused temp channel", { channelId: channel.id });
+          await refreshRegisteredRoomPanelsForRoom(guild, channel.id, "deleted").catch(() => {});
         }
       }
     } finally {

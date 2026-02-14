@@ -17,6 +17,7 @@ describe('Voice command definition', function () {
     const json = voiceCommand.toJSON();
     const names = new Set((json.options || []).map(o => o.name));
 
+    assert.ok(names.has('room_panel'));
     assert.ok(names.has('room_claim'));
     assert.ok(names.has('room_transfer'));
   });

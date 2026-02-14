@@ -83,6 +83,7 @@ Voice lobby system supports:
 - owner handoff/claim/transfer lifecycle
 - per-lobby owner permission templates (`Manage Channels`, `Move Members`, `Mute/Deafen`, `Priority Speaker`)
 - interactive VC control console (`/voice console`) with buttons + dropdowns
+- live dynamic room panel (`/voice room_panel`) that refreshes with room events
 - room controls (`/voice room_status`, `/voice room_rename`, `/voice room_limit`, `/voice room_lock`, `/voice room_unlock`, `/voice room_claim`, `/voice room_transfer`)
 - room dashboard delivery controls:
   - manual `/voice panel`

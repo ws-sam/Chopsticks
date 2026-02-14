@@ -13,6 +13,8 @@ import { getVoiceState } from "./schema.js";
 import { auditLog } from "../../utils/audit.js";
 import { deliverVoiceRoomDashboard } from "./panel.js";
 import {
+  refreshRegisteredRoomPanelsForRoom,
+  showLiveRoomPanel,
   handleVoiceUIButton,
   handleVoiceUISelect,
   showVoiceConsole
@@ -41,6 +43,7 @@ const roomSubs = new Set([
   "room_limit",
   "room_lock",
   "room_unlock",
+  "room_panel",
   "room_claim",
   "room_transfer",
   "panel"
@@ -390,6 +393,12 @@ export const data = new SlashCommandBuilder()
     sub
       .setName("room_unlock")
       .setDescription("Unlock your room")
+  )
+
+  .addSubcommand(sub =>
+    sub
+      .setName("room_panel")
+      .setDescription("Post a live room panel with dynamic buttons in this text channel")
   )
 
   .addSubcommand(sub =>
@@ -751,6 +760,11 @@ export async function execute(interaction) {
     return;
   }
 
+  if (sub === "room_panel") {
+    await showLiveRoomPanel(interaction);
+    return;
+  }
+
   if (sub === "panel_user_default") {
     const mode = interaction.options.getString("mode", true);
     const channel = interaction.options.getChannel("channel");
@@ -921,6 +935,7 @@ export async function execute(interaction) {
         interactionChannel: interaction.channel,
         reason: "ownership-transfer"
       }).catch(() => {});
+      await refreshRegisteredRoomPanelsForRoom(interaction.guild, channel.id, "claim").catch(() => {});
       return;
     }
 
@@ -948,6 +963,7 @@ export async function execute(interaction) {
       await channel.permissionOverwrites.edit(everyoneId, { Connect: false });
       const embed = buildEmbed("Room locked", "Connect is denied for @everyone.");
       await interaction.reply({ embeds: [embed], ephemeral: true });
+      await refreshRegisteredRoomPanelsForRoom(interaction.guild, channel.id, "lock").catch(() => {});
       return;
     }
 
@@ -961,6 +977,7 @@ export async function execute(interaction) {
       }
       const embed = buildEmbed("Room unlocked", "Connect permissions restored to category defaults.");
       await interaction.reply({ embeds: [embed], ephemeral: true });
+      await refreshRegisteredRoomPanelsForRoom(interaction.guild, channel.id, "unlock").catch(() => {});
       return;
     }
 
@@ -1030,6 +1047,7 @@ export async function execute(interaction) {
           reason: "ownership-transfer"
         }).catch(() => {});
       }
+      await refreshRegisteredRoomPanelsForRoom(interaction.guild, channel.id, "transfer").catch(() => {});
       return;
     }
 

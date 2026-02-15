@@ -27,6 +27,7 @@ import { handleButton as handleCommandsButton, handleSelect as handleCommandsSel
 import { handleButton as handleVoiceButton, handleSelect as handleVoiceSelect } from "./commands/voice.js";
 import { handleSelect as handleHelpSelect } from "./commands/help.js";
 import { handleButton as handlePurgeButton } from "./commands/purge.js";
+import { handleButton as handleGameButton, handleSelect as handleGameSelect } from "./commands/game.js";
 import {
   startHealthServer,
   getAndResetCommandDeltas
@@ -639,6 +640,7 @@ client.on(Events.MessageCreate, async message => {
 client.on(Events.InteractionCreate, async interaction => {
   if (interaction.isStringSelectMenu?.()) {
     try {
+      if (await handleGameSelect(interaction)) return;
       if (await handleHelpSelect(interaction)) return;
       if (await handleMusicSelect(interaction)) return;
       if (await handleCommandsSelect(interaction)) return;
@@ -655,6 +657,7 @@ client.on(Events.InteractionCreate, async interaction => {
 
   if (interaction.isButton?.()) {
     try {
+      if (await handleGameButton(interaction)) return;
       if (await handleMusicButton(interaction)) return;
       if (await handleAssistantButton(interaction)) return;
       if (await handleCommandsButton(interaction)) return;

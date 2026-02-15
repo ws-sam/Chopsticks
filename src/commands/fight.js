@@ -6,9 +6,9 @@ import { Colors, replyError } from "../utils/discordOutput.js";
 import { addGameXp, getGameProfile } from "../game/profile.js";
 import { getMultiplier } from "../game/buffs.js";
 
-const BATTLE_COOLDOWN = 10 * 60 * 1000; // 10 minutes
+export const BATTLE_COOLDOWN = 10 * 60 * 1000; // 10 minutes
 
-const DIFFICULTIES = [
+export const DIFFICULTIES = [
   { id: "easy", name: "Easy", emoji: "🥊", minLevel: 1, baseWin: 0.85, creditMin: 120, creditMax: 220, xp: 65, drops: ["data_fragment"] },
   { id: "medium", name: "Medium", emoji: "⚔️", minLevel: 4, baseWin: 0.72, creditMin: 220, creditMax: 380, xp: 110, drops: ["neural_chip", "corrupted_file"] },
   { id: "hard", name: "Hard", emoji: "🛡️", minLevel: 8, baseWin: 0.60, creditMin: 380, creditMax: 650, xp: 170, drops: ["corrupted_file", "encryption_key"] },
@@ -136,4 +136,3 @@ export default {
     }
   }
 };
-

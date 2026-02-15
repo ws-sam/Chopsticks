@@ -7,9 +7,9 @@ import { maybeBuildGuildFunLine } from "../fun/integrations.js";
 import { addGameXp } from "../game/profile.js";
 import { getMultiplier } from "../game/buffs.js";
 
-const WORK_COOLDOWN = 30 * 60 * 1000; // 30 minutes
+export const WORK_COOLDOWN = 30 * 60 * 1000; // 30 minutes
 
-const JOBS = [
+export const JOBS = [
   {
     id: "programmer",
     name: "Code Review",

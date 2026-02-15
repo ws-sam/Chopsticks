@@ -5,13 +5,14 @@ import { schedule } from "../utils/scheduler.js";
 import { readAgentTokensFromEnv } from "../agents/env.js";
 import { request } from "undici";
 import {
-  clampIntensity,
-  findVariants,
-  getVariantById,
-  listVariantStats,
-  randomVariantId,
-  renderFunVariant
+  clampIntensity
 } from "../fun/variants.js";
+import {
+  getFunCatalog,
+  randomFunFromRuntime,
+  renderFunFromRuntime,
+  resolveVariantId
+} from "../fun/runtime.js";
 import {
   isValidAliasName,
   normalizeAliasName,
@@ -314,37 +315,42 @@ export async function getPrefixCommands() {
 
       if (sub === "list" || sub === "catalog") {
         const query = normalizedArgs.slice(1).join(" ");
-        const stats = listVariantStats();
-        const hits = findVariants(query, 20);
+        const payload = await getFunCatalog({ query, limit: 20 });
+        const stats = payload?.stats || { total: payload?.total || 0, themes: "?", styles: "?" };
+        const hits = Array.isArray(payload?.matches) ? payload.matches : [];
         const head = `Fun variants: ${stats.total} (${stats.themes} themes x ${stats.styles} styles)`;
+        const source = payload?.source ? ` [${payload.source}]` : "";
         if (!hits.length) return reply(message, `${head}\nNo variants found for query: ${query || "(empty)"}`);
         const lines = hits.map(v => `${v.id} -> ${v.label}`);
-        return reply(message, `${head}\n${lines.join("\n")}`.slice(0, 1900));
+        return reply(message, `${head}${source}\n${lines.join("\n")}`.slice(0, 1900));
       }
 
-      let variantId = null;
       let target = "";
+      let result = null;
       if (sub === "random" || sub === "r") {
-        variantId = randomVariantId();
         target = normalizedArgs.slice(1).join(" ");
+        result = await randomFunFromRuntime({
+          actorTag: message.author.username,
+          target: target || message.author.username,
+          intensity
+        });
       } else {
-        const direct = getVariantById(sub);
-        const fuzzy = direct || findVariants(sub, 1)[0] || null;
-        if (!fuzzy) {
+        const variantId = resolveVariantId(sub);
+        if (!variantId) {
           return reply(message, "Unknown fun variant. Use `fun list` to browse ids.");
         }
-        variantId = fuzzy.id;
         target = normalizedArgs.slice(1).join(" ");
+        result = await renderFunFromRuntime({
+          variantId,
+          actorTag: message.author.username,
+          target: target || message.author.username,
+          intensity
+        });
       }
 
-      const result = renderFunVariant({
-        variantId,
-        actorTag: message.author.username,
-        target: target || message.author.username,
-        intensity
-      });
       if (!result.ok) return reply(message, "Unable to render variant.");
-      return reply(message, `${result.text}\n${result.metaLine}`);
+      const source = result.source ? ` [${result.source}]` : "";
+      return reply(message, `${result.text}\n${result.metaLine}${source}`);
     }
   }));
 

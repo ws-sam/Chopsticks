@@ -102,6 +102,35 @@ Voice lobby system supports:
 - `/commands ui` opens an interactive command center with category and command dropdowns.
 - `/fun play`, `/fun random`, and `/fun catalog` provide a 220-variant fun system (also available as prefix `!fun`).
 
+## FunHub API
+
+`funhub` is the external API layer for the same fun engine used by `/fun` and `!fun`.
+
+- Base URL: `http://localhost:8790`
+- Health: `GET /health`
+- Authenticated endpoints:
+  - `GET /api/fun/catalog?q=<query>&limit=<1-25>`
+  - `GET /api/fun/random?actor=<name>&target=<name>&intensity=<1-5>`
+  - `GET /api/fun/render?variant=<id>&actor=<name>&target=<name>&intensity=<1-5>`
+  - `GET /api/fun/pack?count=<1-10>&actor=<name>&target=<name>&intensity=<1-5>`
+
+Security controls:
+- API key auth enabled by default (`FUNHUB_REQUIRE_API_KEY=true`)
+- Bot uses `FUN_PROVIDER=auto` and attempts FunHub first, with local fallback
+- Rate limit defaults: `120 requests / 60s` per API key
+- Optional CORS allowlist via `FUNHUB_CORS_ORIGINS`
+
+Recommended env:
+```bash
+FUN_PROVIDER=auto
+FUNHUB_URL=http://funhub:8790
+FUNHUB_INTERNAL_API_KEY=<long-secret-key>
+FUNHUB_API_KEYS=<comma-separated-extra-keys>
+FUNHUB_CORS_ORIGINS=https://your-dashboard.example
+FUNHUB_RATE_LIMIT_MAX=120
+FUNHUB_RATE_LIMIT_WINDOW_MS=60000
+```
+
 ## Testing
 
 Run full unit/contract tests:

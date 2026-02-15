@@ -12,6 +12,9 @@ services:
     environment:
       - STORAGE_DRIVER=postgres
       - NODE_ENV=production
+      - FUN_PROVIDER=${FUN_PROVIDER:-auto}
+      - FUNHUB_URL=${FUNHUB_URL:-http://funhub:8790}
+      - FUNHUB_INTERNAL_API_KEY=${FUNHUB_INTERNAL_API_KEY:-}
     volumes:
       - ./data:/app/data
     networks:
@@ -217,6 +220,12 @@ services:
     environment:
       - NODE_ENV=production
       - FUNHUB_PORT=8790
+      - FUNHUB_REQUIRE_API_KEY=${FUNHUB_REQUIRE_API_KEY:-true}
+      - FUNHUB_INTERNAL_API_KEY=${FUNHUB_INTERNAL_API_KEY:-}
+      - FUNHUB_API_KEYS=${FUNHUB_API_KEYS:-}
+      - FUNHUB_CORS_ORIGINS=${FUNHUB_CORS_ORIGINS:-}
+      - FUNHUB_RATE_LIMIT_MAX=${FUNHUB_RATE_LIMIT_MAX:-120}
+      - FUNHUB_RATE_LIMIT_WINDOW_MS=${FUNHUB_RATE_LIMIT_WINDOW_MS:-60000}
     command: ["npm", "run", "funhub"]
     healthcheck:
       test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:8790/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))\""]

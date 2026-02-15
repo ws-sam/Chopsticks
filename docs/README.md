@@ -13,3 +13,4 @@
 - `../scripts/voice-setup.sh` — install default/custom Piper voice
 - `../scripts/stack-up.sh` — bring up full stack
 - `../scripts/ops/install-systemd.sh` — enable 24/7 boot-time start + watchdog
+- `../scripts/ops/install-update-timer.sh` — enable scheduled safe auto-updates

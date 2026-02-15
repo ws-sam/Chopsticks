@@ -26,8 +26,11 @@
     "smoke:public": "node scripts/ci/public-server-readiness.mjs",
     "smoke:persona": "node scripts/ci/persona-smoke.mjs",
     "ops:watchdog": "bash scripts/ops/chopsticks-watchdog.sh",
+    "ops:auto-update": "bash scripts/ops/chopsticks-auto-update.sh",
     "ops:install-systemd": "bash scripts/ops/install-systemd.sh",
     "ops:uninstall-systemd": "bash scripts/ops/uninstall-systemd.sh",
+    "ops:install-update-timer": "bash scripts/ops/install-update-timer.sh",
+    "ops:uninstall-update-timer": "bash scripts/ops/uninstall-update-timer.sh",
     "test": "mocha 'test/unit/**/*.test.js'",
     "test:watch": "mocha 'test/unit/**/*.test.js' --watch",
     "test:level-1": "mocha 'test/unit/protocol-version.test.js' 'test/unit/agent-limits.test.js' 'test/unit/agent-deployment.test.js' 'test/unit/session-lifecycle.test.js'"

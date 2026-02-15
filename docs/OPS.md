@@ -35,6 +35,39 @@ cd /home/user9007/chopsticks
 bash scripts/ops/uninstall-systemd.sh
 ```
 
+## Scheduled auto-updates (optional)
+You can enable a timer that pulls latest `private/main`, runs safety gates, rebuilds app containers, then runs watchdog checks.
+
+Install:
+```bash
+cd /home/user9007/chopsticks
+bash scripts/ops/install-update-timer.sh
+```
+
+Manual run:
+```bash
+cd /home/user9007/chopsticks
+bash scripts/ops/chopsticks-auto-update.sh
+```
+
+Dry run (no changes):
+```bash
+cd /home/user9007/chopsticks
+AUTO_UPDATE_DRY_RUN=true bash scripts/ops/chopsticks-auto-update.sh
+```
+
+Service status/logs:
+```bash
+systemctl status chopsticks-auto-update.timer --no-pager
+journalctl -u chopsticks-auto-update.service -n 100 --no-pager
+```
+
+Uninstall:
+```bash
+cd /home/user9007/chopsticks
+bash scripts/ops/uninstall-update-timer.sh
+```
+
 ## Core health checks
 ```bash
 docker compose -f docker-compose.production.yml --profile dashboard --profile monitoring --profile fun ps

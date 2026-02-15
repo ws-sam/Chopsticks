@@ -22,11 +22,19 @@ export async function getStreak(userId) {
 export async function claimDaily(userId) {
   const pool = getPool();
   const now = Date.now();
-  
-  await pool.query("BEGIN");
+  const client = await pool.connect();
   
   try {
-    const streak = await getStreak(userId);
+    await client.query("BEGIN");
+
+    const result = await client.query(
+      `INSERT INTO user_streaks (user_id, daily_streak, weekly_streak, last_daily, last_weekly, longest_daily, longest_weekly, streak_multiplier)
+       VALUES ($1, 0, 0, NULL, NULL, 0, 0, 1.00)
+       ON CONFLICT (user_id) DO UPDATE SET user_id = $1
+       RETURNING *`,
+      [userId]
+    );
+    const streak = result.rows[0];
     const lastDaily = streak.last_daily ?? 0;
     const timeSince = now - lastDaily;
     
@@ -36,7 +44,7 @@ export async function claimDaily(userId) {
     // Check if streak continues or breaks
     if (timeSince < DAY_MS) {
       // Already claimed today
-      await pool.query("ROLLBACK");
+      await client.query("ROLLBACK");
       return { ok: false, reason: "already-claimed", nextClaim: lastDaily + DAY_MS };
     } else if (timeSince < 2 * DAY_MS) {
       // Streak continues
@@ -56,14 +64,14 @@ export async function claimDaily(userId) {
     const longestDaily = Math.max(streak.longest_daily, newStreak);
     
     // Update streak
-    await pool.query(
+    await client.query(
       `UPDATE user_streaks 
        SET daily_streak = $1, last_daily = $2, longest_daily = $3, streak_multiplier = $4
        WHERE user_id = $5`,
       [newStreak, now, longestDaily, multiplier, userId]
     );
     
-    await pool.query("COMMIT");
+    await client.query("COMMIT");
     
     return {
       ok: true,
@@ -74,7 +82,9 @@ export async function claimDaily(userId) {
       totalReward: Math.floor(1000 * multiplier)
     };
   } catch (err) {
-    await pool.query("ROLLBACK");
+    try { await client.query("ROLLBACK"); } catch {}
     throw err;
+  } finally {
+    client.release();
   }
 }

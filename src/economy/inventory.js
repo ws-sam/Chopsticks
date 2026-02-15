@@ -36,23 +36,28 @@ export async function addItem(userId, itemId, quantity = 1, metadata = null) {
   try {
     await client.query("BEGIN");
     
-    // Check if item already exists with same metadata
+    // NOTE: Schema enforces UNIQUE(user_id, item_id). Metadata is descriptive only (not part of key).
     const existing = await client.query(
-      `SELECT id, quantity FROM user_inventory WHERE user_id = $1 AND item_id = $2 AND metadata IS NOT DISTINCT FROM $3`,
-      [userId, itemId, metadata ? JSON.stringify(metadata) : null]
+      `SELECT id, quantity, metadata FROM user_inventory WHERE user_id = $1 AND item_id = $2`,
+      [userId, itemId]
     );
     
     if (existing.rows.length > 0) {
-      // Update quantity
+      // Update quantity (and merge metadata if provided)
+      const prevMeta = normalizeMetadata(existing.rows[0].metadata) || {};
+      const nextMeta = metadata && typeof metadata === "object"
+        ? { ...prevMeta, ...metadata }
+        : prevMeta;
       await client.query(
-        `UPDATE user_inventory SET quantity = quantity + $1 WHERE id = $2`,
-        [quantity, existing.rows[0].id]
+        `UPDATE user_inventory SET quantity = quantity + $1, metadata = $2 WHERE id = $3`,
+        [quantity, JSON.stringify(nextMeta), existing.rows[0].id]
       );
     } else {
       // Insert new item
+      const meta = metadata && typeof metadata === "object" ? metadata : {};
       await client.query(
         `INSERT INTO user_inventory (user_id, item_id, quantity, metadata, acquired_at) VALUES ($1, $2, $3, $4, $5)`,
-        [userId, itemId, quantity, metadata ? JSON.stringify(metadata) : null, Date.now()]
+        [userId, itemId, quantity, JSON.stringify(meta), Date.now()]
       );
     }
     
@@ -77,8 +82,8 @@ export async function removeItem(userId, itemId, quantity = 1, metadata = null) 
     await client.query("BEGIN");
     
     const existing = await client.query(
-      `SELECT id, quantity FROM user_inventory WHERE user_id = $1 AND item_id = $2 AND metadata IS NOT DISTINCT FROM $3`,
-      [userId, itemId, metadata ? JSON.stringify(metadata) : null]
+      `SELECT id, quantity FROM user_inventory WHERE user_id = $1 AND item_id = $2`,
+      [userId, itemId]
     );
     
     if (existing.rows.length === 0) {
@@ -117,8 +122,8 @@ export async function removeItem(userId, itemId, quantity = 1, metadata = null) 
 export async function hasItem(userId, itemId, quantity = 1, metadata = null) {
   const pool = getPool();
   const result = await pool.query(
-    `SELECT quantity FROM user_inventory WHERE user_id = $1 AND item_id = $2 AND metadata IS NOT DISTINCT FROM $3`,
-    [userId, itemId, metadata ? JSON.stringify(metadata) : null]
+    `SELECT quantity FROM user_inventory WHERE user_id = $1 AND item_id = $2`,
+    [userId, itemId]
   );
   
   if (result.rows.length === 0) return false;

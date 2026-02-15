@@ -1,7 +1,7 @@
 // src/commands/bank.js
 import { SlashCommandBuilder } from "discord.js";
 import { makeEmbed, Colors } from "../utils/discordOutput.js";
-import { depositToBank, withdrawFromBank, getWallet } from "../economy/wallet.js";
+import { depositToBank, withdrawFromBank, getWallet, upgradeBankCapacity } from "../economy/wallet.js";
 
 export const data = new SlashCommandBuilder()
   .setName("bank")
@@ -9,12 +9,19 @@ export const data = new SlashCommandBuilder()
   .addSubcommand(s => s
     .setName("deposit")
     .setDescription("Deposit credits into your bank")
-    .addIntegerOption(o => o.setName("amount").setDescription("Amount to deposit (or 'all')").setRequired(true).setMinValue(1))
+    .addIntegerOption(o => o.setName("amount").setDescription("Amount to deposit").setRequired(false).setMinValue(1))
+    .addBooleanOption(o => o.setName("all").setDescription("Deposit your entire wallet balance").setRequired(false))
   )
   .addSubcommand(s => s
     .setName("withdraw")
     .setDescription("Withdraw credits from your bank")
-    .addIntegerOption(o => o.setName("amount").setDescription("Amount to withdraw (or 'all')").setRequired(true).setMinValue(1))
+    .addIntegerOption(o => o.setName("amount").setDescription("Amount to withdraw").setRequired(false).setMinValue(1))
+    .addBooleanOption(o => o.setName("all").setDescription("Withdraw your entire bank balance").setRequired(false))
+  )
+  .addSubcommand(s => s
+    .setName("upgrade")
+    .setDescription("Upgrade your bank capacity (cost scales)")
+    .addIntegerOption(o => o.setName("levels").setDescription("How many upgrades to apply").setRequired(false).setMinValue(1).setMaxValue(20))
   )
   .addSubcommand(s => s.setName("view").setDescription("View your bank balance"));
 
@@ -47,13 +54,47 @@ export async function execute(interaction) {
       await interaction.reply({ embeds: [embed], ephemeral: true });
       return;
     }
+
+    if (sub === "upgrade") {
+      const levels = interaction.options.getInteger("levels") || 1;
+      const res = await upgradeBankCapacity(userId, levels);
+      if (!res.ok) {
+        await interaction.reply({
+          embeds: [makeEmbed("Insufficient Funds", "You don't have enough Credits in your wallet to upgrade your bank right now.", [], null, null, Colors.ERROR)],
+          ephemeral: true
+        });
+        return;
+      }
+
+      const w = res.wallet;
+      const embed = makeEmbed(
+        "Bank Upgraded",
+        `Applied **${res.applied}** upgrade(s) for **${res.totalCost.toLocaleString()} Credits**.\n\nNew capacity: **${Number(w.bank_capacity).toLocaleString()}**`,
+        [
+          { name: "Wallet", value: `${Number(w.balance).toLocaleString()} Credits`, inline: true },
+          { name: "Bank", value: `${Number(w.bank).toLocaleString()} / ${Number(w.bank_capacity).toLocaleString()}`, inline: true }
+        ],
+        null,
+        null,
+        Colors.SUCCESS
+      );
+      await interaction.reply({ embeds: [embed], ephemeral: true });
+      return;
+    }
     
-    let amount = interaction.options.getInteger("amount");
     const wallet = await getWallet(userId);
+    const all = Boolean(interaction.options.getBoolean("all"));
+    let amount = interaction.options.getInteger("amount");
     
     if (sub === "deposit") {
-      // Handle "all"
-      if (amount === -1) amount = wallet.balance;
+      if (all) amount = wallet.balance;
+      if (!amount || amount <= 0) {
+        await interaction.reply({
+          embeds: [makeEmbed("Missing Amount", "Provide `amount` or enable `all`.", [], null, null, Colors.WARNING)],
+          ephemeral: true
+        });
+        return;
+      }
       
       const result = await depositToBank(userId, amount);
       
@@ -86,8 +127,14 @@ export async function execute(interaction) {
       
       await interaction.reply({ embeds: [embed], ephemeral: true });
     } else if (sub === "withdraw") {
-      // Handle "all"
-      if (amount === -1) amount = wallet.bank;
+      if (all) amount = wallet.bank;
+      if (!amount || amount <= 0) {
+        await interaction.reply({
+          embeds: [makeEmbed("Missing Amount", "Provide `amount` or enable `all`.", [], null, null, Colors.WARNING)],
+          ephemeral: true
+        });
+        return;
+      }
       
       const result = await withdrawFromBank(userId, amount);
       

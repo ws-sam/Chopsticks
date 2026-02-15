@@ -5,6 +5,8 @@ import { claimDaily } from "../economy/streaks.js";
 import { addCredits } from "../economy/wallet.js";
 import { formatCooldown } from "../economy/cooldowns.js";
 import { maybeBuildGuildFunLine } from "../fun/integrations.js";
+import { addGameXp } from "../game/profile.js";
+import { getMultiplier } from "../game/buffs.js";
 
 export const data = new SlashCommandBuilder()
   .setName("daily")
@@ -36,11 +38,20 @@ export async function execute(interaction) {
     
     // Award credits
     await addCredits(userId, claim.totalReward, "daily");
+
+    const xpMult = await getMultiplier(userId, "xp:mult", 1);
+    const xpBase = 120 + Math.min(600, claim.streak * 15);
+    const xpRes = await addGameXp(userId, xpBase, { reason: "daily", multiplier: xpMult });
     
     const fields = [
       { name: "🔥 Current Streak", value: `${claim.streak} day${claim.streak === 1 ? '' : 's'}`, inline: true },
       { name: "✨ Multiplier", value: `${claim.multiplier.toFixed(2)}x`, inline: true },
-      { name: "💰 Earned", value: `${claim.totalReward.toLocaleString()} Credits`, inline: true }
+      { name: "💰 Earned", value: `${claim.totalReward.toLocaleString()} Credits`, inline: true },
+      {
+        name: "XP",
+        value: `${xpRes.applied.toLocaleString()} XP${xpRes.leveledUp ? ` • Level Up: ${xpRes.fromLevel} -> ${xpRes.toLevel}` : ""}`,
+        inline: false
+      }
     ];
     
     if (claim.bonusReward > 0) {

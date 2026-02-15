@@ -925,6 +925,8 @@ export async function ensureEconomySchema() {
   const queries = [
     `CREATE TABLE IF NOT EXISTS user_wallets (user_id TEXT PRIMARY KEY, balance BIGINT NOT NULL DEFAULT 0 CHECK (balance >= 0), bank BIGINT NOT NULL DEFAULT 0 CHECK (bank >= 0), bank_capacity BIGINT NOT NULL DEFAULT 10000, total_earned BIGINT NOT NULL DEFAULT 0, total_spent BIGINT NOT NULL DEFAULT 0, created_at BIGINT NOT NULL, updated_at BIGINT NOT NULL)`,
     `CREATE INDEX IF NOT EXISTS idx_wallets_balance ON user_wallets(balance DESC)`,
+    `CREATE TABLE IF NOT EXISTS user_game_profiles (user_id TEXT PRIMARY KEY, xp BIGINT NOT NULL DEFAULT 0 CHECK (xp >= 0), level INT NOT NULL DEFAULT 1 CHECK (level >= 1), created_at BIGINT NOT NULL, updated_at BIGINT NOT NULL)`,
+    `CREATE INDEX IF NOT EXISTS idx_game_profiles_level ON user_game_profiles(level DESC, xp DESC)`,
     `CREATE TABLE IF NOT EXISTS user_inventory (id SERIAL PRIMARY KEY, user_id TEXT NOT NULL, item_id TEXT NOT NULL, quantity INT NOT NULL DEFAULT 1 CHECK (quantity > 0), metadata JSONB DEFAULT '{}', acquired_at BIGINT NOT NULL, UNIQUE(user_id, item_id))`,
     `CREATE INDEX IF NOT EXISTS idx_inventory_user ON user_inventory(user_id)`,
     `CREATE TABLE IF NOT EXISTS user_collections (

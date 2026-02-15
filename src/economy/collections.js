@@ -35,6 +35,110 @@ const LOOT_TABLES = {
   ]
 };
 
+// Zone focus tables. These do NOT remove rarities; they bias which items you roll within a rarity tier.
+const ZONE_ALIASES = {
+  any: "any",
+  // legacy option values kept for compatibility
+  characters: "loot",
+  monsters: "misc",
+  loot: "loot",
+  food: "food",
+  skills: "skills",
+  misc: "misc"
+};
+
+const ZONE_TABLES = {
+  any: LOOT_TABLES,
+  loot: {
+    common: [
+      { id: "data_fragment", weight: 55 },
+      { id: "neural_chip", weight: 25 },
+      { id: "corrupted_file", weight: 20 }
+    ],
+    rare: [
+      { id: "corrupted_file", weight: 35 },
+      { id: "neural_chip", weight: 35 },
+      { id: "encryption_key", weight: 20 },
+      { id: "hologram_badge", weight: 10 }
+    ],
+    epic: [
+      { id: "encryption_key", weight: 45 },
+      { id: "hologram_badge", weight: 35 },
+      { id: "xp_booster", weight: 20 }
+    ],
+    legendary: [
+      { id: "quantum_core", weight: 55 },
+      { id: "ancient_code", weight: 45 }
+    ],
+    mythic: [
+      { id: "singularity_shard", weight: 100 }
+    ]
+  },
+  food: {
+    common: [
+      { id: "energy_drink", weight: 55 },
+      { id: "companion_treat", weight: 45 }
+    ],
+    rare: [
+      { id: "luck_charm", weight: 100 }
+    ],
+    epic: [
+      { id: "xp_booster", weight: 100 }
+    ],
+    legendary: [
+      { id: "master_key", weight: 100 }
+    ],
+    mythic: [
+      { id: "master_key", weight: 100 }
+    ]
+  },
+  skills: {
+    common: [
+      { id: "basic_scanner", weight: 50 },
+      { id: "basic_net", weight: 50 }
+    ],
+    rare: [
+      { id: "advanced_scanner", weight: 80 },
+      { id: "luck_charm", weight: 20 }
+    ],
+    epic: [
+      { id: "reinforced_net", weight: 70 },
+      { id: "xp_booster", weight: 30 }
+    ],
+    legendary: [
+      { id: "quantum_scanner", weight: 100 }
+    ],
+    mythic: [
+      { id: "quantum_scanner", weight: 100 }
+    ]
+  },
+  misc: {
+    common: [
+      { id: "data_fragment", weight: 45 },
+      { id: "energy_drink", weight: 20 },
+      { id: "companion_treat", weight: 15 },
+      { id: "neural_chip", weight: 20 }
+    ],
+    rare: [
+      { id: "corrupted_file", weight: 40 },
+      { id: "luck_charm", weight: 35 },
+      { id: "neural_chip", weight: 25 }
+    ],
+    epic: [
+      { id: "encryption_key", weight: 40 },
+      { id: "hologram_badge", weight: 30 },
+      { id: "xp_booster", weight: 30 }
+    ],
+    legendary: [
+      { id: "quantum_core", weight: 65 },
+      { id: "ancient_code", weight: 35 }
+    ],
+    mythic: [
+      { id: "singularity_shard", weight: 100 }
+    ]
+  }
+};
+
 /**
  * Roll for a random rarity tier
  */
@@ -50,6 +154,10 @@ function rollRarity(luckBoost = 0) {
     adjustedWeights.epic += luckBoost * 3;
     adjustedWeights.rare += luckBoost * 2;
     adjustedWeights.common -= luckBoost * 7.5;
+  }
+  // Fail-safe: never allow negative weights
+  for (const k of Object.keys(adjustedWeights)) {
+    if (adjustedWeights[k] < 1) adjustedWeights[k] = 1;
   }
 
   for (const [rarity, weight] of Object.entries(adjustedWeights)) {
@@ -83,10 +191,21 @@ function rollItem(rarity) {
   return table[0].id; // Fallback
 }
 
+function resolveZone(zone) {
+  const z = String(zone || "any").toLowerCase();
+  return ZONE_ALIASES[z] || "any";
+}
+
+function zoneTable(zone, rarity) {
+  const z = resolveZone(zone);
+  const tables = ZONE_TABLES[z] || LOOT_TABLES;
+  return tables[rarity] || LOOT_TABLES[rarity] || null;
+}
+
 /**
  * Perform a gather action with tool bonuses
  */
-export function performGather(toolBonus = 0, luckBoost = 0) {
+export function performGather(toolBonus = 0, luckBoost = 0, zone = "any") {
   const results = [];
   
   // Base gather yields 1-2 items
@@ -99,7 +218,8 @@ export function performGather(toolBonus = 0, luckBoost = 0) {
 
   for (let i = 0; i < gatherCount; i++) {
     const rarity = rollRarity(luckBoost);
-    const itemId = rollItem(rarity);
+    const table = zoneTable(zone, rarity);
+    const itemId = table ? rollItemFromTable(table) : rollItem(rarity);
     
     if (itemId) {
       results.push({ itemId, rarity });
@@ -107,6 +227,19 @@ export function performGather(toolBonus = 0, luckBoost = 0) {
   }
 
   return results;
+}
+
+function rollItemFromTable(table) {
+  if (!Array.isArray(table) || table.length === 0) return null;
+  const totalWeight = table.reduce((sum, item) => sum + Number(item.weight || 0), 0);
+  if (totalWeight <= 0) return table[0]?.id || null;
+  const roll = Math.random() * totalWeight;
+  let cumulative = 0;
+  for (const entry of table) {
+    cumulative += Number(entry.weight || 0);
+    if (roll <= cumulative) return entry.id;
+  }
+  return table[0]?.id || null;
 }
 
 /**

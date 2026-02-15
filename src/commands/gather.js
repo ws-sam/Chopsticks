@@ -6,6 +6,8 @@ import { Colors, replyError } from "../utils/discordOutput.js";
 import itemsData from "../economy/items.json" with { type: "json" };
 import { renderGatherCardPng } from "../game/render/imCards.js";
 import { loadGuildData } from "../utils/storage.js";
+import { addGameXp } from "../game/profile.js";
+import { getMultiplier, getBuff } from "../game/buffs.js";
 
 const GATHER_COOLDOWN = 5 * 60 * 1000; // 5 minutes
 
@@ -86,8 +88,11 @@ export default {
       const selectedZone = interaction.options.getString("zone") || "any";
       const gatherSource = "core";
 
-      const fallback = performGather(toolBonus, 0);
-      let results = fallback.map(entry => ({ ...entry, category: "general" }));
+      const luck = await getBuff(interaction.user.id, "luck:gather");
+      const luckBoostPct = Math.max(0, Math.trunc((Number(luck) || 0) * 100));
+
+      const fallback = performGather(toolBonus, luckBoostPct, selectedZone);
+      let results = fallback.map(entry => ({ ...entry, category: selectedZone }));
 
       if (results.length === 0) {
         return await replyError(
@@ -106,6 +111,15 @@ export default {
 
       // Set cooldown
       await setCooldown(interaction.user.id, "gather", GATHER_COOLDOWN);
+
+      // XP gain (rarity-weighted), affected by xp multiplier consumable.
+      const rarityXp = { common: 12, rare: 20, epic: 35, legendary: 55, mythic: 120 };
+      const xpBase = results.reduce((sum, r) => sum + (rarityXp[r.rarity] || 12), 0);
+      const xpMult = await getMultiplier(interaction.user.id, "xp:mult", 1);
+      const xpRes = await addGameXp(interaction.user.id, xpBase, {
+        reason: "gather",
+        multiplier: xpMult
+      });
 
       // Build response
       const rarityEmojis = {
@@ -133,7 +147,12 @@ export default {
         .addFields(
           { name: "Items Found", value: results.length.toString(), inline: true },
           { name: "Zone", value: formatZone(selectedZone), inline: true },
-          { name: "Cooldown", value: "5 minutes", inline: true }
+          { name: "Cooldown", value: "5 minutes", inline: true },
+          {
+            name: "XP",
+            value: `${xpRes.applied.toLocaleString()} XP${xpRes.leveledUp ? ` • Level Up: ${xpRes.fromLevel} -> ${xpRes.toLevel}` : ""}`,
+            inline: false
+          }
         )
         .setFooter({
           text: toolUsed

@@ -2,6 +2,7 @@ import { SlashCommandBuilder } from "discord.js";
 import { getInventory, removeItem, getItemData } from "../economy/inventory.js";
 import { addCredits } from "../economy/wallet.js";
 import { replySuccess, replyError } from "../utils/discordOutput.js";
+import { setBuff } from "../game/buffs.js";
 
 export default {
   data: new SlashCommandBuilder()
@@ -102,13 +103,14 @@ async function handleConsumable(interaction, matchedItem, itemData, quantity) {
 
   switch (itemData.effect) {
     case "cooldown_reduction":
-      effectDescription = `Your cooldowns are reduced by ${itemData.effectValue * 100}% for ${formatDuration(itemData.duration)}!`;
-      // TODO: Apply buff to user (store in Redis with TTL)
+      // Currently scoped to /work (matches Energy Drink description).
+      await setBuff(interaction.user.id, "cd:work", 1 - Number(itemData.effectValue || 0), itemData.duration);
+      effectDescription = `Your **/work** cooldown is reduced by ${Math.round(Number(itemData.effectValue || 0) * 100)}% for ${formatDuration(itemData.duration)}.`;
       break;
 
     case "luck_boost":
-      effectDescription = `Your luck increased by ${itemData.effectValue * 100}% for ${formatDuration(itemData.duration)}!`;
-      // TODO: Apply buff to user
+      await setBuff(interaction.user.id, "luck:gather", Number(itemData.effectValue || 0), itemData.duration);
+      effectDescription = `Your **/gather** luck increased by ${Math.round(Number(itemData.effectValue || 0) * 100)}% for ${formatDuration(itemData.duration)}.`;
       break;
 
     case "companion_restore":
@@ -117,8 +119,8 @@ async function handleConsumable(interaction, matchedItem, itemData, quantity) {
       break;
 
     case "xp_multiplier":
-      effectDescription = `XP gain multiplied by ${itemData.effectValue}x for ${formatDuration(itemData.duration)}!`;
-      // TODO: Apply buff to user
+      await setBuff(interaction.user.id, "xp:mult", Number(itemData.effectValue || 1), itemData.duration);
+      effectDescription = `XP gain multiplied by **${Number(itemData.effectValue || 1)}x** for ${formatDuration(itemData.duration)}.`;
       break;
 
     case "premium_unlock":

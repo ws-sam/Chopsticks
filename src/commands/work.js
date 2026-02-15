@@ -4,6 +4,8 @@ import { addCredits, getWallet } from "../economy/wallet.js";
 import { addItem } from "../economy/inventory.js";
 import { Colors, replySuccess, replyError } from "../utils/discordOutput.js";
 import { maybeBuildGuildFunLine } from "../fun/integrations.js";
+import { addGameXp } from "../game/profile.js";
+import { getMultiplier } from "../game/buffs.js";
 
 const WORK_COOLDOWN = 30 * 60 * 1000; // 30 minutes
 
@@ -94,8 +96,19 @@ export default {
       // Add credits
       await addCredits(interaction.user.id, reward, `Work: ${job.name}`);
 
-      // Set cooldown
-      await setCooldown(interaction.user.id, "work", WORK_COOLDOWN);
+      // XP + cooldown modifiers (from consumables).
+      const xpMult = await getMultiplier(interaction.user.id, "xp:mult", 1);
+      const cdMult = await getMultiplier(interaction.user.id, "cd:work", 1);
+
+      const xpBase = Math.max(10, Math.trunc(reward / 12));
+      const xpRes = await addGameXp(interaction.user.id, xpBase, {
+        reason: `work:${job.id}`,
+        multiplier: xpMult
+      });
+
+      // Set cooldown (can be reduced by buffs)
+      const effectiveCooldown = Math.max(60 * 1000, Math.trunc(WORK_COOLDOWN * cdMult));
+      await setCooldown(interaction.user.id, "work", effectiveCooldown);
 
       // Check for item drop
       let itemDropped = null;
@@ -114,9 +127,14 @@ export default {
         .setColor(Colors.SUCCESS)
         .addFields(
           { name: "Earned", value: `${reward.toLocaleString()} Credits`, inline: true },
-          { name: "New Balance", value: `${wallet.balance.toLocaleString()} Credits`, inline: true }
+          { name: "New Balance", value: `${wallet.balance.toLocaleString()} Credits`, inline: true },
+          {
+            name: "XP",
+            value: `${xpRes.applied.toLocaleString()} XP${xpRes.leveledUp ? ` • Level Up: ${xpRes.fromLevel} -> ${xpRes.toLevel}` : ""}`,
+            inline: false
+          }
         )
-        .setFooter({ text: "Come back in 30 minutes for another job!" })
+        .setFooter({ text: `Come back in ${formatCooldown(effectiveCooldown)} for another job.` })
         .setTimestamp();
 
       if (itemDropped) {

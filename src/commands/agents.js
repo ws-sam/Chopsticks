@@ -21,7 +21,9 @@ import {
   fetchPoolsByOwner,
   getGuildSelectedPool,
   fetchPoolAgents,
-  listPools
+  listPools,
+  loadGuildData,
+  saveGuildData
 } from "../utils/storage.js";
 import { replyEmbed, replyEmbedWithJson, buildEmbed } from "../utils/discordOutput.js";
 import { getBotOwnerIds, isBotOwner } from "../utils/owners.js";
@@ -78,6 +80,31 @@ export const data = new SlashCommandBuilder()
         o
           .setName("from_pool")
           .setDescription("Deploy from specific pool (leave empty to use guild default)")
+          .setRequired(false)
+      )
+  )
+  .addSubcommand(s =>
+    s
+      .setName("idle_policy")
+      .setDescription("View or configure idle auto-release timeout for this server")
+      .addIntegerOption(o =>
+        o
+          .setName("minutes")
+          .setDescription("Idle minutes before release (1-720)")
+          .setRequired(false)
+          .setMinValue(1)
+          .setMaxValue(720)
+      )
+      .addBooleanOption(o =>
+        o
+          .setName("use_default")
+          .setDescription("Clear this server override and use global default")
+          .setRequired(false)
+      )
+      .addBooleanOption(o =>
+        o
+          .setName("disable")
+          .setDescription("Disable idle auto-release for this server")
           .setRequired(false)
       )
   )
@@ -422,6 +449,85 @@ export async function execute(interaction) {
       } else {
         await interaction.reply({ flags: MessageFlags.Ephemeral, content });
       }
+    }
+    return;
+  }
+
+  if (sub === "idle_policy") {
+    try {
+      const minutes = interaction.options.getInteger("minutes", false);
+      const useDefault = interaction.options.getBoolean("use_default", false) === true;
+      const disable = interaction.options.getBoolean("disable", false) === true;
+      const configured = (minutes !== null ? 1 : 0) + (useDefault ? 1 : 0) + (disable ? 1 : 0);
+
+      if (configured > 1) {
+        await interaction.reply({
+          flags: MessageFlags.Ephemeral,
+          content: "Use only one option: `minutes`, `use_default`, or `disable`."
+        });
+        return;
+      }
+
+      const defaultIdleMs = typeof mgr.getDefaultIdleReleaseMs === "function"
+        ? mgr.getDefaultIdleReleaseMs()
+        : Math.max(0, Number(process.env.AGENT_SESSION_IDLE_RELEASE_MS || 1_800_000));
+
+      const data = await loadGuildData(guildId);
+      if (!data.agents || typeof data.agents !== "object" || Array.isArray(data.agents)) {
+        data.agents = {};
+      }
+
+      let changed = false;
+      if (useDefault) {
+        delete data.agents.idleReleaseMs;
+        changed = true;
+      } else if (disable) {
+        data.agents.idleReleaseMs = 0;
+        changed = true;
+      } else if (minutes !== null) {
+        data.agents.idleReleaseMs = Math.trunc(Number(minutes) * 60_000);
+        changed = true;
+      }
+
+      if (changed) {
+        await saveGuildData(guildId, data);
+        if (typeof mgr.clearGuildIdleReleaseCache === "function") {
+          mgr.clearGuildIdleReleaseCache(guildId);
+        }
+      }
+
+      const guildOverride = Number(data?.agents?.idleReleaseMs);
+      const hasOverride = Number.isFinite(guildOverride);
+      const effectiveMs = hasOverride
+        ? (guildOverride <= 0 ? 0 : guildOverride)
+        : (defaultIdleMs <= 0 ? 0 : defaultIdleMs);
+      const effectiveMin = effectiveMs > 0 ? Math.max(1, Math.round(effectiveMs / 60_000)) : 0;
+      const defaultMin = defaultIdleMs > 0 ? Math.max(1, Math.round(defaultIdleMs / 60_000)) : 0;
+
+      const lines = [];
+      lines.push("**Idle Auto-Release Policy**");
+      lines.push(`Default (global): ${defaultIdleMs > 0 ? `${defaultMin}m` : "disabled"}`);
+
+      if (hasOverride) {
+        lines.push(`Server override: ${guildOverride > 0 ? `${Math.max(1, Math.round(guildOverride / 60_000))}m` : "disabled"}`);
+      } else {
+        lines.push("Server override: none (using default)");
+      }
+
+      lines.push(`Effective in this server: ${effectiveMs > 0 ? `${effectiveMin}m` : "disabled"}`);
+      lines.push("");
+      lines.push("Use `/agents idle_policy minutes:<1-720>` to set, `disable:true` to disable, or `use_default:true` to clear override.");
+
+      await interaction.reply({
+        flags: MessageFlags.Ephemeral,
+        content: lines.join("\n")
+      });
+    } catch (error) {
+      console.error(`[agents:idle_policy] Error: ${error.message}`);
+      await interaction.reply({
+        flags: MessageFlags.Ephemeral,
+        content: `Failed to update idle policy: ${error.message}`
+      });
     }
     return;
   }

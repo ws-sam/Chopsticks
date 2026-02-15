@@ -1,7 +1,7 @@
 // src/agents/agentManager.js
 import { WebSocketServer } from "ws";
 import { randomUUID } from "node:crypto";
-import { fetchAgentBots, fetchAgentRunners, fetchPool, updateAgentBotStatus } from "../utils/storage.js";
+import { fetchAgentBots, fetchAgentRunners, fetchPool, loadGuildData, updateAgentBotStatus } from "../utils/storage.js";
 import { logger, createAgentScopedLogger, generateCorrelationId } from "../utils/logger.js";
 import {
   trackAgentRegistration,
@@ -80,10 +80,12 @@ export class AgentManager {
     this._reconcileTimer = null;
 
     // Idle auto-release watchdog
-    this.sessionIdleReleaseMs = safeInt(process.env.AGENT_SESSION_IDLE_RELEASE_MS, 1_800_000); // 30m
+    this.sessionIdleReleaseMs = safeInt(process.env.AGENT_SESSION_IDLE_RELEASE_MS, 1_800_000); // 30m default
     this.sessionIdleSweepMs = safeInt(process.env.AGENT_SESSION_IDLE_SWEEP_MS, 60_000); // 1m
     this._idleSweepTimer = null;
     this._idleSweepRunning = false;
+    this.guildIdleConfigCacheMs = safeInt(process.env.AGENT_GUILD_IDLE_CACHE_MS, 60_000);
+    this._guildIdleReleaseCache = new Map(); // guildId -> { value, expiresAt }
     this.adminOverrideToken = String(process.env.DASHBOARD_ADMIN_TOKEN || "").trim();
     this._agentDeployerCache = new Map(); // agentId -> ownerUserId
     this._agentDeployerCacheAt = 0;
@@ -124,7 +126,7 @@ export class AgentManager {
     this._reconcileTimer.unref?.();
     await this.reconcileAgents(); // Run once on startup
 
-    if (this.sessionIdleReleaseMs > 0) {
+    if (this.sessionIdleSweepMs > 0) {
       this._idleSweepTimer = setInterval(() => {
         this.releaseIdleSessions().catch(err => {
           logger.error("[AgentManager] Idle session sweep failed", { error: err?.message ?? err });
@@ -789,9 +791,54 @@ export class AgentManager {
 
   // ===== idle auto-release =====
 
+  getDefaultIdleReleaseMs() {
+    return this._normalizeIdleReleaseMs(this.sessionIdleReleaseMs, 1_800_000);
+  }
+
+  _normalizeIdleReleaseMs(value, fallback = 0) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return fallback;
+    if (n <= 0) return 0;
+    return Math.max(60_000, Math.trunc(n));
+  }
+
+  clearGuildIdleReleaseCache(guildId = null) {
+    if (guildId == null) {
+      this._guildIdleReleaseCache.clear();
+      return;
+    }
+    this._guildIdleReleaseCache.delete(String(guildId));
+  }
+
+  async getGuildIdleReleaseMs(guildId) {
+    const gid = String(guildId || "").trim();
+    if (!gid) return this.getDefaultIdleReleaseMs();
+
+    const cached = this._guildIdleReleaseCache.get(gid);
+    const nowTs = now();
+    if (cached && cached.expiresAt > nowTs) return cached.value;
+
+    let resolved = this.getDefaultIdleReleaseMs();
+    try {
+      const data = await loadGuildData(gid);
+      const customMs = data?.agents?.idleReleaseMs;
+      if (customMs !== undefined && customMs !== null) {
+        resolved = this._normalizeIdleReleaseMs(customMs, resolved);
+      }
+    } catch (error) {
+      logger.warn("[AgentManager] Failed to load guild idle config; using default", {
+        guildId: gid,
+        error: error?.message ?? error
+      });
+    }
+
+    const ttlMs = Math.max(5_000, this.guildIdleConfigCacheMs);
+    this._guildIdleReleaseCache.set(gid, { value: resolved, expiresAt: nowTs + ttlMs });
+    return resolved;
+  }
+
   async releaseIdleSessions() {
     if (this._idleSweepRunning) return;
-    if (this.sessionIdleReleaseMs <= 0) return;
 
     this._idleSweepRunning = true;
     const sweepStartedAt = now();
@@ -800,6 +847,15 @@ export class AgentManager {
 
     try {
       await this._refreshAgentDeployerCache();
+      const idleByGuild = new Map();
+      const getIdleForGuild = async guildId => {
+        const gid = String(guildId || "").trim();
+        if (!gid) return 0;
+        if (!idleByGuild.has(gid)) {
+          idleByGuild.set(gid, await this.getGuildIdleReleaseMs(gid));
+        }
+        return idleByGuild.get(gid);
+      };
 
       for (const [key, agentId] of Array.from(this.sessions.entries())) {
         const [guildId, voiceChannelId] = String(key).split(":");
@@ -811,8 +867,11 @@ export class AgentManager {
           continue;
         }
 
+        const guildIdleMs = await getIdleForGuild(guildId);
+        if (guildIdleMs <= 0) continue;
+
         const idleMs = this._computeIdleMs(agent.lastActive);
-        if (idleMs === null || idleMs < this.sessionIdleReleaseMs) continue;
+        if (idleMs === null || idleMs < guildIdleMs) continue;
 
         const humans = await this._getHumanCountInVoice(guildId, voiceChannelId);
         if (humans === null) continue;
@@ -848,8 +907,11 @@ export class AgentManager {
           continue;
         }
 
+        const guildIdleMs = await getIdleForGuild(guildId);
+        if (guildIdleMs <= 0) continue;
+
         const idleMs = this._computeIdleMs(agent.lastActive);
-        if (idleMs === null || idleMs < this.sessionIdleReleaseMs) continue;
+        if (idleMs === null || idleMs < guildIdleMs) continue;
 
         const humans = await this._getHumanCountInVoice(guildId, voiceChannelId);
         if (humans === null) continue;

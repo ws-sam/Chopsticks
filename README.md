@@ -78,6 +78,7 @@ Operational notes:
 - Idle auto-release controls:
   - `AGENT_SESSION_IDLE_RELEASE_MS` (default `1800000` = 30 minutes)
   - `AGENT_SESSION_IDLE_SWEEP_MS` (default `60000` = 1 minute)
+  - Server admins can override per-guild with `/agents idle_policy`
   - On idle timeout with no humans in VC, session is released and deployer/session owner is notified
 
 ## VoiceMaster (Custom VC)

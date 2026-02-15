@@ -45,13 +45,11 @@ cp .env.example .env
 By default, production bring-up enables profiles:
 - `dashboard`
 - `monitoring`
-- optional `fun` profile for FunHub API (`/api/fun/*`)
+- `fun` (FunHub API on `:8790`)
 
 To override:
 ```bash
 COMPOSE_PROFILES=dashboard ./scripts/start.sh
-# or include FunHub
-COMPOSE_PROFILES=dashboard,monitoring,fun ./scripts/start.sh
 ```
 
 3. Verify runtime:

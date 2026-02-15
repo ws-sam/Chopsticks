@@ -20,7 +20,7 @@ echo "Using compose file: $COMPOSE_FILE"
 
 COMPOSE_ARGS=(-f "$COMPOSE_FILE")
 if [ "$COMPOSE_FILE" = "docker-compose.production.yml" ]; then
-  PROFILES="${COMPOSE_PROFILES:-dashboard,monitoring}"
+  PROFILES="${COMPOSE_PROFILES:-dashboard,monitoring,fun}"
   IFS=',' read -ra PROFILE_LIST <<< "$PROFILES"
   for profile in "${PROFILE_LIST[@]}"; do
     profile="${profile//[[:space:]]/}"

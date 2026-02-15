@@ -1,14 +1,15 @@
 import { SlashCommandBuilder, EmbedBuilder, MessageFlags } from "discord.js";
 import {
-  FUN_VARIANT_COUNT,
   clampIntensity,
-  findVariants,
-  getVariantById,
-  listVariantStats,
-  randomVariantId,
-  renderFunVariant,
-  sampleVariantIds
+  findVariants
 } from "../fun/variants.js";
+import {
+  getFunCatalog,
+  getFunRuntimeConfig,
+  randomFunFromRuntime,
+  renderFunFromRuntime,
+  resolveVariantId
+} from "../fun/runtime.js";
 
 export const meta = {
   guildOnly: false,
@@ -78,22 +79,25 @@ export const data = new SlashCommandBuilder()
   );
 
 function buildFunEmbed(result) {
+  const variantName = result?.variant?.label || result?.variantId || "unknown";
   return new EmbedBuilder()
-    .setTitle(`Fun Variant: ${result.variant.label}`)
+    .setTitle(`Fun Variant: ${variantName}`)
     .setColor(0x3ba55d)
-    .setDescription(result.text)
+    .setDescription(String(result.text || "No output."))
     .addFields(
-      { name: "Variant", value: `\`${result.variant.id}\``, inline: true },
-      { name: "Intensity", value: String(result.intensity), inline: true }
+      { name: "Variant", value: `\`${result?.variant?.id || result.variantId || "unknown"}\``, inline: true },
+      { name: "Intensity", value: String(result.intensity ?? 3), inline: true },
+      { name: "Source", value: String(result.source || "local"), inline: true }
     )
-    .setFooter({ text: result.metaLine });
+    .setFooter({ text: String(result.metaLine || "Fun output") });
 }
 
-function buildCatalogEmbed(query = "") {
-  const stats = listVariantStats();
-  const hits = findVariants(query, 20);
+function buildCatalogEmbed(payload, query = "") {
+  const stats = payload?.stats || { total: payload?.total || 0, themes: "?", styles: "?" };
+  const hits = Array.isArray(payload?.matches) ? payload.matches : [];
   const lines = hits.map(v => `- \`${v.id}\` -> ${v.label}`);
-  const sample = sampleVariantIds(8).map(v => `\`${v}\``).join(", ");
+  const sample = (Array.isArray(payload?.sample) ? payload.sample : []).map(v => `\`${v}\``).join(", ");
+  const runtime = getFunRuntimeConfig();
 
   return new EmbedBuilder()
     .setTitle("Fun Catalog")
@@ -102,7 +106,8 @@ function buildCatalogEmbed(query = "") {
       `Total variants: **${stats.total}** (${stats.themes} themes x ${stats.styles} styles)\n` +
       `Use \`/fun play variant:<id>\` or \`/fun random\`.\n` +
       (query ? `Search query: \`${query}\`\n` : "") +
-      `Sample ids: ${sample}`
+      (sample ? `Sample ids: ${sample}\n` : "") +
+      `Provider mode: \`${runtime.provider}\` | Source: \`${payload?.source || "local"}\``
     )
     .addFields({
       name: "Matching Variants",
@@ -115,9 +120,10 @@ export async function execute(interaction) {
 
   if (sub === "catalog") {
     const query = interaction.options.getString("query") || "";
+    const payload = await getFunCatalog({ query, limit: 20 });
     await interaction.reply({
       flags: MessageFlags.Ephemeral,
-      embeds: [buildCatalogEmbed(query)]
+      embeds: [buildCatalogEmbed(payload, query)]
     });
     return;
   }
@@ -125,27 +131,30 @@ export async function execute(interaction) {
   const target = interaction.options.getString("target") || interaction.user.username;
   const intensity = clampIntensity(interaction.options.getInteger("intensity") || 3);
 
-  let variantId = null;
+  let result = null;
   if (sub === "play") {
-    variantId = interaction.options.getString("variant", true).toLowerCase();
-    const existing = getVariantById(variantId);
-    if (!existing) {
+    const requested = interaction.options.getString("variant", true).toLowerCase();
+    const variantId = resolveVariantId(requested);
+    if (!variantId) {
       await interaction.reply({
         flags: MessageFlags.Ephemeral,
         content: "Unknown variant id. Use `/fun catalog` to browse valid ids."
       });
       return;
     }
+    result = await renderFunFromRuntime({
+      variantId,
+      actorTag: interaction.user.username,
+      target,
+      intensity
+    });
   } else {
-    variantId = randomVariantId();
+    result = await randomFunFromRuntime({
+      actorTag: interaction.user.username,
+      target,
+      intensity
+    });
   }
-
-  const result = renderFunVariant({
-    variantId,
-    actorTag: interaction.user.username,
-    target,
-    intensity
-  });
 
   if (!result.ok) {
     await interaction.reply({

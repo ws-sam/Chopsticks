@@ -122,7 +122,9 @@ function topicContent(topicKey) {
         "",
         "**Playlists (drop channels):**",
         "1) Admins: `/music playlist panel` -> Create -> Bind Drop Channel -> (optional) Panel Message",
+        "2) Admins: post a single **Playlist Hub** message so users can self-serve (`/music playlist panel` -> Hub Message)",
         "2) Users: drop audio files or links in the drop channel to add tracks",
+        "   Tip: type `q: keywords` to add a search query item",
         "3) In VC: `/music queue` -> press **Playlists** -> queue a track from dropdowns",
         "",
         "Use Pools UI to see invite availability and the reason for gaps."

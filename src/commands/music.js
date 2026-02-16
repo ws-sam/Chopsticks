@@ -463,6 +463,7 @@ function normalizePlaylistsConfig(data) {
   cfg.maxPersonalPerUser = Math.max(1, Math.min(25, Math.trunc(cfg.maxPersonalPerUser)));
   cfg.playlists ??= {};
   cfg.channelBindings ??= {};
+  cfg.hub ??= null; // { channelId, messageId }
 
   // Normalize playlist objects (additive/back-compat).
   for (const [pid, plRaw] of Object.entries(cfg.playlists)) {
@@ -609,6 +610,23 @@ function buildPlaylistPanelMessageComponents(playlistId) {
   return [row];
 }
 
+function buildPlaylistHubEmbed(cfg) {
+  const fields = [
+    { name: "What This Is", value: "A self-serve playlist station.\nCreate your own drop channel, then drop audio files, links, or `q: keywords` to build a playlist.", inline: false },
+    { name: "How To Use", value: "1) Press **Create Personal Drop**\n2) Drop files/links inside the thread\n3) Press **Browse Playlists** to queue tracks into VC", inline: false }
+  ];
+  return makeEmbed("Music Playlist Hub", "Build playlists without commands spam.", fields, null, null, QUEUE_COLOR);
+}
+
+function buildPlaylistHubComponents() {
+  const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId("mplhub:create").setLabel("Create Personal Drop").setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId("mplhub:browse").setLabel("Browse Playlists").setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId("mplhub:help").setLabel("How It Works").setStyle(ButtonStyle.Secondary)
+  );
+  return [row];
+}
+
 async function tryUpdatePlaylistPanelMessage(guild, guildData, playlistId) {
   try {
     if (!guild || !guildData?.music?.playlists) return;
@@ -660,6 +678,7 @@ function buildPlaylistPanelComponents(cfg, userId) {
     new ButtonBuilder().setCustomId(`musicpl:panel:${userId}:clear`).setLabel("Clear Items").setStyle(ButtonStyle.Secondary).setDisabled(playlists.length === 0),
     new ButtonBuilder().setCustomId(`musicpl:panel:${userId}:delete`).setLabel("Delete").setStyle(ButtonStyle.Danger).setDisabled(playlists.length === 0),
     new ButtonBuilder().setCustomId(`musicpl:panel:${userId}:refresh`).setLabel("Refresh").setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId(`musicpl:panel:${userId}:hub`).setLabel("Hub Message").setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId(`musicpl:panel:${userId}:close`).setLabel("Close").setStyle(ButtonStyle.Secondary)
   );
 
@@ -973,6 +992,93 @@ async function maybeCreatePersonalDropThread(interaction, name) {
   }
 }
 
+async function tryCreateDropThread(interaction, name) {
+  // Attempt private thread first; fall back to public thread if needed.
+  const parent = interaction.channel;
+  if (!interaction.guild || !parent) return null;
+  if (parent.type !== ChannelType.GuildText && parent.type !== ChannelType.GuildAnnouncement) return null;
+
+  try {
+    const thread = await parent.threads.create({
+      name: String(name || "playlist-drop").slice(0, 60),
+      type: ChannelType.PrivateThread,
+      invitable: false,
+      reason: "Chopsticks playlist drop thread"
+    });
+    await thread.members.add(interaction.user.id).catch(() => {});
+    return thread;
+  } catch {}
+
+  try {
+    const thread = await parent.threads.create({
+      name: String(name || "playlist-drop").slice(0, 60),
+      type: ChannelType.PublicThread,
+      reason: "Chopsticks playlist drop thread (fallback)"
+    });
+    await thread.members.add(interaction.user.id).catch(() => {});
+    return thread;
+  } catch {}
+
+  return null;
+}
+
+async function createPersonalPlaylist(interaction, { parentChannelId = null } = {}) {
+  const guildId = interaction.guildId;
+  if (!guildId) return { ok: false, reason: "no-guild" };
+
+  const data = await loadGuildData(guildId);
+  const cfg = normalizePlaylistsConfig(data);
+
+  const myCount = Object.values(cfg.playlists || {}).filter(p => String(p?.createdBy || "") === interaction.user.id).length;
+  if (myCount >= cfg.maxPersonalPerUser) return { ok: false, reason: "personal-limit" };
+  if (Object.values(cfg.playlists || {}).length >= cfg.maxPlaylists) return { ok: false, reason: "server-limit" };
+
+  const playlistId = `pl_${randomKey()}`;
+  const name = `${interaction.user.username}'s playlist`.slice(0, 40);
+  cfg.playlists[playlistId] = {
+    id: playlistId,
+    name,
+    channelId: null,
+    visibility: "collaborators",
+    createdBy: interaction.user.id,
+    collaborators: [],
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    perms: { read: "collaborators", write: "collaborators" },
+    panel: null,
+    items: []
+  };
+
+  // Optionally create + bind a drop thread under the chosen parent channel (defaults to interaction.channel).
+  const boundChannels = Object.keys(cfg.channelBindings || {});
+  const canBindChannel = boundChannels.length < MUSIC_PLAYLIST_MAX_CHANNELS;
+
+  let thread = null;
+  if (canBindChannel) {
+    const prevChannel = interaction.channel;
+    if (parentChannelId && interaction.guild?.channels?.cache?.get(parentChannelId)) {
+      // Temporarily point creation at the chosen channel by creating a shallow wrapper interaction-like.
+      // Avoid mutating the actual interaction object; just use the channel directly.
+      const ch = interaction.guild.channels.cache.get(parentChannelId);
+      if (ch) {
+        const fake = { ...interaction, channel: ch };
+        thread = await tryCreateDropThread(fake, `${interaction.user.username}-playlist`).catch(() => null);
+      }
+    } else {
+      thread = await tryCreateDropThread(interaction, `${interaction.user.username}-playlist`).catch(() => null);
+    }
+  }
+
+  if (thread?.id) {
+    cfg.channelBindings[thread.id] = playlistId;
+    cfg.playlists[playlistId].channelId = thread.id;
+  }
+
+  await saveGuildData(guildId, data).catch(() => {});
+  await auditLog({ guildId, userId: interaction.user.id, action: "music.playlists.personal_create", details: { playlistId, threadId: thread?.id || null } });
+  return { ok: true, playlistId, playlist: cfg.playlists[playlistId], threadId: thread?.id || null };
+}
+
 async function ingestPlaylistMessage(message, guildData) {
   if (!message.guildId) return;
   const cfg = normalizePlaylistsConfig(guildData);
@@ -1043,6 +1149,27 @@ async function ingestPlaylistMessage(message, guildData) {
       sourceMessageId: message.id
     });
     if (newItems.length >= 12) break;
+  }
+
+  // Keyword queries: allow lightweight search terms with "q:" or leading "?".
+  if (!newItems.length) {
+    const raw = String(message.content || "").trim();
+    let q = "";
+    if (raw.startsWith("q:")) q = raw.slice(2).trim();
+    else if (raw.startsWith("?")) q = raw.slice(1).trim();
+    if (q && q.length >= 2 && q.length <= 120) {
+      newItems.push({
+        id: `mpli_${randomKey()}`,
+        type: "query",
+        title: q.slice(0, 100),
+        url: q, // stored as query string
+        size: 0,
+        contentType: "",
+        addedBy: message.author.id,
+        addedAt: Date.now(),
+        sourceMessageId: message.id
+      });
+    }
   }
 
   if (!newItems.length) return;
@@ -1476,6 +1603,63 @@ async function playAudioDropToVc(interaction, dropKey, uploaderId, voiceChannelI
       embeds: [makeEmbed("Music Error", msg, [], null, null, 0xFF0000)]
     }, { preferFollowUp });
   }
+}
+
+async function playPlaylistItem(interaction, agent, guildId, voiceChannelId, item, config, textChannelId) {
+  const query = String(item?.url ?? "");
+  const isUrl = /^https?:\/\//i.test(query);
+  if (isUrl) {
+    return sendAgentCommand(agent, "play", {
+      guildId,
+      voiceChannelId,
+      textChannelId,
+      ownerUserId: interaction.user.id,
+      actorUserId: interaction.user.id,
+      query,
+      defaultMode: config?.defaultMode,
+      defaultVolume: config?.defaultVolume,
+      limits: config?.limits,
+      controlMode: config?.controlMode,
+      searchProviders: config?.searchProviders,
+      fallbackProviders: config?.fallbackProviders,
+      requester: buildRequester(interaction.user)
+    });
+  }
+
+  // Query item: search then play the top result deterministically.
+  const searchRes = await sendAgentCommand(agent, "search", {
+    guildId,
+    voiceChannelId,
+    textChannelId,
+    ownerUserId: interaction.user.id,
+    actorUserId: interaction.user.id,
+    query,
+    defaultMode: config?.defaultMode,
+    defaultVolume: config?.defaultVolume,
+    limits: config?.limits,
+    controlMode: config?.controlMode,
+    searchProviders: config?.searchProviders,
+    fallbackProviders: config?.fallbackProviders,
+    requester: buildRequester(interaction.user)
+  });
+  const tracks = Array.isArray(searchRes?.tracks) ? searchRes.tracks : [];
+  if (!tracks.length) throw new Error("no-results");
+  const top = tracks[0];
+  return sendAgentCommand(agent, "play", {
+    guildId,
+    voiceChannelId,
+    textChannelId,
+    ownerUserId: interaction.user.id,
+    actorUserId: interaction.user.id,
+    query: top?.uri ?? top?.title ?? query,
+    defaultMode: config?.defaultMode,
+    defaultVolume: config?.defaultVolume,
+    limits: config?.limits,
+    controlMode: config?.controlMode,
+    searchProviders: config?.searchProviders,
+    fallbackProviders: config?.fallbackProviders,
+    requester: buildRequester(interaction.user)
+  });
 }
 
 export async function execute(interaction) {
@@ -2111,6 +2295,89 @@ export async function handleButton(interaction) {
   if (!interaction.isButton?.()) return false;
   const id = String(interaction.customId || "");
 
+  if (id.startsWith("mplhub:")) {
+    const action = id.split(":")[1] || "";
+    const guildId = interaction.guildId;
+    if (!guildId) return true;
+
+    if (action === "help") {
+      await interaction.reply({
+        ephemeral: true,
+        embeds: [makeEmbed("Playlist Hub", "Use the hub to create a personal drop thread without spamming commands.\n\nInside your drop thread you can:\n- upload audio files\n- paste links\n- type `q: keywords` to add a search term\n\nThen open **Browse Playlists** to queue tracks into your voice channel.", [], null, null, QUEUE_COLOR)]
+      }).catch(() => {});
+      return true;
+    }
+
+    if (action === "browse") {
+      const voiceChannelId = await resolveMemberVoiceId(interaction);
+      await openPlaylistBrowser(interaction, { voiceChannelId });
+      return true;
+    }
+
+    if (action === "create") {
+      const rl = await checkRateLimit(`mplhub:create:${guildId}:${interaction.user.id}`, 2, 30).catch(() => ({ ok: true }));
+      if (!rl.ok) {
+        await interaction.reply({ ephemeral: true, embeds: [makeEmbed("Playlist Hub", "You're creating playlists too fast. Try again in a moment.", [], null, null, 0xFF0000)] }).catch(() => {});
+        return true;
+      }
+
+      await interaction.deferReply({ ephemeral: true }).catch(() => {});
+      const res = await createPersonalPlaylist(interaction, { parentChannelId: interaction.channelId });
+      if (!res.ok) {
+        const msg =
+          res.reason === "personal-limit"
+            ? "You reached your personal playlist limit."
+            : (res.reason === "server-limit" ? "This server reached its playlist limit." : "Could not create a playlist.");
+        await interaction.editReply({ embeds: [makeEmbed("Personal Playlist", msg, [], null, null, 0xFF0000)] }).catch(() => {});
+        return true;
+      }
+
+      const data = await loadGuildData(guildId);
+      const cfg = normalizePlaylistsConfig(data);
+      const pl = cfg.playlists?.[res.playlistId] ?? res.playlist;
+
+      // If we created a thread, drop a panel message inside it.
+      if (res.threadId && interaction.guild) {
+        const thread = interaction.guild.channels.cache.get(res.threadId);
+        if (thread?.isTextBased?.()) {
+          const msg = await thread.send({
+            embeds: [buildPlaylistPanelMessageEmbed(pl)],
+            components: buildPlaylistPanelMessageComponents(pl.id)
+          }).catch(() => null);
+          if (msg) {
+            await msg.pin().catch(() => {});
+            pl.panel = { channelId: thread.id, messageId: msg.id };
+            pl.updatedAt = Date.now();
+            await saveGuildData(guildId, data).catch(() => {});
+          }
+        }
+      }
+
+      const components = [];
+      const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId("mplhub:browse").setLabel("Browse Playlists").setStyle(ButtonStyle.Primary)
+      );
+      components.push(row);
+
+      await interaction.editReply({
+        embeds: [makeEmbed(
+          "Personal Playlist Created",
+          res.threadId
+            ? `Drop files/links here: <#${res.threadId}>`
+            : "Playlist created. Ask an admin to enable threads or bind a drop channel.",
+          [
+            { name: "Tip", value: "Type `q: keywords` in the drop thread to add a search query.", inline: false }
+          ],
+          null,
+          null,
+          QUEUE_COLOR
+        )],
+        components
+      }).catch(() => {});
+      return true;
+    }
+  }
+
   if (id.startsWith("mplbulk:")) {
     const parts = id.split(":");
     const action = parts[1]; // confirm|cancel
@@ -2515,11 +2782,6 @@ export async function handleButton(interaction) {
         return true;
       }
       const pick = items[Math.floor(Math.random() * items.length)];
-      const url = String(pick?.url ?? "");
-      if (!/^https?:\/\//i.test(url)) {
-        await interaction.reply({ ephemeral: true, embeds: [makeEmbed("Playlist", "Selected item URL invalid.", [], null, null, 0xFF0000)] }).catch(() => {});
-        return true;
-      }
       const vcId = await resolveMemberVoiceId(interaction);
       if (!vcId) {
         await interaction.reply({ ephemeral: true, embeds: [makeEmbed("Music", "Join a voice channel, then press Queue Random again.", [], null, null, 0xFF0000)] }).catch(() => {});
@@ -2533,24 +2795,14 @@ export async function handleButton(interaction) {
         return true;
       }
       try {
-        const result = await sendAgentCommand(alloc.agent, "play", {
-          guildId,
-          voiceChannelId: vcId,
-          textChannelId: interaction.channelId,
-          ownerUserId: interaction.user.id,
-          actorUserId: interaction.user.id,
-          query: url,
-          defaultMode: config?.defaultMode,
-          defaultVolume: config?.defaultVolume,
-          limits: config?.limits,
-          controlMode: config?.controlMode,
-          searchProviders: config?.searchProviders,
-          fallbackProviders: config?.fallbackProviders,
-          requester: buildRequester(interaction.user)
-        });
-        const track = result?.track ?? { title: pick?.title || "Playlist item", uri: url };
+        const result = await playPlaylistItem(interaction, alloc.agent, guildId, vcId, pick, config, interaction.channelId);
+        const track = result?.track ?? { title: pick?.title || "Playlist item" };
         await interaction.reply({ ephemeral: true, embeds: [buildTrackEmbed(String(result?.action ?? "queued"), track)] }).catch(() => {});
       } catch (err) {
+        if (String(err?.message ?? err) === "no-results") {
+          await interaction.reply({ ephemeral: true, embeds: [makeEmbed("Music", "No results found for that query.", [], null, null, 0xFF0000)] }).catch(() => {});
+          return true;
+        }
         await interaction.reply({ ephemeral: true, embeds: [makeEmbed("Music Error", formatMusicError(err), [], null, null, 0xFF0000)] }).catch(() => {});
       }
       return true;
@@ -2755,12 +3007,6 @@ export async function handleButton(interaction) {
       }
 
       const it = view.find(v => String(v?.id || "") === String(selectedItemId || "")) ?? view[0];
-      const url = String(it?.url ?? "");
-      if (!/^https?:\/\//i.test(url)) {
-        await interaction.followUp({ ephemeral: true, embeds: [makeEmbed("Music Playlists", "That item URL is invalid.", [], null, null, 0xFF0000)] }).catch(() => {});
-        return true;
-      }
-
       const vcId = await resolveMemberVoiceId(interaction);
       if (!vcId) {
         await interaction.followUp({ ephemeral: true, embeds: [makeEmbed("Music", "Join a voice channel, then press Queue again.", [], null, null, 0xFF0000)] }).catch(() => {});
@@ -2785,25 +3031,16 @@ export async function handleButton(interaction) {
       }
 
       try {
-        const result = await sendAgentCommand(alloc.agent, "play", {
-          guildId: state.guildId,
-          voiceChannelId: vcId,
-          textChannelId: interaction.channelId,
-          ownerUserId: interaction.user.id,
-          actorUserId: interaction.user.id,
-          query: url,
-          defaultMode: config?.defaultMode,
-          defaultVolume: config?.defaultVolume,
-          limits: config?.limits,
-          controlMode: config?.controlMode,
-          searchProviders: config?.searchProviders,
-          fallbackProviders: config?.fallbackProviders,
-          requester: buildRequester(interaction.user)
-        });
-        const track = result?.track ?? { title: it?.title || "Playlist item", uri: url };
+        const result = await playPlaylistItem(interaction, alloc.agent, state.guildId, vcId, it, config, interaction.channelId);
+        const q = String(it?.url ?? "");
+        const track = result?.track ?? { title: it?.title || "Playlist item", uri: /^https?:\/\//i.test(q) ? q : null };
         const action2 = String(result?.action ?? "queued");
         await interaction.followUp({ ephemeral: true, embeds: [buildTrackEmbed(action2, track)] }).catch(() => {});
       } catch (err) {
+        if (String(err?.message ?? err) === "no-results") {
+          await interaction.followUp({ ephemeral: true, embeds: [makeEmbed("Music", "No results found for that query.", [], null, null, 0xFF0000)] }).catch(() => {});
+          return true;
+        }
         await interaction.followUp({ ephemeral: true, embeds: [makeEmbed("Music Error", formatMusicError(err), [], null, null, 0xFF0000)] }).catch(() => {});
       }
       return true;
@@ -2976,6 +3213,26 @@ export async function handleButton(interaction) {
       const embed = makeEmbed("Playlist Panel Message", `Post a pinned playlist panel for **${pl.name || pl.id}**.\nUsers will be able to browse and queue tracks from it.`, [
         { name: "Tip", value: "Post it in your playlist drop channel for the best UX.", inline: false }
       ], null, null, QUEUE_COLOR);
+      await interaction.reply({ ephemeral: true, embeds: [embed], components: [new ActionRowBuilder().addComponents(menu)] }).catch(() => {});
+      return true;
+    }
+
+    if (action === "hub") {
+      const channels = interaction.guild?.channels?.cache
+        ? Array.from(interaction.guild.channels.cache.values())
+            .filter(ch => ch && (ch.type === ChannelType.GuildText || ch.type === ChannelType.GuildAnnouncement))
+            .slice(0, 25)
+        : [];
+      if (!channels.length) {
+        await interaction.reply({ ephemeral: true, embeds: [makeEmbed("Playlist Hub", "No text channels available.", [], null, null, 0xFF0000)] }).catch(() => {});
+        return true;
+      }
+      const opts = channels.map(ch => ({ label: truncate(ch.name, 100), value: ch.id }));
+      const menu = new StringSelectMenuBuilder()
+        .setCustomId(`musicplsel:hub_channel:${interaction.user.id}`)
+        .setPlaceholder("Choose where to post the Playlist Hub message")
+        .addOptions(opts);
+      const embed = makeEmbed("Playlist Hub", "Post a single hub message where users can create personal drop threads and browse playlists.\nThis prevents chat clutter from setup commands.", [], null, null, QUEUE_COLOR);
       await interaction.reply({ ephemeral: true, embeds: [embed], components: [new ActionRowBuilder().addComponents(menu)] }).catch(() => {});
       return true;
     }
@@ -3730,6 +3987,47 @@ export async function handleSelect(interaction) {
       await saveGuildData(guildId, data).catch(() => {});
       await auditLog({ guildId, userId: interaction.user.id, action: "music.playlists.panel_set", details: { playlistId, channelId, messageId: msg.id } });
       await interaction.followUp({ ephemeral: true, embeds: [makeEmbed("Playlist Panel", `Panel posted in <#${channelId}>.`, [], null, null, QUEUE_COLOR)] }).catch(() => {});
+      return true;
+    }
+
+    if (kind === "hub_channel") {
+      const channelId = String(interaction.values?.[0] ?? "");
+      const data = await loadGuildData(guildId);
+      const cfg = normalizePlaylistsConfig(data);
+      const guild = interaction.guild;
+      const ch = guild?.channels?.cache?.get(channelId) ?? null;
+      if (!ch?.isTextBased?.()) {
+        await interaction.followUp({ ephemeral: true, embeds: [makeEmbed("Playlist Hub", "Invalid channel.", [], null, null, 0xFF0000)] }).catch(() => {});
+        return true;
+      }
+
+      const embed = buildPlaylistHubEmbed(cfg);
+      // Update existing hub if present.
+      let msg = null;
+      if (cfg.hub?.channelId && cfg.hub?.messageId) {
+        const prevCh = guild.channels.cache.get(cfg.hub.channelId);
+        if (prevCh?.isTextBased?.()) {
+          const prevMsg = await prevCh.messages.fetch(cfg.hub.messageId).catch(() => null);
+          if (prevMsg) {
+            await prevMsg.edit({ embeds: [embed], components: buildPlaylistHubComponents() }).catch(() => {});
+            msg = prevMsg;
+          }
+        }
+      }
+
+      if (!msg) {
+        msg = await ch.send({ embeds: [embed], components: buildPlaylistHubComponents() }).catch(() => null);
+      }
+
+      if (!msg) {
+        await interaction.followUp({ ephemeral: true, embeds: [makeEmbed("Playlist Hub", "Failed to post hub message. Check bot permissions.", [], null, null, 0xFF0000)] }).catch(() => {});
+        return true;
+      }
+
+      cfg.hub = { channelId: ch.id, messageId: msg.id };
+      await saveGuildData(guildId, data).catch(() => {});
+      await auditLog({ guildId, userId: interaction.user.id, action: "music.playlists.hub_set", details: { channelId: ch.id, messageId: msg.id } });
+      await interaction.followUp({ ephemeral: true, embeds: [makeEmbed("Playlist Hub", `Hub posted in <#${ch.id}>.`, [], null, null, QUEUE_COLOR)] }).catch(() => {});
       return true;
     }
 

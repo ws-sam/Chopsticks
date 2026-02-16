@@ -628,6 +628,20 @@ async function tryUpdatePlaylistPanelMessage(guild, guildData, playlistId) {
   }
 }
 
+async function tryDisablePlaylistPanelMessage(guild, playlist) {
+  try {
+    if (!guild || !playlist?.panel?.channelId || !playlist?.panel?.messageId) return;
+    const ch = guild.channels.cache.get(playlist.panel.channelId);
+    if (!ch?.isTextBased?.()) return;
+    const msg = await ch.messages.fetch(playlist.panel.messageId).catch(() => null);
+    if (!msg) return;
+    await msg.edit({
+      embeds: [makeEmbed("Playlist", "This playlist was removed or is no longer available.", [], null, null, 0xFF0000)],
+      components: []
+    }).catch(() => {});
+  } catch {}
+}
+
 function buildPlaylistPanelComponents(cfg, userId) {
   const playlists = Object.values(cfg.playlists || {})
     .sort((a, b) => String(a?.name || "").localeCompare(String(b?.name || "")))
@@ -2334,7 +2348,11 @@ export async function handleButton(interaction) {
       };
 
       // Best-effort: create a private drop thread under current channel.
-      const thread = await maybeCreatePersonalDropThread(interaction, `${interaction.user.username}-playlist`).catch(() => null);
+      const boundChannels = Object.keys(cfg.channelBindings || {});
+      const canBindChannel = boundChannels.length < MUSIC_PLAYLIST_MAX_CHANNELS;
+      const thread = canBindChannel
+        ? await maybeCreatePersonalDropThread(interaction, `${interaction.user.username}-playlist`).catch(() => null)
+        : null;
       if (thread?.id) {
         cfg.channelBindings[thread.id] = playlistId;
         cfg.playlists[playlistId].channelId = thread.id;
@@ -2353,7 +2371,9 @@ export async function handleButton(interaction) {
         ephemeral: true,
         embeds: [makeEmbed("Personal Playlist", thread?.id
           ? `Created **${name}**.\nDrop files/links here: <#${thread.id}>`
-          : `Created **${name}**.\nTo add tracks, bind a drop channel from the admin panel or ask an admin to allow threads.`, [], null, null, QUEUE_COLOR)]
+          : (canBindChannel
+              ? `Created **${name}**.\nTo add tracks, bind a drop channel from the admin panel or ask an admin to allow threads.`
+              : `Created **${name}**.\nThis server has reached its playlist-channel cap (${MUSIC_PLAYLIST_MAX_CHANNELS}). Ask an admin to increase it or clean up unused playlist channels.`), [], null, null, QUEUE_COLOR)]
       }).catch(() => {});
       return true;
     }
@@ -3055,12 +3075,15 @@ export async function handleButton(interaction) {
       pl.items = [];
       pl.updatedAt = Date.now();
       await saveGuildData(guildId, data).catch(() => {});
+      void tryUpdatePlaylistPanelMessage(interaction.guild, data, pl.id).catch(() => {});
       await interaction.deferUpdate().catch(() => {});
       await interaction.editReply({ embeds: [makeEmbed("Playlist Cleared", `Cleared items for **${pl.name || pl.id}**.`, [], null, null, QUEUE_COLOR)], components: [] }).catch(() => {});
       return true;
     }
 
     if (action === "delete") {
+      // Disable panel message first (best-effort).
+      void tryDisablePlaylistPanelMessage(interaction.guild, pl).catch(() => {});
       // Remove bindings to this playlist.
       for (const [chId, pid] of Object.entries(cfg.channelBindings || {})) {
         if (pid === playlistId) delete cfg.channelBindings[chId];
@@ -3582,7 +3605,9 @@ export async function handleSelect(interaction) {
     };
 
     if (kind === "pl") {
-      next.selectedPlaylistId = String(interaction.values?.[0] ?? "");
+      const picked = String(interaction.values?.[0] ?? "");
+      if (picked === "none") return true;
+      next.selectedPlaylistId = picked;
       next.selectedItemId = "";
       next.page = 0;
     } else if (kind === "sort") {

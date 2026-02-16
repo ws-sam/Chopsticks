@@ -120,6 +120,11 @@ function topicContent(topicKey) {
         "2) `/music play <query>`",
         "3) If it says all busy: deploy more agents or wait for idle release.",
         "",
+        "**Playlists (drop channels):**",
+        "1) Admins: `/music playlist panel` -> Create -> Bind Drop Channel -> (optional) Panel Message",
+        "2) Users: drop audio files or links in the drop channel to add tracks",
+        "3) In VC: `/music queue` -> press **Playlists** -> queue a track from dropdowns",
+        "",
         "Use Pools UI to see invite availability and the reason for gaps."
       ].join("\n")
     };

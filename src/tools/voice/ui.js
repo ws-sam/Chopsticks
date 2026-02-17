@@ -36,7 +36,10 @@ const MODE_LABELS = {
 const roomPanelRegistry = new Map();
 
 function hasAdmin(interaction) {
-  return interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild);
+  return Boolean(
+    interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild) ||
+    interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)
+  );
 }
 
 function buildEmbed(title, description) {
@@ -90,11 +93,22 @@ function makeRoomPanelCustomId(kind, roomChannelId) {
 
 function parseRoomPanelCustomId(customId) {
   const parts = String(customId || "").split(":");
-  if (parts.length < 3 || parts[0] !== ROOM_PANEL_PREFIX) return null;
-  return {
-    kind: parts[1],
-    roomChannelId: parts[2]
-  };
+  if (parts[0] !== ROOM_PANEL_PREFIX) return null;
+  if (parts.length === 3) {
+    return {
+      kind: parts[1],
+      guildId: null,
+      roomChannelId: parts[2]
+    };
+  }
+  if (parts.length === 4) {
+    return {
+      kind: parts[1],
+      guildId: parts[2],
+      roomChannelId: parts[3]
+    };
+  }
+  return null;
 }
 
 function roomPanelKey(guildId, roomChannelId) {
@@ -914,11 +928,191 @@ async function handleLivePanelButton(interaction, parsed) {
   return true;
 }
 
+function buildDmRoomErrorPayload(message) {
+  return {
+    embeds: [buildErrorEmbed(message)],
+    components: []
+  };
+}
+
+async function resolveRoomContextFromIds(client, guildId, roomChannelId, actingUserId) {
+  const gid = String(guildId || "").trim();
+  const rid = String(roomChannelId || "").trim();
+  const uid = String(actingUserId || "").trim();
+  if (!gid || !rid || !uid) return { ok: false, error: "invalid" };
+
+  const guild = await client.guilds.fetch(gid).catch(() => null);
+  if (!guild) return { ok: false, error: "guild-missing" };
+
+  const member =
+    guild.members.cache.get(uid) ??
+    (await guild.members.fetch(uid).catch(() => null));
+  if (!member) return { ok: false, error: "member-missing" };
+
+  const voice = await getVoiceState(gid);
+  if (!voice) return { ok: false, error: "no-voice-state" };
+  voice.tempChannels ??= {};
+  voice.lobbies ??= {};
+
+  const temp = voice.tempChannels[rid] ?? null;
+  if (!temp) return { ok: false, error: "not-temp", guild, member, voice };
+
+  const roomChannel =
+    guild.channels.cache.get(rid) ??
+    (await guild.channels.fetch(rid).catch(() => null));
+  if (!roomChannel) return { ok: false, error: "room-missing", guild, member, voice, temp };
+
+  const isOwner = String(temp.ownerId || "") === uid;
+  const perms = member.permissions;
+  const isAdmin = Boolean(
+    perms?.has?.(PermissionFlagsBits.ManageGuild) ||
+    perms?.has?.(PermissionFlagsBits.Administrator)
+  );
+
+  const lobby = voice.lobbies?.[temp.lobbyId] ?? null;
+  return { ok: true, guild, member, voice, temp, roomChannel, lobby, isOwner, isAdmin };
+}
+
+function buildDmDashboardPayload(ctx, { notice = null, closed = false } = {}) {
+  const ownerId = ctx?.temp?.ownerId || ctx?.member?.id || "0";
+  const embed = buildVoiceRoomDashboardEmbed({
+    roomChannel: ctx?.roomChannel,
+    tempRecord: ctx?.temp,
+    lobby: ctx?.lobby,
+    ownerUserId: ownerId,
+    reason: "manual"
+  });
+
+  if (notice) {
+    embed.setFooter({ text: String(notice).slice(0, 240) });
+  }
+
+  const controlsDisabled = closed || (!ctx?.isOwner && !ctx?.isAdmin);
+  const components =
+    ctx?.roomChannel?.id
+      ? buildVoiceRoomDashboardComponents(ctx.roomChannel.id, {
+          guildId: ctx.guild?.id,
+          includeDmButton: false,
+          controlsDisabled
+        })
+      : [];
+
+  return { embeds: [embed], components };
+}
+
+async function handleRoomPanelButtonInDm(interaction, parsed) {
+  const gid = String(parsed.guildId || "").trim();
+  if (!gid) {
+    await interaction.update(buildDmRoomErrorPayload("This dashboard button needs a server context. Re-open the dashboard from inside the server.")).catch(() => {});
+    return true;
+  }
+
+  const ctx = await resolveRoomContextFromIds(interaction.client, gid, parsed.roomChannelId, interaction.user.id);
+  if (!ctx.ok) {
+    const msg =
+      ctx.error === "guild-missing"
+        ? "That server is no longer available."
+        : ctx.error === "member-missing"
+          ? "You are no longer a member of that server."
+          : ctx.error === "room-missing"
+            ? "That room no longer exists."
+            : ctx.error === "not-temp"
+              ? "That room is no longer managed by VoiceMaster."
+              : ctx.error === "no-voice-state"
+                ? "Voice settings are not initialized yet."
+                : "Unable to use this dashboard right now.";
+    await interaction.update(buildDmRoomErrorPayload(msg)).catch(() => {});
+    return true;
+  }
+
+  const action = parsed.kind;
+  if (action === "refresh") {
+    await interaction.update(buildDmDashboardPayload(ctx, { notice: "Refreshed." })).catch(() => {});
+    return true;
+  }
+
+  if (action === "dm") {
+    await interaction.update(buildDmDashboardPayload(ctx, { notice: "You are already viewing this in DMs." })).catch(() => {});
+    return true;
+  }
+
+  if (!ctx.isOwner && !ctx.isAdmin) {
+    await interaction.update(buildDmDashboardPayload(ctx, { notice: "Only the room owner (or admins) can do that." })).catch(() => {});
+    return true;
+  }
+
+  if (action === "lock" || action === "unlock") {
+    const everyoneRoleId = ctx.guild.roles.everyone?.id;
+    if (!everyoneRoleId) {
+      await interaction.update(buildDmDashboardPayload(ctx, { notice: "Unable to resolve @everyone role." })).catch(() => {});
+      return true;
+    }
+
+    try {
+      if (action === "lock") {
+        await ctx.roomChannel.permissionOverwrites.edit(everyoneRoleId, { Connect: false });
+        await interaction.update(buildDmDashboardPayload(ctx, { notice: "Room locked." })).catch(() => {});
+        return true;
+      }
+
+      if (ctx.roomChannel.permissionOverwrites.cache.has(everyoneRoleId)) {
+        await ctx.roomChannel.permissionOverwrites.delete(everyoneRoleId);
+      }
+      await interaction.update(buildDmDashboardPayload(ctx, { notice: "Room unlocked." })).catch(() => {});
+      return true;
+    } catch {
+      await interaction.update(buildDmDashboardPayload(ctx, { notice: "Failed to update room lock state. Check bot permissions." })).catch(() => {});
+      return true;
+    }
+  }
+
+  if (action === "release") {
+    const roomId = ctx.roomChannel.id;
+    const lobbyChannelId = ctx.temp?.lobbyId ?? null;
+    const lobbyChannel =
+      lobbyChannelId
+        ? (ctx.guild.channels.cache.get(lobbyChannelId) ?? (await ctx.guild.channels.fetch(lobbyChannelId).catch(() => null)))
+        : null;
+    const canMoveToLobby = Boolean(lobbyChannel && lobbyChannel.type === ChannelType.GuildVoice);
+
+    const humans = Array.from(ctx.roomChannel.members.values()).filter(m => !m.user?.bot);
+    for (const m of humans) {
+      if (!m?.voice) continue;
+      try {
+        if (canMoveToLobby) {
+          await m.voice.setChannel(lobbyChannel).catch(() => {});
+        } else {
+          await m.voice.setChannel(null).catch(() => {});
+        }
+      } catch {}
+    }
+
+    await removeTempChannel(ctx.guild.id, roomId, ctx.voice).catch(() => {});
+    await ctx.roomChannel.delete().catch(() => {});
+
+    await auditLog({
+      guildId: ctx.guild.id,
+      userId: interaction.user.id,
+      action: "voice.room.release.dm",
+      details: { channelId: roomId, lobbyId: lobbyChannelId, moved: humans.length }
+    }).catch(() => {});
+
+    await interaction.update(buildDmDashboardPayload(ctx, { notice: "Room released (deleted).", closed: true })).catch(() => {});
+    return true;
+  }
+
+  await interaction.update(buildDmDashboardPayload(ctx, { notice: "Unsupported action." })).catch(() => {});
+  return true;
+}
+
 export async function handleVoiceUIButton(interaction) {
   if (!interaction.isButton?.()) return false;
 
   const parsedRoom = parseRoomPanelCustomId(interaction.customId);
   if (parsedRoom) {
+    if (!interaction.inGuild?.()) {
+      return handleRoomPanelButtonInDm(interaction, parsedRoom);
+    }
     return handleLivePanelButton(interaction, parsedRoom);
   }
 

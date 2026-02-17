@@ -70,7 +70,10 @@ const roomSubs = new Set([
 ]);
 
 function hasAdmin(interaction) {
-  return interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild);
+  return Boolean(
+    interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild) ||
+    interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)
+  );
 }
 
 function buildEmbed(title, description) {

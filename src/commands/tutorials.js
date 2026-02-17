@@ -16,6 +16,7 @@ import { showVoiceConsole } from "../tools/voice/ui.js";
 import { getVoiceState } from "../tools/voice/schema.js";
 import { ensureCustomVcsState, getCustomVcConfig } from "../tools/voice/customVcsState.js";
 import { buildCustomVcPanelMessage } from "../tools/voice/customVcsUi.js";
+import { fetchPool, getGuildSelectedPool } from "../utils/storage.js";
 
 export const meta = {
   guildOnly: false,
@@ -93,6 +94,95 @@ function buildBaseEmbed(title, description) {
     .setDescription(String(description || "").slice(0, 4096))
     .setColor(Colors.INFO)
     .setTimestamp();
+}
+
+function checklistLine(status, text) {
+  const tag = status === "ok" ? "[OK]" : status === "todo" ? "[TODO]" : "[WARN]";
+  return `${tag} ${text}`.slice(0, 240);
+}
+
+async function buildQuickstartChecklist(interaction) {
+  if (!interaction.inGuild?.()) return null;
+
+  const guildId = interaction.guildId;
+  const lines = [];
+
+  const canManage = hasManageGuild(interaction);
+  lines.push(
+    canManage
+      ? checklistLine("ok", "Admin access: Manage Server detected.")
+      : checklistLine("warn", "Admin access: missing Manage Server (some setup actions are admin-only).")
+  );
+
+  try {
+    const poolId = await getGuildSelectedPool(guildId);
+    const pool = await fetchPool(poolId).catch(() => null);
+    if (pool) {
+      const name = pool.name ? ` (${String(pool.name).slice(0, 48)})` : "";
+      lines.push(checklistLine("ok", `Pool selected: \`${poolId}\`${name}.`));
+    } else if (poolId) {
+      lines.push(checklistLine("warn", `Pool selected: \`${poolId}\` (not found). Open Pools UI to pick a valid pool.`));
+    } else {
+      lines.push(checklistLine("todo", "Pool selected: not set. Open Pools UI to pick one."));
+    }
+  } catch {
+    lines.push(checklistLine("warn", "Pool selected: unable to read guild default pool (try Refresh)."));
+  }
+
+  try {
+    const mgr = global.agentManager;
+    if (!mgr?.liveAgents?.values) {
+      lines.push(checklistLine("warn", "Agents: controller not ready yet (try Refresh in a few seconds)."));
+    } else {
+      let inGuild = 0;
+      let ready = 0;
+      for (const a of mgr.liveAgents.values()) {
+        if (!a?.guildIds?.has?.(guildId)) continue;
+        inGuild++;
+        if (a.ready) ready++;
+      }
+      if (inGuild === 0) {
+        lines.push(checklistLine("todo", "Agents: none deployed to this server yet (use Deploy UI)."));
+      } else if (ready === 0) {
+        lines.push(checklistLine("warn", `Agents: ${inGuild} present but none are ready yet.`));
+      } else {
+        lines.push(checklistLine("ok", `Agents: ${ready}/${inGuild} ready in this server.`));
+      }
+    }
+  } catch {
+    lines.push(checklistLine("warn", "Agents: unable to read live agent status."));
+  }
+
+  try {
+    const voice = await getVoiceState(guildId);
+    const lobbies = voice?.lobbies && typeof voice.lobbies === "object" ? Object.values(voice.lobbies) : [];
+    const enabled = lobbies.filter(l => l?.enabled).length;
+    if (!lobbies.length) {
+      lines.push(checklistLine("todo", "VoiceMaster: no lobbies configured (run `/voice setup`)."));
+    } else if (enabled === 0) {
+      lines.push(checklistLine("warn", `VoiceMaster: ${lobbies.length} lobby(s) configured but none enabled.`));
+    } else {
+      lines.push(checklistLine("ok", `VoiceMaster: ${enabled}/${lobbies.length} lobby(s) enabled.`));
+    }
+
+    if (voice) {
+      ensureCustomVcsState(voice);
+      const cfg = getCustomVcConfig(voice);
+      if (!cfg?.enabled) {
+        lines.push(checklistLine("todo", "Custom VCs: disabled (admins can enable with `/voice customs_setup enabled:true`)."));
+      } else if (!cfg.categoryId) {
+        lines.push(checklistLine("warn", "Custom VCs: enabled but category not set (`/voice customs_setup category:#...`)."));
+      } else if (!cfg.panelMessageId) {
+        lines.push(checklistLine("todo", "Custom VCs: panel not posted yet (`/voice customs_panel`)."));
+      } else {
+        lines.push(checklistLine("ok", "Custom VCs: enabled and panel is set."));
+      }
+    }
+  } catch {
+    lines.push(checklistLine("warn", "Voice: unable to read voice configuration."));
+  }
+
+  return lines.slice(0, 12).join("\n").slice(0, 1024);
 }
 
 function topicContent(topicKey) {
@@ -223,7 +313,7 @@ function topicContent(topicKey) {
   };
 }
 
-function buildTutorialEmbed(topicKey, interaction) {
+async function buildTutorialEmbed(topicKey, interaction) {
   const topic = topicContent(topicKey);
   const embed = buildBaseEmbed(topic.title, topic.body);
   if (!interaction.inGuild()) {
@@ -232,6 +322,15 @@ function buildTutorialEmbed(topicKey, interaction) {
       value: "Some controls require a server context (deploy planning, guild defaults, voice console).",
       inline: false
     });
+  } else if (topicKey === "start") {
+    const checklist = await buildQuickstartChecklist(interaction);
+    if (checklist) {
+      embed.addFields({
+        name: "Quickstart Checklist",
+        value: checklist,
+        inline: false
+      });
+    }
   }
   return embed;
 }
@@ -273,7 +372,11 @@ function buildTutorialComponents(interaction, userId, topicKey) {
       .setCustomId(uiId("open_voice_console", userId, topicKey))
       .setLabel("Voice Console")
       .setStyle(ButtonStyle.Secondary)
-      .setDisabled(!inGuild)
+      .setDisabled(!inGuild),
+    new ButtonBuilder()
+      .setCustomId(uiId("refresh", userId, topicKey))
+      .setLabel("Refresh")
+      .setStyle(ButtonStyle.Secondary)
   );
 
   const row3 = new ActionRowBuilder().addComponents(
@@ -288,7 +391,7 @@ function buildTutorialComponents(interaction, userId, topicKey) {
 }
 
 async function renderTutorial(interaction, { update = false, topicKey = "start" } = {}) {
-  const embed = buildTutorialEmbed(topicKey, interaction);
+  const embed = await buildTutorialEmbed(topicKey, interaction);
   const components = buildTutorialComponents(interaction, interaction.user.id, topicKey);
   const payload = { embeds: [embed], components, flags: MessageFlags.Ephemeral };
 
@@ -333,6 +436,11 @@ export async function handleButton(interaction) {
       embeds: [buildBaseEmbed("Panel Locked", "This tutorial panel belongs to another user.").setColor(Colors.ERROR)],
       flags: MessageFlags.Ephemeral
     });
+    return true;
+  }
+
+  if (parsed.kind === "refresh") {
+    await renderTutorial(interaction, { update: true, topicKey: parsed.topicKey || "start" });
     return true;
   }
 

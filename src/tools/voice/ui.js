@@ -10,7 +10,12 @@ import {
 
 import * as VoiceDomain from "./domain.js";
 import { getVoiceState } from "./schema.js";
-import { buildVoiceRoomDashboardEmbed, deliverVoiceRoomDashboard, resolvePanelDelivery } from "./panel.js";
+import {
+  buildVoiceRoomDashboardComponents,
+  buildVoiceRoomDashboardEmbed,
+  deliverVoiceRoomDashboard,
+  resolvePanelDelivery
+} from "./panel.js";
 import { ownerPermissionOverwrite } from "./ownerPerms.js";
 import { auditLog } from "../../utils/audit.js";
 import { removeTempChannel } from "./state.js";
@@ -813,7 +818,11 @@ async function handleLivePanelButton(interaction, parsed) {
         reason: "manual"
       });
       embed.setFooter({ text: "DM failed. Enable DMs from server members, or use Panel Here / channel delivery." });
-      await interaction.reply({ embeds: [embed], ephemeral: true });
+      await interaction.reply({
+        embeds: [embed],
+        components: buildVoiceRoomDashboardComponents(ctx.roomChannel.id),
+        ephemeral: true
+      });
       return true;
     }
     await interaction.reply({ embeds: [buildEmbed("Voice panel", panelDeliveryMessage(sent))], ephemeral: true });
@@ -942,18 +951,18 @@ export async function handleVoiceUIButton(interaction) {
     return true;
   }
 
-  if (parsed.kind === "panel_here" || parsed.kind === "panel_dm") {
-    const sent = await deliverVoiceRoomDashboard({
-      guild: interaction.guild,
-      member: interaction.member,
-      roomChannel: ctx.roomChannel,
-      tempRecord: ctx.temp,
-      lobby: ctx.lobby,
-      voice: ctx.voice,
-      modeOverride: parsed.kind === "panel_here" ? "here" : "dm",
-      interactionChannel: interaction.channel,
-      reason: "manual"
-    });
+    if (parsed.kind === "panel_here" || parsed.kind === "panel_dm") {
+      const sent = await deliverVoiceRoomDashboard({
+        guild: interaction.guild,
+        member: interaction.member,
+        roomChannel: ctx.roomChannel,
+        tempRecord: ctx.temp,
+        lobby: ctx.lobby,
+        voice: ctx.voice,
+        modeOverride: parsed.kind === "panel_here" ? "here" : "dm",
+        interactionChannel: interaction.channel,
+        reason: "manual"
+      });
     if (parsed.kind === "panel_dm" && !sent.ok) {
       const embed = buildVoiceRoomDashboardEmbed({
         roomChannel: ctx.roomChannel,
@@ -963,10 +972,14 @@ export async function handleVoiceUIButton(interaction) {
         reason: "manual"
       });
       embed.setFooter({ text: "DM failed. Enable DMs from server members, or use Panel Here / channel delivery." });
-      await interaction.followUp({ embeds: [embed], ephemeral: true }).catch(() => {});
+      await interaction.followUp({
+        embeds: [embed],
+        components: buildVoiceRoomDashboardComponents(ctx.roomChannel.id),
+        ephemeral: true
+      }).catch(() => {});
     }
-    return updateConsole(interaction, parsed.userId, parsed.channelId, panelDeliveryMessage(sent));
-  }
+      return updateConsole(interaction, parsed.userId, parsed.channelId, panelDeliveryMessage(sent));
+    }
 
   if (parsed.kind === "claim") {
     const result = await handleClaim(interaction, ctx);

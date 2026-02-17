@@ -14,7 +14,11 @@ import {
 import * as VoiceDomain from "./domain.js";
 import { getVoiceState } from "./schema.js";
 import { auditLog } from "../../utils/audit.js";
-import { buildVoiceRoomDashboardEmbed, deliverVoiceRoomDashboard } from "./panel.js";
+import {
+  buildVoiceRoomDashboardComponents,
+  buildVoiceRoomDashboardEmbed,
+  deliverVoiceRoomDashboard
+} from "./panel.js";
 import {
   refreshRegisteredRoomPanelsForRoom,
   showLiveRoomPanel,
@@ -1336,7 +1340,11 @@ export async function execute(interaction) {
           reason: "manual"
         });
         embed.setFooter({ text: "DM failed. Enable DMs from server members, or choose a different delivery mode." });
-        await interaction.reply({ embeds: [embed], ephemeral: true });
+        await interaction.reply({
+          embeds: [embed],
+          components: buildVoiceRoomDashboardComponents(channel.id),
+          ephemeral: true
+        });
         return;
       }
 

@@ -1,0 +1,62 @@
+# Optional hardening overrides. Use with:
+#   docker compose -f docker-compose.production.yml -f docker-compose.hardened.yml up -d
+#
+# This file is intentionally conservative: it does not change networking/ports or env vars.
+# It applies least-privilege flags that should not regress features, but can surface hidden
+# filesystem write assumptions in some environments.
+
+services:
+  bot:
+    init: true
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp
+      - /var/tmp
+      - /root/.cache
+      - /var/cache/fontconfig
+    stop_grace_period: 30s
+
+  agents:
+    init: true
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp
+      - /var/tmp
+      - /root/.cache
+      - /var/cache/fontconfig
+    stop_grace_period: 30s
+
+  dashboard:
+    init: true
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp
+      - /var/tmp
+      - /root/.cache
+    stop_grace_period: 30s
+
+  funhub:
+    init: true
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp
+      - /var/tmp
+      - /root/.cache
+    stop_grace_period: 30s
+

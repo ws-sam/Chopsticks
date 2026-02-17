@@ -13,6 +13,57 @@ function parseOrigins(raw) {
   return list;
 }
 
+const SENSITIVE_KEY_RE =
+  /(pass(word)?|secret|token|api[-_]?key|authorization|cookie|session|private|key)$/i;
+
+function truncateString(s, max = 512) {
+  const t = String(s);
+  if (t.length <= max) return t;
+  return `${t.slice(0, max)}…(truncated)`;
+}
+
+export function sanitizeAuditPayload(input, opts = {}) {
+  const maxDepth = Number.isFinite(opts.maxDepth) ? opts.maxDepth : 6;
+  const maxArray = Number.isFinite(opts.maxArray) ? opts.maxArray : 50;
+  const maxString = Number.isFinite(opts.maxString) ? opts.maxString : 512;
+
+  const seen = new WeakSet();
+
+  function walk(value, depth) {
+    if (value == null) return value;
+    if (typeof value === "string") return truncateString(value, maxString);
+    if (typeof value === "number" || typeof value === "boolean") return value;
+    if (typeof value === "bigint") return String(value);
+    if (typeof value === "function") return "[Function]";
+    if (typeof value !== "object") return String(value);
+
+    if (seen.has(value)) return "[Circular]";
+    seen.add(value);
+
+    if (depth >= maxDepth) return "[MaxDepth]";
+
+    if (Array.isArray(value)) {
+      const out = [];
+      const n = Math.min(value.length, maxArray);
+      for (let i = 0; i < n; i += 1) out.push(walk(value[i], depth + 1));
+      if (value.length > n) out.push(`[TruncatedArray:${value.length - n}]`);
+      return out;
+    }
+
+    const out = {};
+    for (const [k, v] of Object.entries(value)) {
+      if (SENSITIVE_KEY_RE.test(k)) {
+        out[k] = "[REDACTED]";
+      } else {
+        out[k] = walk(v, depth + 1);
+      }
+    }
+    return out;
+  }
+
+  return walk(input, 0);
+}
+
 // Corporate-grade Express security middleware stack
 export function applySecurityMiddleware(app) {
   app.disable("x-powered-by");
@@ -164,7 +215,7 @@ export function auditLog(action) {
       action,
       userId: req.session?.user?.id,
       ip: req.ip,
-      body: req.body,
+      body: sanitizeAuditPayload(req.body),
       params: req.params,
       timestamp: new Date().toISOString(),
     }, "Audit Log");

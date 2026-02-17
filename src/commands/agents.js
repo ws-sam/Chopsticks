@@ -239,6 +239,9 @@ const ADVISOR_UI_PREFIX = "agadvisorui";
 const DEPLOY_UI_PREFIX = "agdeployui";
 const DEPLOY_UI_DESIRED = [10, 20, 30, 40, 49];
 
+const AGENT_INV_PREFIX = "agentinv";
+const INVITES_PER_PAGE = 10; // 2 rows of 5 link buttons + nav row
+
 function encodePoolId(poolId) {
   const raw = String(poolId || "").trim();
   if (!raw) return "_";
@@ -296,6 +299,149 @@ function parseAdvisorUiId(customId) {
     desired: Number.isFinite(desired) ? desired : DEPLOY_UI_DESIRED[0],
     poolId: decodePoolId(parts.slice(4).join(":"))
   };
+}
+
+function agentInvId(action, userId, desiredTotal, page, poolId) {
+  const p = Number.isFinite(Number(page)) ? Math.max(0, Math.trunc(Number(page))) : 0;
+  return `${AGENT_INV_PREFIX}:${action}:${userId}:${desiredTotal}:${p}:${encodePoolId(poolId)}`;
+}
+
+function parseAgentInvId(customId) {
+  const parts = String(customId || "").split(":");
+  if (parts.length < 6 || parts[0] !== AGENT_INV_PREFIX) return null;
+  const desired = Number(parts[3]);
+  const page = Number(parts[4]);
+  return {
+    action: parts[1],
+    userId: parts[2],
+    desired: Number.isFinite(desired) ? desired : DEPLOY_UI_DESIRED[0],
+    page: Number.isFinite(page) ? Math.max(0, Math.trunc(page)) : 0,
+    poolId: decodePoolId(parts.slice(5).join(":"))
+  };
+}
+
+function inviteLabel(inv, idx) {
+  const tag = String(inv?.tag || "").trim();
+  const agentId = String(inv?.agentId || "").trim();
+  const base = tag ? tag : (agentId ? agentId : `Agent ${idx + 1}`);
+  return base.slice(0, 80);
+}
+
+function buildInvitePanelEmbed({ guildId, poolId, desiredTotal, plan, page, pages }) {
+  const invites = Array.isArray(plan?.invites) ? plan.invites : [];
+  const total = invites.length;
+  const start = page * INVITES_PER_PAGE;
+  const end = Math.min(total, start + INVITES_PER_PAGE);
+
+  const desc = [
+    "Click a button to open Discord's invite flow for that agent identity.",
+    "You still need Discord permissions to add bots to this server.",
+    pages > 1 ? `Page **${page + 1}** / **${pages}**` : null,
+    "",
+    total
+      ? `Showing invites **${start + 1}**-${end} of **${total}**.`
+      : "No invite links available for this plan."
+  ].filter(Boolean).join("\n");
+
+  return new EmbedBuilder()
+    .setTitle("Agent Invite Links")
+    .setColor(total ? Colors.INFO : Colors.WARNING)
+    .setDescription(desc.slice(0, 4096))
+    .addFields(
+      { name: "Guild", value: guildId ? `\`${guildId}\`` : "n/a", inline: true },
+      { name: "Pool", value: poolId ? `\`${poolId}\`` : "n/a", inline: true },
+      { name: "Desired", value: String(desiredTotal ?? "n/a"), inline: true },
+      { name: "Present", value: String(plan?.presentCount ?? 0), inline: true },
+      { name: "Need", value: String(plan?.needInvites ?? 0), inline: true },
+      { name: "Invites", value: String(total), inline: true }
+    )
+    .setFooter({ text: "In development" })
+    .setTimestamp();
+}
+
+function buildInvitePanelComponents({ userId, desiredTotal, poolId, plan, page, pages }) {
+  const invites = Array.isArray(plan?.invites) ? plan.invites : [];
+  const rows = [];
+
+  const start = page * INVITES_PER_PAGE;
+  const slice = invites.slice(start, start + INVITES_PER_PAGE);
+  const btns = slice
+    .map((inv, i) => {
+      const url = String(inv?.inviteUrl || "").trim();
+      if (!/^https?:\/\//i.test(url)) return null;
+      return new ButtonBuilder()
+        .setStyle(ButtonStyle.Link)
+        .setLabel(inviteLabel(inv, start + i))
+        .setURL(url);
+    })
+    .filter(Boolean);
+
+  for (let i = 0; i < btns.length; i += 5) {
+    rows.push(new ActionRowBuilder().addComponents(...btns.slice(i, i + 5)));
+  }
+
+  rows.push(
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(agentInvId("prev", userId, desiredTotal, Math.max(0, page - 1), poolId))
+        .setLabel("Prev")
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(page <= 0),
+      new ButtonBuilder()
+        .setCustomId(agentInvId("next", userId, desiredTotal, Math.min(pages - 1, page + 1), poolId))
+        .setLabel("Next")
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(page >= pages - 1),
+      new ButtonBuilder()
+        .setCustomId(agentInvId("download", userId, desiredTotal, page, poolId))
+        .setLabel("Download All")
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(invites.length === 0),
+      new ButtonBuilder()
+        .setCustomId(agentInvId("close", userId, desiredTotal, page, poolId))
+        .setLabel("Close")
+        .setStyle(ButtonStyle.Danger)
+    )
+  );
+
+  return rows.slice(0, 5);
+}
+
+function buildInviteExportFile({ guildId, poolId, desiredTotal, plan }) {
+  const invites = Array.isArray(plan?.invites) ? plan.invites : [];
+  const lines = [];
+  lines.push(`# Chopsticks Agent Invite Links`);
+  lines.push(`guild=${guildId || ""}`);
+  lines.push(`pool=${poolId || ""}`);
+  lines.push(`desired=${desiredTotal || ""}`);
+  lines.push(`present=${plan?.presentCount ?? ""}`);
+  lines.push(`need=${plan?.needInvites ?? ""}`);
+  lines.push(`generated=${invites.length}`);
+  lines.push("");
+  for (let idx = 0; idx < invites.length; idx += 1) {
+    const inv = invites[idx];
+    const label = inv.tag ? `${inv.agentId} (${inv.tag})` : inv.agentId;
+    lines.push(`${idx + 1}. ${label}`);
+    lines.push(inv.inviteUrl);
+    lines.push("");
+  }
+  const payload = Buffer.from(lines.join("\n"), "utf8");
+  return new AttachmentBuilder(payload, {
+    name: `agent-invites-${guildId}-${Date.now()}.txt`
+  });
+}
+
+async function replyInvitePanel(interaction, { guildId, userId, desiredTotal, poolId, plan, page = 0, update = false } = {}) {
+  const invites = Array.isArray(plan?.invites) ? plan.invites : [];
+  const pages = Math.max(1, Math.ceil(invites.length / INVITES_PER_PAGE));
+  const safePage = Math.max(0, Math.min(pages - 1, Math.trunc(Number(page) || 0)));
+
+  const embed = buildInvitePanelEmbed({ guildId, poolId, desiredTotal, plan, page: safePage, pages });
+  const components = buildInvitePanelComponents({ userId, desiredTotal, poolId, plan, page: safePage, pages });
+
+  const payload = { embeds: [embed], components, flags: MessageFlags.Ephemeral };
+  if (update) return interaction.update(payload);
+  return interaction.reply(payload);
 }
 
 async function resolveAdvisorUiState(guildId, userId, ownerIds, mgr, requested = {}) {
@@ -2256,6 +2402,97 @@ export async function handleSelect(interaction) {
 
 export async function handleButton(interaction) {
   if (!interaction.isButton?.()) return false;
+
+  const invParsed = parseAgentInvId(interaction.customId);
+  if (invParsed) {
+    if (invParsed.userId !== interaction.user.id) {
+      await interaction.reply({
+        embeds: [buildInfoEmbed("Panel Locked", "This invite panel belongs to another user.", Colors.ERROR)],
+        flags: MessageFlags.Ephemeral
+      });
+      return true;
+    }
+
+    const mgr = global.agentManager;
+    if (!mgr) {
+      await interaction.reply({
+        embeds: [buildInfoEmbed("Agent Control Offline", "Agent orchestration is not running.", Colors.ERROR)],
+        flags: MessageFlags.Ephemeral
+      });
+      return true;
+    }
+
+    const ownerIds = getBotOwnerIds();
+    if (!canManageGuild(interaction, ownerIds)) {
+      await interaction.reply({
+        embeds: [buildInfoEmbed("Permission Required", "You need `Manage Server` to view invite links.", Colors.ERROR)],
+        flags: MessageFlags.Ephemeral
+      });
+      return true;
+    }
+
+    const poolId = invParsed.poolId;
+    if (!poolId) {
+      await interaction.reply({
+        embeds: [buildInfoEmbed("No Pool Selected", "Select a pool before generating invite links.", Colors.WARNING)],
+        flags: MessageFlags.Ephemeral
+      });
+      return true;
+    }
+
+    const desiredTotal = clampDeployUiDesired(invParsed.desired);
+    const plan = await mgr.buildDeployPlan(interaction.guildId, desiredTotal, poolId).catch(() => null);
+    if (!plan || plan.error) {
+      await interaction.reply({
+        embeds: [buildInfoEmbed("No Invite Plan", plan?.error || "Could not build deployment plan.", Colors.ERROR)],
+        flags: MessageFlags.Ephemeral
+      });
+      return true;
+    }
+
+    if (invParsed.action === "download") {
+      const file = buildInviteExportFile({
+        guildId: interaction.guildId,
+        poolId,
+        desiredTotal,
+        plan
+      });
+      await interaction.reply({
+        embeds: [buildInfoEmbed("Invite Links", "Download generated invite links.", Colors.INFO).setFooter({ text: "In development" })],
+        files: [file],
+        flags: MessageFlags.Ephemeral
+      }).catch(() => {});
+      return true;
+    }
+
+    if (invParsed.action === "close") {
+      await interaction.update({
+        embeds: [buildInfoEmbed("Invite Links", "Closed.", Colors.INFO).setFooter({ text: "In development" })],
+        components: []
+      }).catch(() => {});
+      return true;
+    }
+
+    if (invParsed.action === "prev" || invParsed.action === "next") {
+      await replyInvitePanel(interaction, {
+        guildId: interaction.guildId,
+        userId: interaction.user.id,
+        desiredTotal,
+        poolId,
+        plan,
+        page: invParsed.page,
+        update: true
+      });
+      return true;
+    }
+
+    await interaction.reply({
+      embeds: [buildInfoEmbed("Unsupported", "Unsupported invite panel action.", Colors.WARNING).setFooter({ text: "In development" })],
+      flags: MessageFlags.Ephemeral
+    });
+    return true;
+  }
+
   const deployParsed = parseDeployUiId(interaction.customId);
   const advisorParsed = parseAdvisorUiId(interaction.customId);
   if (!deployParsed && !advisorParsed) return false;
@@ -2337,38 +2574,14 @@ export async function handleButton(interaction) {
         });
         return true;
       }
-
-      const lines = [];
-      lines.push(`# Chopsticks Agent Invite Links`);
-      lines.push(`guild=${interaction.guildId}`);
-      lines.push(`pool=${context.state.selectedPoolId}`);
-      lines.push(`desired=${context.state.desiredTotal}`);
-      lines.push(`present=${plan.presentCount}`);
-      lines.push(`need=${plan.needInvites}`);
-      lines.push(`generated=${plan.invites.length}`);
-      lines.push("");
-      for (let idx = 0; idx < plan.invites.length; idx += 1) {
-        const inv = plan.invites[idx];
-        const label = inv.tag ? `${inv.agentId} (${inv.tag})` : inv.agentId;
-        lines.push(`${idx + 1}. ${label}`);
-        lines.push(inv.inviteUrl);
-        lines.push("");
-      }
-      const payload = Buffer.from(lines.join("\n"), "utf8");
-      const file = new AttachmentBuilder(payload, {
-        name: `agent-invites-${interaction.guildId}-${Date.now()}.txt`
-      });
-
-      await interaction.reply({
-        embeds: [
-          buildInfoEmbed(
-            "Invite Links Ready",
-            `Generated **${plan.invites.length}** invite link(s) from pool \`${context.state.selectedPoolId}\`.`,
-            Colors.SUCCESS
-          )
-        ],
-        files: [file],
-        flags: MessageFlags.Ephemeral
+      await replyInvitePanel(interaction, {
+        guildId: interaction.guildId,
+        userId: interaction.user.id,
+        desiredTotal: context.state.desiredTotal,
+        poolId: context.state.selectedPoolId,
+        plan,
+        page: 0,
+        update: false
       });
       return true;
     }
@@ -2445,38 +2658,14 @@ export async function handleButton(interaction) {
         });
         return true;
       }
-
-      const lines = [];
-      lines.push(`# Chopsticks Advisor Invite Links`);
-      lines.push(`guild=${interaction.guildId}`);
-      lines.push(`pool=${selected.pool.pool_id}`);
-      lines.push(`desired=${state.desiredTotal}`);
-      lines.push(`present=${selected.presentCount}`);
-      lines.push(`need=${selected.needInvites}`);
-      lines.push(`generated=${selected.plan.invites.length}`);
-      lines.push("");
-      for (let idx = 0; idx < selected.plan.invites.length; idx += 1) {
-        const inv = selected.plan.invites[idx];
-        const label = inv.tag ? `${inv.agentId} (${inv.tag})` : inv.agentId;
-        lines.push(`${idx + 1}. ${label}`);
-        lines.push(inv.inviteUrl);
-        lines.push("");
-      }
-      const payload = Buffer.from(lines.join("\n"), "utf8");
-      const file = new AttachmentBuilder(payload, {
-        name: `advisor-invites-${interaction.guildId}-${Date.now()}.txt`
-      });
-
-      await interaction.reply({
-        embeds: [
-          buildInfoEmbed(
-            "Invite Links Ready",
-            `Generated **${selected.plan.invites.length}** invite link(s) from pool \`${selected.pool.pool_id}\`.`,
-            Colors.SUCCESS
-          )
-        ],
-        files: [file],
-        flags: MessageFlags.Ephemeral
+      await replyInvitePanel(interaction, {
+        guildId: interaction.guildId,
+        userId: interaction.user.id,
+        desiredTotal: state.desiredTotal,
+        poolId: selected.pool.pool_id,
+        plan: selected.plan,
+        page: 0,
+        update: false
       });
       return true;
     }

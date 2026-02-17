@@ -116,36 +116,61 @@ function makeRoomPanelCustomId(kind, roomChannelId) {
   return `${ROOM_PANEL_PREFIX}:${kind}:${roomChannelId}`;
 }
 
-export function buildVoiceRoomDashboardComponents(roomChannelId, { disabled = false } = {}) {
-  return [
-    new ActionRowBuilder().addComponents(
+function makeRoomPanelCustomIdWithGuild(kind, guildId, roomChannelId) {
+  const gid = String(guildId || "").trim();
+  if (!gid) return makeRoomPanelCustomId(kind, roomChannelId);
+  return `${ROOM_PANEL_PREFIX}:${kind}:${gid}:${roomChannelId}`;
+}
+
+export function buildVoiceRoomDashboardComponents(
+  roomChannelId,
+  { disabled = false, controlsDisabled = false, includeDmButton = true, guildId = null } = {}
+) {
+  const makeId = guildId
+    ? (kind => makeRoomPanelCustomIdWithGuild(kind, guildId, roomChannelId))
+    : (kind => makeRoomPanelCustomId(kind, roomChannelId));
+
+  const row1Buttons = [
+    new ButtonBuilder()
+      .setCustomId(makeId("refresh"))
+      .setLabel("Refresh")
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(disabled)
+  ];
+
+  if (includeDmButton) {
+    row1Buttons.push(
       new ButtonBuilder()
-        .setCustomId(makeRoomPanelCustomId("refresh", roomChannelId))
-        .setLabel("Refresh")
-        .setStyle(ButtonStyle.Secondary)
-        .setDisabled(disabled),
-      new ButtonBuilder()
-        .setCustomId(makeRoomPanelCustomId("dm", roomChannelId))
+        .setCustomId(makeId("dm"))
         .setLabel("DM Dashboard")
         .setStyle(ButtonStyle.Primary)
-        .setDisabled(disabled),
-      new ButtonBuilder()
-        .setCustomId(makeRoomPanelCustomId("release", roomChannelId))
-        .setLabel("Release")
-        .setStyle(ButtonStyle.Danger)
         .setDisabled(disabled)
+    );
+  }
+
+  row1Buttons.push(
+    new ButtonBuilder()
+      .setCustomId(makeId("release"))
+      .setLabel("Release")
+      .setStyle(ButtonStyle.Danger)
+      .setDisabled(disabled || controlsDisabled)
+  );
+
+  return [
+    new ActionRowBuilder().addComponents(
+      ...row1Buttons
     ),
     new ActionRowBuilder().addComponents(
       new ButtonBuilder()
-        .setCustomId(makeRoomPanelCustomId("lock", roomChannelId))
+        .setCustomId(makeId("lock"))
         .setLabel("Lock")
         .setStyle(ButtonStyle.Secondary)
-        .setDisabled(disabled),
+        .setDisabled(disabled || controlsDisabled),
       new ButtonBuilder()
-        .setCustomId(makeRoomPanelCustomId("unlock", roomChannelId))
+        .setCustomId(makeId("unlock"))
         .setLabel("Unlock")
         .setStyle(ButtonStyle.Secondary)
-        .setDisabled(disabled)
+        .setDisabled(disabled || controlsDisabled)
     )
   ];
 }
@@ -182,7 +207,7 @@ export async function deliverVoiceRoomDashboard({
     roomChannel,
     tempRecord,
     lobby,
-    ownerUserId: member.id,
+    ownerUserId: tempRecord?.ownerId || member.id,
     reason
   });
 
@@ -190,9 +215,25 @@ export async function deliverVoiceRoomDashboard({
   let channelSent = false;
   const errors = [];
 
+  const isOwner = String(tempRecord?.ownerId || "") && String(tempRecord.ownerId) === String(member.id);
+  const memberPerms = member?.permissions;
+  const isAdmin = Boolean(
+    memberPerms?.has?.(PermissionFlagsBits.ManageGuild) ||
+    memberPerms?.has?.(PermissionFlagsBits.Administrator)
+  );
+  const controlsDisabled = !isOwner && !isAdmin;
+
   if (mode === "dm" || mode === "both") {
     try {
-      await member.send({ embeds: [embed] });
+      const dmPayload = { embeds: [embed] };
+      if (roomChannel?.id) {
+        dmPayload.components = buildVoiceRoomDashboardComponents(roomChannel.id, {
+          guildId: guild?.id,
+          includeDmButton: false,
+          controlsDisabled
+        });
+      }
+      await member.send(dmPayload);
       dmSent = true;
     } catch (err) {
       errors.push(`dm:${err?.code ?? err?.message ?? "send-failed"}`);

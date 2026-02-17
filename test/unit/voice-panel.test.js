@@ -45,12 +45,16 @@ describe('Voice panel delivery defaults', function () {
   it('builds room dashboard action buttons', function () {
     const rows = buildVoiceRoomDashboardComponents('123');
     assert.ok(Array.isArray(rows));
-    assert.equal(rows.length, 2);
+    assert.ok(rows.length >= 2);
     const ids = rows.flatMap(row => row.components.map(c => c.data.custom_id));
     assert.ok(ids.includes('voiceroom:refresh:123'));
     assert.ok(ids.includes('voiceroom:dm:123'));
     assert.ok(ids.includes('voiceroom:release:123'));
     assert.ok(ids.includes('voiceroom:lock:123'));
     assert.ok(ids.includes('voiceroom:unlock:123'));
+    assert.ok(ids.includes('voiceroom:rename:123'));
+    assert.ok(ids.includes('voiceroom:limit:123'));
+    assert.ok(ids.includes('voiceroom:music:123'));
+    assert.ok(ids.includes('voiceroom:game:123'));
   });
 });

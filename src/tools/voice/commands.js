@@ -24,6 +24,7 @@ import {
   showLiveRoomPanel,
   handleVoiceUIButton,
   handleVoiceUISelect,
+  handleVoiceUIModal,
   showVoiceConsole
 } from "./ui.js";
 import {
@@ -1392,6 +1393,7 @@ export async function handleSelect(interaction) {
 }
 
 export async function handleModal(interaction) {
+  if (await handleVoiceUIModal(interaction)) return true;
   if (await handleCustomVcModal(interaction)) return true;
   return false;
 }

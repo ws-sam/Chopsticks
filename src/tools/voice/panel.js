@@ -150,6 +150,19 @@ export function buildVoiceRoomDashboardComponents(
 
   row1Buttons.push(
     new ButtonBuilder()
+      .setCustomId(makeId("rename"))
+      .setLabel("Rename")
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(disabled || controlsDisabled),
+    new ButtonBuilder()
+      .setCustomId(makeId("limit"))
+      .setLabel("Member Cap")
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(disabled || controlsDisabled)
+  );
+
+  row1Buttons.push(
+    new ButtonBuilder()
       .setCustomId(makeId("release"))
       .setLabel("Release")
       .setStyle(ButtonStyle.Danger)
@@ -171,6 +184,18 @@ export function buildVoiceRoomDashboardComponents(
         .setLabel("Unlock")
         .setStyle(ButtonStyle.Secondary)
         .setDisabled(disabled || controlsDisabled)
+    ),
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(makeId("music"))
+        .setLabel("Quick Play")
+        .setStyle(ButtonStyle.Primary)
+        .setDisabled(disabled),
+      new ButtonBuilder()
+        .setCustomId(makeId("game"))
+        .setLabel("Game")
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(disabled)
     )
   ];
 }
@@ -255,7 +280,7 @@ export async function deliverVoiceRoomDashboard({
       try {
         const textPayload = { embeds: [embed] };
         if (!textTarget.isDMBased?.() && roomChannel?.id) {
-          textPayload.components = buildVoiceRoomDashboardComponents(roomChannel.id);
+          textPayload.components = buildVoiceRoomDashboardComponents(roomChannel.id, { guildId: guild?.id });
         }
         await textTarget.send(textPayload);
         channelSent = true;

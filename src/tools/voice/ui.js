@@ -4,12 +4,18 @@ import {
   ButtonStyle,
   ChannelType,
   EmbedBuilder,
+  MessageFlags,
   PermissionFlagsBits,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
   StringSelectMenuBuilder
 } from "discord.js";
 
 import * as VoiceDomain from "./domain.js";
 import { getVoiceState } from "./schema.js";
+import { execute as musicExecute } from "../../commands/music.js";
+import { execute as gameExecute } from "../../commands/game.js";
 import {
   buildVoiceRoomDashboardComponents,
   buildVoiceRoomDashboardEmbed,
@@ -22,6 +28,7 @@ import { removeTempChannel } from "./state.js";
 
 const UI_PREFIX = "voiceui";
 const ROOM_PANEL_PREFIX = "voiceroom";
+const ROOM_MODAL_PREFIX = "voiceroommodal";
 const ROOM_PANEL_TTL_MS = 6 * 60 * 60 * 1000;
 
 const MODE_LABELS = {
@@ -91,6 +98,17 @@ function makeRoomPanelCustomId(kind, roomChannelId) {
   return `${ROOM_PANEL_PREFIX}:${kind}:${roomChannelId}`;
 }
 
+function makeRoomModalCustomId(kind, guildId, roomChannelId) {
+  return `${ROOM_MODAL_PREFIX}:${kind}:${guildId}:${roomChannelId}`;
+}
+
+function parseRoomModalCustomId(customId) {
+  const parts = String(customId || "").split(":");
+  if (parts.length !== 4) return null;
+  if (parts[0] !== ROOM_MODAL_PREFIX) return null;
+  return { kind: parts[1], guildId: parts[2], roomChannelId: parts[3] };
+}
+
 function parseRoomPanelCustomId(customId) {
   const parts = String(customId || "").split(":");
   if (parts[0] !== ROOM_PANEL_PREFIX) return null;
@@ -109,6 +127,20 @@ function parseRoomPanelCustomId(customId) {
     };
   }
   return null;
+}
+
+function clampInt(value, { min, max, fallback }) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  const t = Math.trunc(n);
+  if (t < min) return min;
+  if (t > max) return max;
+  return t;
+}
+
+function safeRoomName(value, fallback = "room") {
+  const s = String(value ?? "").trim().replace(/\s+/g, " ");
+  return (s || fallback).slice(0, 90);
 }
 
 function roomPanelKey(guildId, roomChannelId) {
@@ -843,6 +875,95 @@ async function handleLivePanelButton(interaction, parsed) {
     return true;
   }
 
+  if (action === "rename" || action === "limit") {
+    const ctx = await resolveContext(interaction, parsed.roomChannelId, {
+      requireMembership: false,
+      requireControl: true
+    });
+    if (!ctx.ok) {
+      await interaction.reply({ embeds: [buildErrorEmbed(contextErrorMessage(ctx.error))], ephemeral: true });
+      return true;
+    }
+
+    const modal = new ModalBuilder()
+      .setCustomId(makeRoomModalCustomId(action, interaction.guildId, parsed.roomChannelId))
+      .setTitle(action === "rename" ? "Rename Room" : "Set Member Cap");
+
+    if (action === "rename") {
+      modal.addComponents(
+        new ActionRowBuilder().addComponents(
+          new TextInputBuilder()
+            .setCustomId("name")
+            .setLabel("New room name")
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true)
+            .setMaxLength(90)
+            .setValue(String(ctx.roomChannel?.name || "").slice(0, 90) || "")
+        )
+      );
+    } else {
+      const cur = Number.isFinite(ctx.roomChannel?.userLimit) ? String(ctx.roomChannel.userLimit) : "0";
+      modal.addComponents(
+        new ActionRowBuilder().addComponents(
+          new TextInputBuilder()
+            .setCustomId("limit")
+            .setLabel("Member cap (0 = unlimited)")
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true)
+            .setMaxLength(2)
+            .setValue(cur)
+        )
+      );
+    }
+
+    await interaction.showModal(modal).catch(() => {});
+    return true;
+  }
+
+  if (action === "music") {
+    const ctx = await resolveContext(interaction, parsed.roomChannelId, {
+      requireMembership: true,
+      requireControl: false
+    });
+    if (!ctx.ok) {
+      await interaction.reply({ embeds: [buildErrorEmbed(contextErrorMessage(ctx.error))], ephemeral: true });
+      return true;
+    }
+
+    // Avoid surprising playback: Quick Play is for the room you're currently in.
+    if (interaction.member?.voice?.channelId !== parsed.roomChannelId) {
+      await interaction.reply({ embeds: [buildErrorEmbed("Join this room voice channel to use Quick Play from its dashboard.")], ephemeral: true });
+      return true;
+    }
+
+    const modal = new ModalBuilder()
+      .setCustomId(makeRoomModalCustomId("music", interaction.guildId, parsed.roomChannelId))
+      .setTitle("Quick Play");
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder()
+          .setCustomId("query")
+          .setLabel("Search or URL")
+          .setStyle(TextInputStyle.Short)
+          .setRequired(true)
+          .setMaxLength(200)
+          .setPlaceholder("e.g., never gonna give you up")
+      )
+    );
+    await interaction.showModal(modal).catch(() => {});
+    return true;
+  }
+
+  if (action === "game") {
+    const wrapped = Object.create(interaction);
+    wrapped.options = {
+      getSubcommand: () => "panel",
+      getString: (name) => (name === "delivery" ? "ephemeral" : null)
+    };
+    await gameExecute(wrapped);
+    return true;
+  }
+
   if (action === "claim") {
     const ctx = await resolveContext(interaction, parsed.roomChannelId, {
       requireMembership: true,
@@ -1007,6 +1128,24 @@ async function handleRoomPanelButtonInDm(interaction, parsed) {
     return true;
   }
 
+  if (parsed.kind === "music") {
+    await interaction.reply({
+      embeds: [buildErrorEmbed("Quick Play is guild-only. Use the dashboard inside the server, or run `/music play <query>` in the server.")],
+      flags: MessageFlags.Ephemeral
+    }).catch(() => {});
+    return true;
+  }
+
+  if (parsed.kind === "game") {
+    const wrapped = Object.create(interaction);
+    wrapped.options = {
+      getSubcommand: () => "panel",
+      getString: (name) => (name === "delivery" ? "dm" : null)
+    };
+    await gameExecute(wrapped);
+    return true;
+  }
+
   const ctx = await resolveRoomContextFromIds(interaction.client, gid, parsed.roomChannelId, interaction.user.id);
   if (!ctx.ok) {
     const msg =
@@ -1033,6 +1172,47 @@ async function handleRoomPanelButtonInDm(interaction, parsed) {
 
   if (action === "dm") {
     await interaction.update(buildDmDashboardPayload(ctx, { notice: "You are already viewing this in DMs." })).catch(() => {});
+    return true;
+  }
+
+  if (action === "rename" || action === "limit") {
+    if (!ctx.isOwner && !ctx.isAdmin) {
+      await interaction.update(buildDmDashboardPayload(ctx, { notice: "Only the room owner (or admins) can do that." })).catch(() => {});
+      return true;
+    }
+
+    const modal = new ModalBuilder()
+      .setCustomId(makeRoomModalCustomId(action, ctx.guild.id, ctx.roomChannel.id))
+      .setTitle(action === "rename" ? "Rename Room" : "Set Member Cap");
+
+    if (action === "rename") {
+      modal.addComponents(
+        new ActionRowBuilder().addComponents(
+          new TextInputBuilder()
+            .setCustomId("name")
+            .setLabel("New room name")
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true)
+            .setMaxLength(90)
+            .setValue(String(ctx.roomChannel?.name || "").slice(0, 90) || "")
+        )
+      );
+    } else {
+      const cur = Number.isFinite(ctx.roomChannel?.userLimit) ? String(ctx.roomChannel.userLimit) : "0";
+      modal.addComponents(
+        new ActionRowBuilder().addComponents(
+          new TextInputBuilder()
+            .setCustomId("limit")
+            .setLabel("Member cap (0 = unlimited)")
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true)
+            .setMaxLength(2)
+            .setValue(cur)
+        )
+      );
+    }
+
+    await interaction.showModal(modal).catch(() => {});
     return true;
   }
 
@@ -1103,6 +1283,95 @@ async function handleRoomPanelButtonInDm(interaction, parsed) {
 
   await interaction.update(buildDmDashboardPayload(ctx, { notice: "Unsupported action." })).catch(() => {});
   return true;
+}
+
+export async function handleVoiceUIModal(interaction) {
+  if (!interaction.isModalSubmit?.()) return false;
+  const parsed = parseRoomModalCustomId(interaction.customId);
+  if (!parsed) return false;
+
+  const kind = parsed.kind;
+  const gid = String(parsed.guildId || "").trim();
+  const rid = String(parsed.roomChannelId || "").trim();
+
+  if (kind === "rename" || kind === "limit") {
+    const ctx = interaction.inGuild?.()
+      ? await resolveContext(interaction, rid, { requireMembership: false, requireControl: true })
+      : await resolveRoomContextFromIds(interaction.client, gid, rid, interaction.user.id);
+
+    if (!ctx?.ok) {
+      await interaction.reply({
+        embeds: [buildErrorEmbed("This room is no longer available.")],
+        flags: MessageFlags.Ephemeral
+      }).catch(() => {});
+      return true;
+    }
+
+    if (!ctx.isOwner && !ctx.isAdmin) {
+      await interaction.reply({
+        embeds: [buildErrorEmbed("Only the room owner (or admins) can do that.")],
+        flags: MessageFlags.Ephemeral
+      }).catch(() => {});
+      return true;
+    }
+
+    if (kind === "rename") {
+      const nextName = safeRoomName(interaction.fields.getTextInputValue("name"), ctx.roomChannel?.name || "room");
+      await ctx.roomChannel.setName(nextName).catch(() => {});
+      await refreshRegisteredRoomPanelsForRoom(ctx.guild, rid, "rename", { notice: "Renamed." }).catch(() => {});
+      const payload = buildDmDashboardPayload(ctx, { notice: "Room renamed." });
+      await interaction.reply({ ...payload, flags: MessageFlags.Ephemeral }).catch(() => {});
+      return true;
+    }
+
+    const raw = interaction.fields.getTextInputValue("limit");
+    const limit = clampInt(raw, { min: 0, max: 99, fallback: 0 });
+    await ctx.roomChannel.setUserLimit(limit).catch(() => {});
+    await refreshRegisteredRoomPanelsForRoom(ctx.guild, rid, "limit", { notice: "Member cap updated." }).catch(() => {});
+    const payload = buildDmDashboardPayload(ctx, { notice: `Member cap updated: ${limit === 0 ? "unlimited" : String(limit)}.` });
+    await interaction.reply({ ...payload, flags: MessageFlags.Ephemeral }).catch(() => {});
+    return true;
+  }
+
+  if (kind === "music") {
+    if (!interaction.inGuild?.() || interaction.guildId !== gid) {
+      await interaction.reply({
+        embeds: [buildErrorEmbed("Quick Play must be used from inside the server.")],
+        flags: MessageFlags.Ephemeral
+      }).catch(() => {});
+      return true;
+    }
+
+    if (interaction.member?.voice?.channelId !== rid) {
+      await interaction.reply({
+        embeds: [buildErrorEmbed("Join this room voice channel to use Quick Play from its dashboard.")],
+        flags: MessageFlags.Ephemeral
+      }).catch(() => {});
+      return true;
+    }
+
+    const query = String(interaction.fields.getTextInputValue("query") || "").trim();
+    if (!query) {
+      await interaction.reply({
+        embeds: [buildErrorEmbed("Query is empty.")],
+        flags: MessageFlags.Ephemeral
+      }).catch(() => {});
+      return true;
+    }
+
+    const wrapped = Object.create(interaction);
+    wrapped.options = {
+      getSubcommand: () => "play",
+      getString: (name) => (name === "query" ? query : null)
+    };
+    wrapped.deferReply = (opts = {}) => interaction.deferReply({ ...opts, flags: MessageFlags.Ephemeral });
+    wrapped.reply = (payload) => interaction.reply({ ...(payload || {}), flags: MessageFlags.Ephemeral });
+    wrapped.followUp = (payload) => interaction.followUp({ ...(payload || {}), flags: MessageFlags.Ephemeral });
+    await musicExecute(wrapped);
+    return true;
+  }
+
+  return false;
 }
 
 export async function handleVoiceUIButton(interaction) {

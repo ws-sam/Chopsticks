@@ -145,7 +145,10 @@ async function startAgent(agentConfig) {
     if (!ws || ws.readyState !== WebSocket.OPEN) return false;
     try {
       // Inject agentId into outgoing messages
-      ws.send(JSON.stringify({ ...payload, agentId, runnerId: RUNNER_ID }));
+      const out = { ...payload, agentId, runnerId: RUNNER_ID };
+      // DEBUG: log outgoing WS frames for troubleshooting handshake
+      try { console.debug?.("[agent-runner] OUTGOING_WS", JSON.stringify(out)); } catch {}
+      ws.send(JSON.stringify(out));
       return true;
     } catch {
       return false;

@@ -204,6 +204,7 @@ export class AgentManager {
   handleMessage(ws, data) {
     let msg;
     try {
+      console.log('[AgentManager:RAW]', String(data));
       msg = JSON.parse(String(data));
     } catch {
       console.log('[AgentManager] Invalid JSON received from agent');
@@ -230,7 +231,7 @@ export class AgentManager {
     });
 
     // Validate protocol version
-    const agentVersion = msg?.protocolVersion;
+    const agentVersion = msg?.protocolVersion || msg?.protocol_version || msg?.protocolversion || msg?.version || null;
     if (!agentVersion) {
       agentLogger.warn('Agent missing protocol version, rejecting');
       trackAgentRegistration('rejected');

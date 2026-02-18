@@ -9,6 +9,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     python3 \
+    python3-dev \
     pkg-config \
     libcairo2-dev \
     libjpeg-dev \
@@ -20,6 +21,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libfontconfig1-dev \
     libglib2.0-dev \
     librsvg2-dev \
+    libsodium-dev \
+    libopus-dev \
+    libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy dependencies
@@ -36,7 +40,8 @@ COPY . .
 # Create non-root runtime user
 RUN set -eux; \
     addgroup --system app || true; \
-    adduser --system --ingroup app --uid 1000 app || true; \
+    adduser --system --ingroup app app || true; \
+
     id -u app >/dev/null 2>&1 && chown -R app:app /app || true
 
 USER app

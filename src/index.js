@@ -39,6 +39,7 @@ import {
   handleModal as handleVoiceModal
 } from "./commands/voice.js";
 import { handleSelect as handleHelpSelect } from "./commands/help.js";
+import { registerAllCommands } from "../scripts/registerAllCommands.js";
 import { handleButton as handlePurgeButton } from "./commands/purge.js";
 import { handleButton as handleGameButton, handleSelect as handleGameSelect } from "./commands/game.js";
 import { handleButton as handleQuestsButton } from "./commands/quests.js";
@@ -386,6 +387,14 @@ if (DEV_API_ENABLED) {
 client.once(Events.ClientReady, async () => {
   console.log(`✅ Ready as ${client.user.tag}`);
   console.log(`📊 Serving ${client.guilds.cache.size} guilds`);
+  
+  // Auto-register all commands in help registry
+  try {
+    await registerAllCommands();
+    console.log(`📚 Help registry initialized with ${client.commands.size} commands`);
+  } catch (err) {
+    console.warn(`⚠️  Help registry initialization failed: ${err.message}`);
+  }
 
   // Presence is a UX hint, not a control plane. Keep it best-effort and non-fatal.
   try {

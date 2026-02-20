@@ -20,7 +20,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { timingSafeEqual } from "node:crypto";
-import { ActivityType, Client, Collection, GatewayIntentBits, Events, Partials } from "discord.js";
+import { ActivityType, Client, Collection, GatewayIntentBits, Events, Partials, PermissionFlagsBits } from "discord.js";
 import { AgentManager } from "./agents/agentManager.js";
 import { handleButton as handleAgentsButton, handleSelect as handleAgentsSelect } from "./commands/agents.js";
 import {
@@ -66,7 +66,7 @@ import { addCommandLog } from "./utils/commandlog.js";
 import { botLogger } from "./utils/modernLogger.js";
 import { trackCommand, trackCommandInvocation, trackCommandError, trackRateLimit } from "./utils/metrics.js";
 import { redisHealthOk } from "./utils/metrics.js";
-import { checkRedisHealth } from "./utils/cache.js";
+import { checkRedisHealth, cacheIncr, cacheGet, cacheSet } from "./utils/cache.js";
 import { buildErrorEmbed, replyInteraction, replyInteractionIfFresh } from "./utils/interactionReply.js";
 import { patchInteractionUiMethods } from "./utils/interactionUiPatch.js";
 import { generateCorrelationId } from "./utils/logger.js";
@@ -607,6 +607,34 @@ const MUTATION_COMMANDS = new Set([
 client.on(Events.MessageCreate, async message => {
   if (message.author?.bot) return;
 
+  // ── Antispam enforcement ──────────────────────────────────────────────────
+  if (message.guildId && message.guild) {
+    try {
+      const gd = await loadGuildData(message.guildId);
+      const as = gd?.antispam;
+      if (as?.enabled && as.threshold > 0) {
+        const key = `antispam:${message.guildId}:${message.author.id}`;
+        const count = await cacheIncr(key, as.window || 10);
+        if (count >= as.threshold) {
+          const member = await message.guild.members.fetch(message.author.id).catch(() => null);
+          if (member && !member.permissions.has(PermissionFlagsBits.ManageGuild)) {
+            if (as.action === "ban") {
+              await member.ban({ reason: "Antispam: message threshold exceeded" }).catch(() => {});
+            } else if (as.action === "kick") {
+              await member.kick("Antispam: message threshold exceeded").catch(() => {});
+            } else {
+              // mute: apply communication timeout for window duration (min 60s)
+              const muteMs = Math.max((as.window || 10) * 2, 60) * 1000;
+              await member.timeout(muteMs, "Antispam: message threshold exceeded").catch(() => {});
+            }
+            await message.delete().catch(() => {});
+            return;
+          }
+        }
+      }
+    } catch {}
+  }
+
   if (message.guildId) {
     void runGuildEventAutomations({
       guild: message.guild,
@@ -988,3 +1016,63 @@ setInterval(async () => {
     redisHealthOk.set(0);
   }
 }, 30_000);
+
+// Birthday & Events reminder scheduler — runs every hour
+setInterval(async () => {
+  try {
+    const { query } = await import("./utils/db.js");
+    const res = await query("SELECT guild_id, data FROM guild_settings WHERE data IS NOT NULL");
+    const now = new Date();
+    const todayMD = `${String(now.getUTCMonth() + 1).padStart(2, "0")}-${String(now.getUTCDate()).padStart(2, "0")}`;
+
+    for (const row of res.rows) {
+      const guildId = row.guild_id;
+      const data = row.data || {};
+
+      // Birthday reminders
+      if (data.birthdays) {
+        const birthdayChannelId = data.birthdayChannelId;
+        const guild = client.guilds.cache.get(guildId);
+        if (guild && birthdayChannelId) {
+          const channel = guild.channels.cache.get(birthdayChannelId);
+          if (channel?.isTextBased()) {
+            for (const [userId, info] of Object.entries(data.birthdays)) {
+              if (info.date === todayMD) {
+                const alreadyKey = `bday:${guildId}:${userId}:${now.getUTCFullYear()}`;
+                const already = await cacheGet(alreadyKey);
+                if (!already) {
+                  await cacheSet(alreadyKey, 1, 86400);
+                  channel.send(`🎂 Happy Birthday <@${userId}>!`).catch(() => {});
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // Events reminders (10 minutes before)
+      if (Array.isArray(data.events)) {
+        const guild = client.guilds.cache.get(guildId);
+        if (guild) {
+          const upcoming = data.events.filter(e => {
+            const t = new Date(e.time_iso).getTime();
+            const diff = t - now.getTime();
+            return diff > 0 && diff <= 10 * 60 * 1000; // within next 10 min
+          });
+          for (const ev of upcoming) {
+            const reminderKey = `evtremind:${guildId}:${ev.id}`;
+            const already = await cacheGet(reminderKey);
+            if (!already) {
+              await cacheSet(reminderKey, 1, 700);
+              const evtCh = data.eventChannelId ? guild.channels.cache.get(data.eventChannelId) : null;
+              const target = evtCh?.isTextBased() ? evtCh : null;
+              if (target) {
+                target.send(`📅 **Event reminder:** "${ev.title}" starts in ~10 minutes!`).catch(() => {});
+              }
+            }
+          }
+        }
+      }
+    }
+  } catch {}
+}, 60 * 60 * 1000); // every hour

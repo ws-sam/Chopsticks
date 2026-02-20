@@ -1,0 +1,188 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "version": "1.0.0",
+  "description": "Rate limit configuration for the Chopsticks Discord bot. All limits expressed as max_invocations/window_seconds. Override precedence: command_overrides > category_defaults > _default.",
+
+  "category_defaults": {
+    "_comment": "Per-category baseline limits. Applied to every command in that category unless overridden in command_overrides.",
+    "mod":       { "max": 5,  "window_sec": 30,  "burst": 2,  "scope": "user+guild" },
+    "admin":     { "max": 3,  "window_sec": 60,  "burst": 1,  "scope": "user+guild" },
+    "music":     { "max": 10, "window_sec": 30,  "burst": 4,  "scope": "user+guild" },
+    "voice":     { "max": 8,  "window_sec": 30,  "burst": 3,  "scope": "user+guild" },
+    "assistant": { "max": 5,  "window_sec": 60,  "burst": 2,  "scope": "user" },
+    "fun":       { "max": 10, "window_sec": 60,  "burst": 5,  "scope": "user+guild" },
+    "core":      { "max": 15, "window_sec": 60,  "burst": 6,  "scope": "user" },
+    "economy":   { "max": 8,  "window_sec": 60,  "burst": 3,  "scope": "user" },
+    "tools":     { "max": 10, "window_sec": 60,  "burst": 4,  "scope": "user" },
+    "pools":     { "max": 6,  "window_sec": 60,  "burst": 2,  "scope": "guild" },
+    "social":    { "max": 12, "window_sec": 60,  "burst": 5,  "scope": "user+guild" },
+    "util":      { "max": 15, "window_sec": 60,  "burst": 6,  "scope": "user" },
+    "ai":        { "max": 3,  "window_sec": 60,  "burst": 1,  "scope": "user",      "_added": "phase-3" },
+    "_default":  { "max": 5,  "window_sec": 60,  "burst": 2,  "scope": "user",      "_comment": "Fallback for uncategorised commands" }
+  },
+
+  "command_overrides": {
+    "_comment": "Explicit per-command limits. These take precedence over category_defaults for the named command.",
+    "ban":        { "max": 2,  "window_sec": 30,  "burst": 1,  "scope": "user+guild", "category": "mod",   "reason": "Destructive mod action — low frequency expected" },
+    "kick":       { "max": 2,  "window_sec": 30,  "burst": 1,  "scope": "user+guild", "category": "mod",   "reason": "Destructive mod action" },
+    "timeout":    { "max": 3,  "window_sec": 30,  "burst": 1,  "scope": "user+guild", "category": "mod",   "reason": "Reversible but impactful; slightly higher than ban/kick" },
+    "purge":      { "max": 2,  "window_sec": 20,  "burst": 1,  "scope": "user+guild", "category": "mod",   "reason": "Bulk delete — shortest window to prevent mass message loss" },
+    "warn":       { "max": 5,  "window_sec": 30,  "burst": 2,  "scope": "user+guild", "category": "mod",   "reason": "Non-destructive but high volume possible in active moderation" },
+    "clearwarns": { "max": 3,  "window_sec": 30,  "burst": 1,  "scope": "user+guild", "category": "mod",   "reason": "Bulk data modification" },
+    "ai chat":    { "max": 5,  "window_sec": 60,  "burst": 2,  "scope": "user",       "category": "ai",    "reason": "Upstream LLM API cost control" },
+    "ai image":   { "max": 2,  "window_sec": 300, "burst": 1,  "scope": "user",       "category": "ai",    "reason": "Image generation is expensive; 5-min window" }
+  },
+
+  "premium_tiers": {
+    "_comment": "Multipliers applied on top of effective base limits. free = 1× (identity). supporter = 2×. premium = 5× with AI exemption.",
+    "free": {
+      "label": "Free",
+      "multiplier": 1.0,
+      "ai_unlimited": false,
+      "description": "Default for all users. Limits apply as configured."
+    },
+    "supporter": {
+      "label": "Supporter",
+      "multiplier": 2.0,
+      "ai_unlimited": false,
+      "description": "All rate limit windows doubled. Role: SUPPORTER. Resolved at invocation time via guild role check."
+    },
+    "premium": {
+      "label": "Premium",
+      "multiplier": 5.0,
+      "ai_unlimited": true,
+      "description": "All rate limit windows 5×. AI commands (category: ai) have unlimited calls — rate limit check skipped entirely.",
+      "ai_exempt_categories": ["ai"]
+    }
+  },
+
+  "quota_exhaustion_behavior": {
+    "_comment": "Behaviour when a 429 Too Many Requests state is triggered.",
+    "http_response": {
+      "status_code": 429,
+      "headers": {
+        "Retry-After": "seconds until the window resets (integer)",
+        "X-RateLimit-Limit": "max invocations allowed in this window",
+        "X-RateLimit-Remaining": "0",
+        "X-RateLimit-Reset": "Unix epoch timestamp when the window resets"
+      }
+    },
+    "discord_response": {
+      "type": "ephemeral",
+      "visible_to": "invoking user only",
+      "message_template": "⏳ Slow down! You can use `/{command}` **{max} times per {window_sec}s**. Try again <t:{reset_epoch}:R>.",
+      "include_retry_after": true
+    },
+    "async_operations": {
+      "description": "Commands that trigger background jobs (e.g. ai image, music upload) are not silently dropped on 429. They are forwarded to the Dead Letter Queue for retry.",
+      "dlq": {
+        "backend": "Redis stream (key: chopsticks:dlq:ratelimited)",
+        "ttl_sec": 3600,
+        "max_retries": 3,
+        "retry_backoff": "exponential — 30s, 60s, 120s",
+        "on_max_retries_exceeded": "publish to chopsticks:alerts:dlq_overflow; notify guild owner via DM if enabled"
+      }
+    },
+    "logging": {
+      "emit_metric": "chopsticks_ratelimit_hit_total{command, guild_id, tier}",
+      "log_level": "WARN",
+      "include_fields": ["user_id", "guild_id", "command", "window_sec", "invocation_count"]
+    }
+  },
+
+  "test_vectors": [
+    {
+      "id": "tv-01",
+      "description": "Happy path: ban within limit",
+      "command": "ban",
+      "user_id": "user_001",
+      "guild_id": "guild_001",
+      "tier": "free",
+      "invocations": 2,
+      "window_sec": 30,
+      "expected_429_at_invocation_n": null,
+      "expected_result": "All 2 invocations succeed (limit is 2/30s)"
+    },
+    {
+      "id": "tv-02",
+      "description": "ban: 3rd invocation triggers 429",
+      "command": "ban",
+      "user_id": "user_001",
+      "guild_id": "guild_001",
+      "tier": "free",
+      "invocations": 3,
+      "window_sec": 30,
+      "expected_429_at_invocation_n": 3,
+      "expected_result": "Invocations 1-2 succeed; invocation 3 returns 429 with ephemeral message"
+    },
+    {
+      "id": "tv-03",
+      "description": "ai chat: supporter tier doubles limit (5 → 10/60s); 11th invocation triggers 429",
+      "command": "ai chat",
+      "user_id": "user_002",
+      "guild_id": "guild_001",
+      "tier": "supporter",
+      "invocations": 11,
+      "window_sec": 60,
+      "expected_429_at_invocation_n": 11,
+      "expected_result": "Invocations 1-10 succeed; invocation 11 returns 429"
+    },
+    {
+      "id": "tv-04",
+      "description": "ai image: premium tier skips AI rate limit entirely",
+      "command": "ai image",
+      "user_id": "user_003",
+      "guild_id": "guild_001",
+      "tier": "premium",
+      "invocations": 20,
+      "window_sec": 300,
+      "expected_429_at_invocation_n": null,
+      "expected_result": "All 20 invocations succeed; premium AI exemption applied"
+    },
+    {
+      "id": "tv-05",
+      "description": "purge: 3rd invocation in 20s window triggers 429; DLQ entry created",
+      "command": "purge",
+      "user_id": "user_004",
+      "guild_id": "guild_002",
+      "tier": "free",
+      "invocations": 3,
+      "window_sec": 20,
+      "expected_429_at_invocation_n": 3,
+      "expected_result": "Invocations 1-2 succeed; invocation 3 returns 429; async purge job written to DLQ"
+    },
+    {
+      "id": "tv-06",
+      "description": "warn: 6th invocation in 30s window triggers 429",
+      "command": "warn",
+      "user_id": "user_005",
+      "guild_id": "guild_003",
+      "tier": "free",
+      "invocations": 6,
+      "window_sec": 30,
+      "expected_429_at_invocation_n": 6,
+      "expected_result": "Invocations 1-5 succeed; invocation 6 returns 429 with Retry-After header"
+    }
+  ],
+
+  "implementation_prompt": {
+    "pr_title": "feat(rate-limit): implement per-command and per-category rate limiting with premium tiers",
+    "branch": "feat/phase3-rate-limit",
+    "files_to_modify": [
+      "src/middleware/rateLimiter.ts       — token-bucket / sliding-window logic; Redis backend with memory fallback",
+      "src/config/rateLimitConfig.ts       — typed loader for this JSON; exports resolveLimit(command, tier)",
+      "src/commands/*/index.ts             — attach @RateLimit decorator or middleware call at command registration",
+      "src/services/premiumResolver.ts     — resolves user tier from guild roles; caches in Redis (TTL 300s)",
+      "src/services/dlq.ts                 — Dead Letter Queue publisher/consumer (Redis stream)",
+      "src/events/interactionCreate.ts     — intercept 429 state; reply with ephemeral message using template",
+      "docker-compose.override.yml         — add RL_* env vars for local dev overrides",
+      "src/metrics/index.ts                — register chopsticks_ratelimit_hit_total Prometheus counter"
+    ],
+    "tests_to_add": [
+      "tests/unit/rateLimiter.spec.ts      — unit tests for all 6 test_vectors above; Redis mock via ioredis-mock",
+      "tests/unit/premiumResolver.spec.ts  — multiplier and AI-exempt logic",
+      "tests/integration/rateLimit.spec.ts — spin up Redis + bot; verify 429 headers and ephemeral replies",
+      "tests/integration/dlq.spec.ts       — verify DLQ entry on async-command 429"
+    ]
+  }
+}

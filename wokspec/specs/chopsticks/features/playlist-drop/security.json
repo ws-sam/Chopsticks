@@ -1,0 +1,155 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "feature_id": "playlist-drop",
+  "version": "1.0.0",
+  "description": "Machine-readable security spec for audio file uploads.",
+
+  "risks": [
+    {
+      "id": "risk-01",
+      "name": "Malware / virus upload",
+      "severity": "critical",
+      "description": "A user uploads an audio file containing embedded malware or an exploit payload disguised as audio.",
+      "mitigation": "Scan every upload with ClamAV (local sidecar) before writing to persistent storage. Fail closed if scanner is unavailable. VirusTotal optional fallback.",
+      "detection_metric": "chopsticks_virus_detected_total{guild_id}",
+      "recovery_tool": "Auto-delete temp buffer on detection; emit alert to #security-alerts webhook; log to audit_log with action=VIRUS_REJECTED"
+    },
+    {
+      "id": "risk-02",
+      "name": "NSFW / profane audio content",
+      "severity": "high",
+      "description": "Users upload audio with explicit, harmful, or legally restricted content and queue it for playback in public channels.",
+      "mitigation": "Optional guild opt-in audio moderation via Sightengine API or local Whisper + text classifier. Reject on score ≥ 0.7.",
+      "detection_metric": "chopsticks_audio_nsfw_rejected_total{guild_id, backend}",
+      "recovery_tool": "/music purge-uploads [user]; guild admin can disable audio moderation if causing false positives"
+    },
+    {
+      "id": "risk-03",
+      "name": "Storage quota exhaustion (per-guild)",
+      "severity": "medium",
+      "description": "A single guild uploads large files repeatedly, exhausting storage quota or inflating S3 costs.",
+      "mitigation": "Enforce 500 MB/month per guild (free tier) before step 7 (store_original). Block upload with 507 Insufficient Storage. Premium: unlimited.",
+      "detection_metric": "chopsticks_upload_quota_rejected_total{guild_id, tier}",
+      "recovery_tool": "Admin /admin quota status; expiry cron reclaims space; admin can purge or unpin files"
+    },
+    {
+      "id": "risk-04",
+      "name": "Upload rate abuse (individual user)",
+      "severity": "medium",
+      "description": "A user floods the bot with upload requests, exhausting per-user rate limits and consuming transcode worker capacity.",
+      "mitigation": "5 uploads/hour per user (sliding window Redis). 429 ephemeral reply with retry-after. Configurable via UPLOAD_USER_HOURLY_LIMIT.",
+      "detection_metric": "chopsticks_upload_ratelimit_hit_total{guild_id, user_id}",
+      "recovery_tool": "Admin override via /admin ratelimit-override; temporary ban from uploads via role removal"
+    },
+    {
+      "id": "risk-05",
+      "name": "Upload rate abuse (guild-wide)",
+      "severity": "medium",
+      "description": "Coordinated abuse by multiple users in one guild exceeds guild-daily upload limit.",
+      "mitigation": "50 uploads/day per guild (reset midnight UTC). 429 ephemeral reply. Configurable via UPLOAD_GUILD_DAILY_LIMIT.",
+      "detection_metric": "chopsticks_upload_guild_limit_hit_total{guild_id}",
+      "recovery_tool": "Admin override via Redis key; alert fired if limit hit repeatedly within short window"
+    },
+    {
+      "id": "risk-06",
+      "name": "Oversized file upload",
+      "severity": "low",
+      "description": "User attempts to upload a file exceeding the allowed size limit to cause memory pressure or storage waste.",
+      "mitigation": "Validate attachment.size at step 2 (before any download). Free: 25 MB. Premium: 100 MB. 400 ephemeral reply.",
+      "detection_metric": "chopsticks_upload_size_rejected_total{guild_id, tier}",
+      "recovery_tool": "Validation failure is self-contained; no storage consumed"
+    },
+    {
+      "id": "risk-07",
+      "name": "Content-type spoofing",
+      "severity": "low",
+      "description": "User attaches a non-audio file (e.g. executable, image) with a renamed .mp3 extension to bypass content-type check.",
+      "mitigation": "Validate content_type header AND run ffprobe on the downloaded buffer to confirm audio streams exist. Reject if no valid audio stream found.",
+      "detection_metric": "chopsticks_upload_type_rejected_total{guild_id}",
+      "recovery_tool": "400 rejection at step 6 (duration_probe); temp buffer deleted"
+    },
+    {
+      "id": "risk-08",
+      "name": "Storage backend unavailability",
+      "severity": "medium",
+      "description": "S3 / local volume is unreachable during upload, causing data loss or hanging requests.",
+      "mitigation": "Upload step uses a timeout (30s). On failure: 500 ephemeral reply; job published to DLQ for retry (3×, exponential backoff). Original Discord attachment URL remains valid for ~14 days.",
+      "detection_metric": "chopsticks_storage_upload_error_total{backend}",
+      "recovery_tool": "DLQ consumer retries; if max retries exceeded: DM user with Discord CDN URL so they can re-upload"
+    },
+    {
+      "id": "risk-09",
+      "name": "Duplicate content / storage waste",
+      "severity": "low",
+      "description": "Same file uploaded multiple times wastes storage and transcode compute.",
+      "mitigation": "Dedup via SHA-256 checksum at step 4. If match found with status='ready' in same guild: return existing track URL immediately without re-storing.",
+      "detection_metric": "chopsticks_upload_dedup_hit_total{guild_id}",
+      "recovery_tool": "Dedup is automatic; no manual recovery needed"
+    },
+    {
+      "id": "risk-10",
+      "name": "Stale / expired files accumulating",
+      "severity": "low",
+      "description": "Uploads that are never played or referenced accumulate in storage, inflating cost.",
+      "mitigation": "Automatic expiry after 30 days (unless pinned). Daily cron job deletes storage objects and sets status='deleted'.",
+      "detection_metric": "chopsticks_audio_expired_total{guild_id}",
+      "recovery_tool": "Admin /admin uploads report; expiry cron; manual /music purge-uploads"
+    }
+  ],
+
+  "rate_limits": {
+    "uploads_per_user_per_hour": {
+      "value": 5,
+      "window_sec": 3600,
+      "scope": "user+guild",
+      "redis_key_pattern": "chopsticks:upload_rl:user:{guild_id}:{user_id}",
+      "env_override": "UPLOAD_USER_HOURLY_LIMIT",
+      "on_exceeded": { "status": 429, "message_template": "⏳ Upload limit reached. You can upload {max} files/hour. Try again <t:{reset_epoch}:R>." }
+    },
+    "uploads_per_guild_per_day": {
+      "value": 50,
+      "window_sec": 86400,
+      "scope": "guild",
+      "redis_key_pattern": "chopsticks:upload_rl:guild:{guild_id}",
+      "env_override": "UPLOAD_GUILD_DAILY_LIMIT",
+      "window_reset": "midnight UTC",
+      "on_exceeded": { "status": 429, "message_template": "⏳ This server has reached its daily upload limit ({max} files/day). Try again tomorrow." }
+    }
+  },
+
+  "quotas": {
+    "free": {
+      "max_file_size_bytes": 26214400,
+      "max_storage_per_guild_per_month_bytes": 524288000,
+      "on_file_exceeded": { "status": 400, "message": "❌ File too large. Maximum size is 25 MB." },
+      "on_guild_quota_exceeded": { "status": 507, "message": "❌ This server has reached its monthly storage quota (500 MB). An admin can free space by purging old uploads." }
+    },
+    "premium": {
+      "max_file_size_bytes": 104857600,
+      "max_storage_per_guild_per_month_bytes": -1,
+      "on_file_exceeded": { "status": 400, "message": "❌ File too large. Maximum size is 100 MB." },
+      "on_guild_quota_exceeded": null
+    }
+  },
+
+  "expiry_policy": {
+    "default_expiry_days": 30,
+    "pinned_expiry_days": -1,
+    "cron_schedule": "0 2 * * *",
+    "cron_timezone": "UTC",
+    "soft_delete_first": true,
+    "statuses_eligible_for_expiry": ["ready"],
+    "actions_on_expiry": [
+      "UPDATE audio_uploads SET status='expired' WHERE expires_at < NOW() AND pinned = FALSE AND status = 'ready'",
+      "Delete storage object (S3 DeleteObject or local unlink)",
+      "UPDATE audio_uploads SET status='deleted', storage_key=NULL",
+      "Remove expired track from any active Lavalink queue; notify music channel",
+      "Emit metric: chopsticks_audio_expired_total{guild_id}"
+    ],
+    "admin_controls": {
+      "pin": "/admin uploads pin <upload_id>",
+      "unpin": "/admin uploads unpin <upload_id>",
+      "purge_user": "/music purge-uploads user:<@user> confirm:true"
+    }
+  }
+}

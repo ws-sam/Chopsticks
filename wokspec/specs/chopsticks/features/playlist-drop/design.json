@@ -1,0 +1,269 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "feature_id": "playlist-drop",
+  "version": "1.0.0",
+  "description": "Machine-readable spec for the Playlist Drop / Audio File Uploads feature.",
+
+  "slash_commands": [
+    {
+      "name": "music upload",
+      "description": "Upload an audio file to the voice channel queue.",
+      "options": [
+        {
+          "name": "file",
+          "type": "ATTACHMENT",
+          "description": "Audio file to upload (mp3, ogg, wav, flac). Max 25 MB (free) / 100 MB (premium).",
+          "required": true
+        },
+        {
+          "name": "title",
+          "type": "STRING",
+          "description": "Display title for the track. Defaults to filename.",
+          "required": false,
+          "max_length": 100
+        },
+        {
+          "name": "position",
+          "type": "INTEGER",
+          "description": "1-based position in the queue. 0 = play next. Defaults to end of queue.",
+          "required": false,
+          "min_value": 0
+        }
+      ],
+      "response_type": "DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE",
+      "ephemeral_on_error": true
+    },
+    {
+      "name": "playlist add-file",
+      "description": "Append an audio file to a saved playlist.",
+      "options": [
+        {
+          "name": "file",
+          "type": "ATTACHMENT",
+          "description": "Audio file to upload.",
+          "required": true
+        },
+        {
+          "name": "playlist",
+          "type": "STRING",
+          "description": "Name of the target playlist.",
+          "required": true,
+          "max_length": 50,
+          "autocomplete": true
+        },
+        {
+          "name": "title",
+          "type": "STRING",
+          "description": "Display title. Defaults to filename.",
+          "required": false,
+          "max_length": 100
+        }
+      ],
+      "response_type": "DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE",
+      "ephemeral_on_error": true
+    },
+    {
+      "name": "music purge-uploads",
+      "description": "Admin: delete all uploaded audio files from a user in this guild.",
+      "default_member_permissions": "MANAGE_GUILD",
+      "options": [
+        {
+          "name": "user",
+          "type": "USER",
+          "description": "Target user whose uploads will be purged.",
+          "required": true
+        },
+        {
+          "name": "confirm",
+          "type": "BOOLEAN",
+          "description": "Set to true to confirm deletion. Required to prevent accidental purge.",
+          "required": true
+        }
+      ],
+      "response_type": "DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE",
+      "ephemeral_on_error": true
+    }
+  ],
+
+  "storage_schema": {
+    "table": "audio_uploads",
+    "columns": {
+      "id":              { "type": "UUID",        "primary_key": true, "default": "gen_random_uuid()" },
+      "guild_id":        { "type": "TEXT",        "nullable": false },
+      "uploader_id":     { "type": "TEXT",        "nullable": false },
+      "filename":        { "type": "TEXT",        "nullable": false },
+      "storage_key":     { "type": "TEXT",        "nullable": false, "unique": true },
+      "original_key":    { "type": "TEXT",        "nullable": true },
+      "checksum_sha256": { "type": "CHAR(64)",    "nullable": false },
+      "duration_sec":    { "type": "INTEGER",     "nullable": false },
+      "format":          { "type": "TEXT",        "nullable": false, "enum": ["mp3","ogg","wav","flac"] },
+      "size_bytes":      { "type": "BIGINT",      "nullable": false },
+      "status":          { "type": "TEXT",        "nullable": false, "default": "pending_transcode",
+                           "enum": ["pending_transcode","transcoding","ready","failed","expired","deleted"] },
+      "created_at":      { "type": "TIMESTAMPTZ", "nullable": false, "default": "NOW()" },
+      "expires_at":      { "type": "TIMESTAMPTZ", "nullable": false, "default": "NOW() + INTERVAL '30 days'" },
+      "pinned":          { "type": "BOOLEAN",     "nullable": false, "default": false },
+      "title":           { "type": "TEXT",        "nullable": true },
+      "playlist_id":     { "type": "UUID",        "nullable": true, "references": "playlists(id)", "on_delete": "SET NULL" }
+    },
+    "indexes": [
+      { "columns": ["guild_id", "created_at DESC"] },
+      { "columns": ["guild_id", "uploader_id", "created_at DESC"] },
+      { "columns": ["checksum_sha256"] },
+      { "columns": ["status"], "where": "status NOT IN ('ready','deleted')" }
+    ]
+  },
+
+  "ingest_pipeline": [
+    {
+      "step": 1,
+      "name": "receive_attachment",
+      "description": "Extract attachment from Discord interaction. Record size, content_type, filename, URL."
+    },
+    {
+      "step": 2,
+      "name": "validate_metadata",
+      "description": "Check: size ≤ limit (25MB free / 100MB premium), content_type matches audio/*, filename extension in [mp3,ogg,wav,flac].",
+      "on_failure": "reject: HTTP 400 ephemeral reply"
+    },
+    {
+      "step": 3,
+      "name": "download_to_buffer",
+      "description": "Stream attachment URL to temp buffer (disk-backed if size > 10MB). Compute SHA-256 checksum during stream."
+    },
+    {
+      "step": 4,
+      "name": "dedup_check",
+      "description": "Query audio_uploads WHERE checksum_sha256 = computed AND guild_id = current AND status = 'ready'. If found, skip to step 9.",
+      "on_dedup": "return existing track URL and storage_key"
+    },
+    {
+      "step": 5,
+      "name": "virus_scan",
+      "description": "Scan temp buffer with ClamAV (local) or VirusTotal API (cloud). Decision: see missing_inputs.json.",
+      "on_failure": "delete temp buffer; reject: HTTP 400 ephemeral + fire alert metric"
+    },
+    {
+      "step": 6,
+      "name": "duration_probe",
+      "description": "Run ffprobe on temp buffer to determine duration_sec. Reject if > 900 seconds (15 min).",
+      "on_failure": "reject: HTTP 400 ephemeral reply"
+    },
+    {
+      "step": 7,
+      "name": "store_original",
+      "description": "Upload original file bytes to storage backend (S3 or local volume). Set original_key. Decision: see missing_inputs.json."
+    },
+    {
+      "step": 8,
+      "name": "db_insert",
+      "description": "INSERT INTO audio_uploads with status='pending_transcode'. Capture new UUID."
+    },
+    {
+      "step": 9,
+      "name": "transcode",
+      "description": "If format ≠ ogg or codec ≠ opus: run ffmpeg -i {input} -c:a libopus -b:a 128k -vn {uuid}.ogg. Update storage_key to transcoded ogg. Set status='ready'.",
+      "on_failure": "UPDATE status='failed'; DM uploader with error"
+    },
+    {
+      "step": 10,
+      "name": "enqueue_lavalink",
+      "description": "Resolve Lavalink track from storage URL. PATCH player with track + position_in_queue. If Lavalink unavailable: push to Redis list chopsticks:queue:{guild_id} for deferred playback.",
+      "on_lavalink_unavailable": "store in Redis queue; post warning to music text channel"
+    },
+    {
+      "step": 11,
+      "name": "confirm_user",
+      "description": "Edit deferred interaction reply: '✅ {title} added to queue at position #{position}'. Include duration, expires_at, thumbnail if available."
+    }
+  ],
+
+  "limits": {
+    "file_size_free_bytes":       26214400,
+    "file_size_premium_bytes":    104857600,
+    "duration_max_sec":           900,
+    "allowed_formats":            ["mp3", "ogg", "wav", "flac"],
+    "transcode_target_codec":     "libopus",
+    "transcode_target_bitrate":   "128k",
+    "transcode_target_container": "ogg",
+    "uploads_per_user_per_hour":  5,
+    "uploads_per_guild_per_day":  50,
+    "storage_per_guild_free_bytes":    524288000,
+    "storage_per_guild_premium_bytes": -1,
+    "expiry_days_default":        30,
+    "expiry_days_pinned":         -1
+  },
+
+  "test_vectors": [
+    { "id": "tv-01", "ref": "test_vectors.json#tv-01", "description": "Valid mp3 upload (happy path)" },
+    { "id": "tv-02", "ref": "test_vectors.json#tv-02", "description": "File too large (>25MB)" },
+    { "id": "tv-03", "ref": "test_vectors.json#tv-03", "description": "Wrong content-type (image/png)" },
+    { "id": "tv-04", "ref": "test_vectors.json#tv-04", "description": "Duration >15min" },
+    { "id": "tv-05", "ref": "test_vectors.json#tv-05", "description": "Virus detected" },
+    { "id": "tv-06", "ref": "test_vectors.json#tv-06", "description": "Rate limit exhausted" },
+    { "id": "tv-07", "ref": "test_vectors.json#tv-07", "description": "Storage unavailable" },
+    { "id": "tv-08", "ref": "test_vectors.json#tv-08", "description": "Lavalink unavailable" },
+    { "id": "tv-09", "ref": "test_vectors.json#tv-09", "description": "Duplicate upload (same checksum)" },
+    { "id": "tv-10", "ref": "test_vectors.json#tv-10", "description": "Admin purge of user uploads" }
+  ],
+
+  "implementation_prompts": [
+    {
+      "id": "pr-1",
+      "title": "feat(playlist-drop): storage integration",
+      "branch": "feat/playlist-drop-storage",
+      "description": "Implement the storage layer for audio file uploads. Add audio_uploads table migration, S3-compatible upload client (with local volume fallback), SHA-256 checksum computation, dedup check, and expiry cron job. No Discord or Lavalink integration yet.",
+      "files": [
+        "prisma/migrations/YYYYMMDD_add_audio_uploads/migration.sql",
+        "src/services/storage/storageClient.ts        — abstraction over S3 / local volume",
+        "src/services/storage/audioUploadRepository.ts — CRUD for audio_uploads table",
+        "src/jobs/expireAudioUploads.ts               — cron: mark expired rows, delete storage objects",
+        "src/config/storageConfig.ts                  — env-driven: STORAGE_BACKEND, S3_BUCKET, LOCAL_VOLUME_PATH"
+      ],
+      "tests": [
+        "tests/unit/storageClient.spec.ts",
+        "tests/unit/audioUploadRepository.spec.ts",
+        "tests/integration/expireAudioUploads.spec.ts"
+      ]
+    },
+    {
+      "id": "pr-2",
+      "title": "feat(playlist-drop): transcode pipeline",
+      "branch": "feat/playlist-drop-transcode",
+      "depends_on": "pr-1",
+      "description": "Implement the ingest and transcode pipeline. Add virus scan integration (ClamAV), ffprobe duration probe, ffmpeg transcode worker, Redis job queue (producer + consumer), and DLQ handling for failed transcode jobs.",
+      "files": [
+        "src/workers/transcodeWorker.ts               — ffmpeg wrapper; reads from Redis stream chopsticks:jobs:transcode",
+        "src/services/virusScanner.ts                 — ClamAV / VirusTotal abstraction",
+        "src/services/durationProbe.ts                — ffprobe wrapper",
+        "src/jobs/queueTranscodeJob.ts                — publishes to Redis stream after storage upload",
+        "src/services/dlq.ts                          — update: add transcode failure DLQ routing"
+      ],
+      "tests": [
+        "tests/unit/transcodeWorker.spec.ts",
+        "tests/unit/virusScanner.spec.ts",
+        "tests/integration/transcodePipeline.spec.ts  — end-to-end: upload → scan → probe → transcode → status=ready"
+      ]
+    },
+    {
+      "id": "pr-3",
+      "title": "feat(playlist-drop): Discord slash command integration",
+      "branch": "feat/playlist-drop-slash",
+      "depends_on": "pr-2",
+      "description": "Wire up the /music upload and /playlist add-file slash commands. Add attachment validation, rate limiting, Lavalink enqueueing (with Redis fallback queue), deferred reply flow, and /music purge-uploads admin command.",
+      "files": [
+        "src/commands/music/upload.ts                 — /music upload command handler",
+        "src/commands/playlist/addFile.ts             — /playlist add-file command handler",
+        "src/commands/music/purgeUploads.ts           — /music purge-uploads admin command",
+        "src/services/lavalinkEnqueuer.ts             — update: support pre-uploaded storage URLs",
+        "src/middleware/uploadRateLimit.ts            — 5/hr per user, 50/day per guild",
+        "src/events/lavalinkReconnect.ts              — drain Redis queue on Lavalink reconnect"
+      ],
+      "tests": [
+        "tests/unit/uploadRateLimit.spec.ts",
+        "tests/integration/musicUpload.spec.ts        — covers all 10 test vectors in test_vectors.json",
+        "tests/integration/purgeUploads.spec.ts"
+      ]
+    }
+  ]
+}

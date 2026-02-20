@@ -1,0 +1,212 @@
+[
+  {
+    "id": 1,
+    "description": "/ai chat — provider=none → returns setup message",
+    "input": {
+      "subcommand": "chat",
+      "options": { "message": "Hello, how are you?" },
+      "guild_settings": { "ai": { "provider": "none" }, "ai_tokens": {} }
+    },
+    "expected": {
+      "ephemeral": true,
+      "content_contains": "No AI provider is configured for this server",
+      "content_contains_also": "/ai set-provider",
+      "llm_called": false,
+      "key_exposed": false
+    }
+  },
+  {
+    "id": 2,
+    "description": "/ai chat — valid Anthropic key linked by user → returns LLM response",
+    "input": {
+      "subcommand": "chat",
+      "options": { "message": "What is 2 + 2?" },
+      "guild_settings": {
+        "ai": { "provider": "none" },
+        "ai_tokens": { "USER_ID_123": { "anthropic": "ENCRYPTED_VALID_KEY" } }
+      },
+      "mock_llm_response": "2 + 2 equals 4."
+    },
+    "expected": {
+      "ephemeral": true,
+      "content_contains": "4",
+      "llm_called": true,
+      "provider_used": "anthropic",
+      "key_exposed": false,
+      "context_stored": true,
+      "context_ttl_seconds": 1800
+    }
+  },
+  {
+    "id": 3,
+    "description": "/ai chat — linked key is invalid/expired → graceful error, key not exposed",
+    "input": {
+      "subcommand": "chat",
+      "options": { "message": "Tell me a joke." },
+      "guild_settings": {
+        "ai": { "provider": "none" },
+        "ai_tokens": { "USER_ID_123": { "anthropic": "ENCRYPTED_INVALID_KEY" } }
+      },
+      "mock_llm_error": "401 Unauthorized"
+    },
+    "expected": {
+      "ephemeral": true,
+      "error_code": "ERR_LLM_UNAVAILABLE",
+      "content_contains": "AI service",
+      "key_exposed": false,
+      "raw_error_exposed": false,
+      "llm_called": true
+    }
+  },
+  {
+    "id": 4,
+    "description": "/ai chat — user exceeds rate limit (3/30s) → 429 ephemeral",
+    "input": {
+      "subcommand": "chat",
+      "options": { "message": "Fourth message in 30 seconds" },
+      "rate_limit_state": { "user_requests_in_30s": 3 },
+      "guild_settings": {
+        "ai": { "provider": "openai" },
+        "ai_tokens": {}
+      }
+    },
+    "expected": {
+      "ephemeral": true,
+      "error_code": "ERR_RATE_LIMITED",
+      "content_contains": "too fast",
+      "content_contains_also": "retry_after",
+      "llm_called": false,
+      "http_status_analogue": 429
+    }
+  },
+  {
+    "id": 5,
+    "description": "/ai chat — context maintained across 3 consecutive messages",
+    "input": {
+      "subcommand": "chat",
+      "sequence": [
+        { "message": "My name is Alice.", "mock_llm_response": "Got it, Alice!" },
+        { "message": "What is my name?",  "mock_llm_response": "Your name is Alice." },
+        { "message": "What did I just tell you?", "mock_llm_response": "You told me your name is Alice." }
+      ],
+      "guild_settings": {
+        "ai": { "provider": "anthropic" },
+        "ai_tokens": {}
+      }
+    },
+    "expected": {
+      "context_passed_to_llm_on_message_2": [
+        { "role": "user",      "content": "My name is Alice." },
+        { "role": "assistant", "content": "Got it, Alice!" }
+      ],
+      "context_passed_to_llm_on_message_3_length": 4,
+      "response_3_contains": "Alice",
+      "context_key_pattern": "ai:ctx:{guildId}:{channelId}:{userId}",
+      "context_ttl_refreshed_on_each_message": true
+    }
+  },
+  {
+    "id": 6,
+    "description": "/ai chat — prompt contains blocked content → content filtered, no LLM call",
+    "input": {
+      "subcommand": "chat",
+      "options": { "message": "BLOCKED_KEYWORD_PLACEHOLDER" },
+      "guild_settings": {
+        "ai": { "provider": "openai" },
+        "ai_tokens": {}
+      }
+    },
+    "expected": {
+      "ephemeral": true,
+      "error_code": "ERR_CONTENT_FILTERED",
+      "content_does_not_contain": "BLOCKED_KEYWORD_PLACEHOLDER",
+      "llm_called": false,
+      "mod_log_entry_created": true,
+      "mod_log_contains_full_prompt": false,
+      "mod_log_contains_user_id": true
+    }
+  },
+  {
+    "id": 7,
+    "description": "/ai image — user has linked DALL-E (openai) key → returns image attachment",
+    "input": {
+      "subcommand": "image",
+      "options": { "prompt": "A cyberpunk cat on a rooftop at night" },
+      "guild_settings": {
+        "ai": { "provider": "none" },
+        "ai_tokens": { "USER_ID_123": { "openai": "ENCRYPTED_VALID_OPENAI_KEY" } }
+      },
+      "mock_image_url": "https://mock.openai.com/generated/image.png"
+    },
+    "expected": {
+      "ephemeral": false,
+      "has_image_attachment": true,
+      "embed_description_contains": "A cyberpunk cat on a rooftop at night",
+      "key_exposed": false,
+      "provider_used": "openai"
+    }
+  },
+  {
+    "id": 8,
+    "description": "/ai image — no key linked for any image provider → setup message",
+    "input": {
+      "subcommand": "image",
+      "options": { "prompt": "A dragon in a forest" },
+      "guild_settings": {
+        "ai": { "provider": "anthropic" },
+        "ai_tokens": {}
+      }
+    },
+    "expected": {
+      "ephemeral": true,
+      "content_contains": "/ai token link",
+      "content_contains_also": "openai",
+      "has_image_attachment": false,
+      "llm_called": false
+    }
+  },
+  {
+    "id": 9,
+    "description": "/ai token link — valid Anthropic key → encrypted and stored, key not exposed",
+    "input": {
+      "subcommand_group": "token",
+      "subcommand": "link",
+      "options": { "provider": "anthropic" },
+      "modal_input": { "api_key": "sk-ant-VALID_KEY_FOR_TESTING" },
+      "mock_validation_response": { "status": 200 }
+    },
+    "expected": {
+      "modal_shown": true,
+      "modal_ephemeral": true,
+      "validation_called": true,
+      "validation_endpoint": "https://api.anthropic.com/v1/models",
+      "key_stored": true,
+      "stored_value_is_encrypted": true,
+      "stored_value_format": "{iv_hex}:{ciphertext_hex}:{auth_tag_hex}",
+      "reply_content": "✅ Key linked.",
+      "reply_contains_raw_key": false,
+      "reply_ephemeral": true
+    }
+  },
+  {
+    "id": 10,
+    "description": "/ai token link — invalid key (validation returns 401) → rejected, nothing stored",
+    "input": {
+      "subcommand_group": "token",
+      "subcommand": "link",
+      "options": { "provider": "anthropic" },
+      "modal_input": { "api_key": "sk-ant-INVALID_KEY" },
+      "mock_validation_response": { "status": 401 }
+    },
+    "expected": {
+      "modal_shown": true,
+      "validation_called": true,
+      "key_stored": false,
+      "database_unchanged": true,
+      "reply_content_contains": "Key invalid",
+      "reply_content_contains_also": "Try again",
+      "reply_contains_raw_key": false,
+      "reply_ephemeral": true
+    }
+  }
+]

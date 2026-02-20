@@ -1,0 +1,61 @@
+{
+  "tokens": {
+    "color-success": "#57F287",
+    "color-error": "#ED4245",
+    "color-warning": "#FEE75C",
+    "color-info": "#5865F2",
+    "color-neutral": "#99AAB5",
+    "color-premium": "#FF73FA",
+    "color-music": "#1DB954",
+    "color-danger": "#FF0000"
+  },
+  "embed_color_map": {
+    "success": 5763719,
+    "error": 15548997,
+    "warning": 16705372,
+    "info": 5793266,
+    "neutral": 10070709,
+    "premium": 16741370,
+    "music": 1947988,
+    "danger": 16711680
+  },
+  "accessible_pairs": [
+    {
+      "background": "#23272A",
+      "foreground": "#57F287",
+      "wcag_aa": true,
+      "use_case": "success on dark (Discord dark background)"
+    },
+    {
+      "background": "#23272A",
+      "foreground": "#ED4245",
+      "wcag_aa": true,
+      "use_case": "error on dark"
+    },
+    {
+      "background": "#23272A",
+      "foreground": "#FEE75C",
+      "wcag_aa": true,
+      "use_case": "warning on dark"
+    },
+    {
+      "background": "#23272A",
+      "foreground": "#FFFFFF",
+      "wcag_aa": true,
+      "use_case": "body text on dark (primary readable pair)"
+    },
+    {
+      "background": "#2C2F33",
+      "foreground": "#99AAB5",
+      "wcag_aa": true,
+      "use_case": "muted/neutral text on embed background"
+    }
+  ],
+  "button_styles": {
+    "confirm": "SUCCESS",
+    "cancel": "SECONDARY",
+    "danger": "DANGER",
+    "primary": "PRIMARY",
+    "link": "LINK"
+  }
+}

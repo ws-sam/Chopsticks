@@ -1,0 +1,313 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "feature_id": "playlist-drop",
+  "version": "1.0.0",
+  "description": "Test vectors for audio file upload feature. Each vector specifies input conditions, expected HTTP status, expected response content, and expected side effects.",
+
+  "test_vectors": [
+    {
+      "id": "tv-01",
+      "description": "Valid mp3 upload — happy path. File is within size, content-type, and duration limits. Should store, transcode, enqueue, and confirm.",
+      "input": {
+        "command": "/music upload",
+        "attachment": {
+          "filename": "chill_lo_fi.mp3",
+          "content_type": "audio/mpeg",
+          "size_bytes": 5242880,
+          "duration_sec": 210,
+          "checksum_sha256": "abc123deadbeef0000000000000000000000000000000000000000000000000001"
+        },
+        "options": {
+          "title": "Chill Lo-Fi",
+          "position": 0
+        },
+        "user": { "id": "user_001", "tier": "free" },
+        "guild_id": "guild_001"
+      },
+      "expected_status": 200,
+      "expected_response_contains": [
+        "✅",
+        "Chill Lo-Fi",
+        "queue",
+        "position"
+      ],
+      "expected_side_effects": [
+        "audio_uploads row inserted with status='ready' after transcode completes",
+        "storage_key set to {guild_id}/{user_id}/{uuid}.ogg (transcoded)",
+        "Lavalink player updated with new track at queue position 1",
+        "chopsticks_upload_total{guild_id, tier='free'} incremented by 1"
+      ]
+    },
+    {
+      "id": "tv-02",
+      "description": "File too large (>25 MB free tier). Attachment size exceeds free tier limit. Should be rejected before any download occurs.",
+      "input": {
+        "command": "/music upload",
+        "attachment": {
+          "filename": "very_large_mix.mp3",
+          "content_type": "audio/mpeg",
+          "size_bytes": 31457280,
+          "duration_sec": 600,
+          "checksum_sha256": null
+        },
+        "options": { "title": null, "position": null },
+        "user": { "id": "user_002", "tier": "free" },
+        "guild_id": "guild_001"
+      },
+      "expected_status": 400,
+      "expected_response_contains": [
+        "too large",
+        "25 MB"
+      ],
+      "expected_side_effects": [
+        "No download initiated",
+        "No audio_uploads row created",
+        "No storage write",
+        "chopsticks_upload_size_rejected_total{guild_id, tier='free'} incremented by 1"
+      ]
+    },
+    {
+      "id": "tv-03",
+      "description": "Wrong content-type (image/png). Discord attachment has content_type=image/png. Should be rejected at metadata validation step.",
+      "input": {
+        "command": "/music upload",
+        "attachment": {
+          "filename": "totally_an_audio.png",
+          "content_type": "image/png",
+          "size_bytes": 2097152,
+          "duration_sec": null,
+          "checksum_sha256": null
+        },
+        "options": { "title": null, "position": null },
+        "user": { "id": "user_003", "tier": "free" },
+        "guild_id": "guild_001"
+      },
+      "expected_status": 400,
+      "expected_response_contains": [
+        "Invalid file type",
+        "mp3",
+        "ogg",
+        "wav",
+        "flac"
+      ],
+      "expected_side_effects": [
+        "No download initiated",
+        "No audio_uploads row created",
+        "chopsticks_upload_type_rejected_total{guild_id} incremented by 1"
+      ]
+    },
+    {
+      "id": "tv-04",
+      "description": "Duration >15 min. File is a valid audio/mpeg but ffprobe reports 1200 seconds (20 min). Should be rejected after duration probe.",
+      "input": {
+        "command": "/music upload",
+        "attachment": {
+          "filename": "long_podcast_episode.mp3",
+          "content_type": "audio/mpeg",
+          "size_bytes": 18874368,
+          "duration_sec": 1200,
+          "checksum_sha256": "abc123deadbeef0000000000000000000000000000000000000000000000000002"
+        },
+        "options": { "title": null, "position": null },
+        "user": { "id": "user_004", "tier": "free" },
+        "guild_id": "guild_002"
+      },
+      "expected_status": 400,
+      "expected_response_contains": [
+        "too long",
+        "15 minutes"
+      ],
+      "expected_side_effects": [
+        "File downloaded to temp buffer",
+        "ffprobe executed",
+        "Temp buffer deleted after rejection",
+        "No audio_uploads row created",
+        "No storage write",
+        "chopsticks_upload_duration_rejected_total{guild_id} incremented by 1"
+      ]
+    },
+    {
+      "id": "tv-05",
+      "description": "Virus detected. ClamAV scan returns FOUND result. File must be rejected, temp buffer deleted, and alert emitted.",
+      "input": {
+        "command": "/music upload",
+        "attachment": {
+          "filename": "totally_normal_song.mp3",
+          "content_type": "audio/mpeg",
+          "size_bytes": 4194304,
+          "duration_sec": 180,
+          "checksum_sha256": "deadbeef0000000000000000000000000000000000000000000000000000000099",
+          "_test_mock": "clamav_returns_infected"
+        },
+        "options": { "title": null, "position": null },
+        "user": { "id": "user_005", "tier": "free" },
+        "guild_id": "guild_003"
+      },
+      "expected_status": 400,
+      "expected_response_contains": [
+        "rejected",
+        "security scan failed",
+        "server admin"
+      ],
+      "expected_side_effects": [
+        "Temp buffer deleted immediately",
+        "No audio_uploads row created",
+        "No storage write",
+        "chopsticks_virus_detected_total{guild_id} incremented by 1",
+        "Alert payload POSTed to #security-alerts webhook",
+        "Audit log entry written: action=VIRUS_REJECTED, user_id, guild_id, filename, checksum"
+      ]
+    },
+    {
+      "id": "tv-06",
+      "description": "Rate limit exhausted — 6th upload in 1 hour by same user. First 5 succeed; 6th triggers 429.",
+      "input": {
+        "command": "/music upload",
+        "attachment": {
+          "filename": "track_six.mp3",
+          "content_type": "audio/mpeg",
+          "size_bytes": 3145728,
+          "duration_sec": 120,
+          "checksum_sha256": "abc123deadbeef0000000000000000000000000000000000000000000000000006"
+        },
+        "options": { "title": null, "position": null },
+        "user": { "id": "user_006", "tier": "free" },
+        "guild_id": "guild_004",
+        "_test_precondition": "user_006 has already made 5 uploads in the current 1-hour window for guild_004"
+      },
+      "expected_status": 429,
+      "expected_response_contains": [
+        "Upload limit reached",
+        "5 files/hour",
+        "Try again"
+      ],
+      "expected_side_effects": [
+        "No download initiated",
+        "No audio_uploads row created",
+        "Retry-After header present in response",
+        "chopsticks_upload_ratelimit_hit_total{guild_id, user_id} incremented by 1"
+      ]
+    },
+    {
+      "id": "tv-07",
+      "description": "Storage backend unavailable. S3/local volume throws a connection error at step 7 (store_original). Should return 500, write to DLQ, and preserve the Discord CDN URL for retry.",
+      "input": {
+        "command": "/music upload",
+        "attachment": {
+          "filename": "store_me.mp3",
+          "content_type": "audio/mpeg",
+          "size_bytes": 6291456,
+          "duration_sec": 250,
+          "checksum_sha256": "abc123deadbeef0000000000000000000000000000000000000000000000000007",
+          "_test_mock": "storage_backend_unavailable"
+        },
+        "options": { "title": null, "position": null },
+        "user": { "id": "user_007", "tier": "free" },
+        "guild_id": "guild_005"
+      },
+      "expected_status": 500,
+      "expected_response_contains": [
+        "upload failed",
+        "try again"
+      ],
+      "expected_side_effects": [
+        "Temp buffer cleaned up",
+        "No audio_uploads row with status='ready' created",
+        "DLQ entry written to chopsticks:dlq:upload_retry with Discord CDN URL + all metadata",
+        "chopsticks_storage_upload_error_total{backend} incremented by 1",
+        "DLQ consumer will retry up to 3× with exponential backoff (30s, 60s, 120s)"
+      ]
+    },
+    {
+      "id": "tv-08",
+      "description": "Lavalink unavailable. File successfully stored and transcoded, but Lavalink is unreachable when enqueueing. Track should be saved to Redis queue for deferred playback on reconnect.",
+      "input": {
+        "command": "/music upload",
+        "attachment": {
+          "filename": "deferred_track.ogg",
+          "content_type": "audio/ogg",
+          "size_bytes": 4718592,
+          "duration_sec": 195,
+          "checksum_sha256": "abc123deadbeef0000000000000000000000000000000000000000000000000008",
+          "_test_mock": "lavalink_unavailable"
+        },
+        "options": { "title": "Deferred Track", "position": null },
+        "user": { "id": "user_008", "tier": "free" },
+        "guild_id": "guild_006"
+      },
+      "expected_status": 200,
+      "expected_response_contains": [
+        "Deferred Track",
+        "queued",
+        "played when bot reconnects"
+      ],
+      "expected_side_effects": [
+        "audio_uploads row inserted with status='ready'",
+        "Storage write succeeds",
+        "Track pushed to Redis list chopsticks:queue:guild_006",
+        "Warning message posted to music text channel: bot is disconnected from voice; track queued",
+        "On Lavalink reconnect: LavalinkManager.onReconnect drains chopsticks:queue:guild_006 and enqueues track",
+        "chopsticks_lavalink_unavailable_queue_total{guild_id} incremented by 1"
+      ]
+    },
+    {
+      "id": "tv-09",
+      "description": "Duplicate upload — same SHA-256 checksum already exists in audio_uploads with status='ready' for this guild. Should skip re-storing and re-transcoding; return existing track URL immediately.",
+      "input": {
+        "command": "/music upload",
+        "attachment": {
+          "filename": "duplicate_track.mp3",
+          "content_type": "audio/mpeg",
+          "size_bytes": 5242880,
+          "duration_sec": 210,
+          "checksum_sha256": "abc123deadbeef0000000000000000000000000000000000000000000000000001",
+          "_test_precondition": "audio_uploads already contains a 'ready' row with this checksum for guild_001"
+        },
+        "options": { "title": null, "position": null },
+        "user": { "id": "user_009", "tier": "free" },
+        "guild_id": "guild_001"
+      },
+      "expected_status": 200,
+      "expected_response_contains": [
+        "already in library",
+        "queue"
+      ],
+      "expected_side_effects": [
+        "No new storage write",
+        "No new transcode job",
+        "No new audio_uploads row inserted",
+        "Existing storage_key returned and enqueued in Lavalink",
+        "chopsticks_upload_dedup_hit_total{guild_id} incremented by 1"
+      ]
+    },
+    {
+      "id": "tv-10",
+      "description": "Admin purge of all uploads from a specific user. /music purge-uploads user:@user_005 confirm:true should delete all storage objects and DB rows for that user in the guild.",
+      "input": {
+        "command": "/music purge-uploads",
+        "options": {
+          "user": { "id": "user_005" },
+          "confirm": true
+        },
+        "invoker": { "id": "admin_001", "permissions": ["MANAGE_GUILD"] },
+        "guild_id": "guild_003",
+        "_test_precondition": "audio_uploads has 3 rows for user_005 in guild_003 with status='ready'; total size 14680064 bytes"
+      },
+      "expected_status": 200,
+      "expected_response_contains": [
+        "Purged",
+        "3",
+        "uploads",
+        "user_005",
+        "14"
+      ],
+      "expected_side_effects": [
+        "3 storage objects deleted from S3 / local volume",
+        "3 audio_uploads rows updated to status='deleted', storage_key=NULL",
+        "Audit log entry written: action=PURGE_UPLOADS, actor_id=admin_001, target_user_id=user_005, guild_id=guild_003, count=3, total_size_bytes=14680064",
+        "If any purged tracks were in the active Lavalink queue: removed and music channel notified",
+        "chopsticks_admin_purge_total{guild_id} incremented by 1"
+      ]
+    }
+  ]
+}

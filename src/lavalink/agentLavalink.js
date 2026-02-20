@@ -1291,6 +1291,30 @@ export function createAgentLavalink(agentClient) {
     if (n === "8d") {
       return { rotation: { rotationHz: 0.2 } };
     }
+    if (n === "treble") {
+      return {
+        equalizer: [
+          { band: 10, gain: 0.25 },
+          { band: 11, gain: 0.25 },
+          { band: 12, gain: 0.25 },
+          { band: 13, gain: 0.25 },
+          { band: 14, gain: 0.25 }
+        ]
+      };
+    }
+    if (n === "pop") {
+      return {
+        equalizer: [
+          { band: 0, gain: -0.05 },
+          { band: 1, gain: 0.1 },
+          { band: 2, gain: 0.15 },
+          { band: 3, gain: 0.1 },
+          { band: 4, gain: 0.05 },
+          { band: 7, gain: 0.1 },
+          { band: 8, gain: 0.15 }
+        ]
+      };
+    }
     return null;
   }
 

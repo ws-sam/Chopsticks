@@ -200,7 +200,29 @@ data.addSubcommandGroup(g =>
     .setDescription("Server playlists powered by drop channels")
     .addSubcommand(s => s.setName("panel").setDescription("Admin playlist setup panel (Manage Server)"))
     .addSubcommand(s => s.setName("browse").setDescription("Browse playlists and play from dropdowns"))
+    .addSubcommand(s =>
+      s.setName("load").setDescription("Load a saved playlist into the queue")
+        .addStringOption(o => o.setName("name").setDescription("Playlist name").setRequired(true))
+    )
 );
+
+data.addSubcommand(s =>
+  s.setName("save").setDescription("Save current queue as a named playlist")
+    .addStringOption(o => o.setName("name").setDescription("Playlist name").setRequired(true).setMaxLength(50))
+);
+data.addSubcommand(s =>
+  s.setName("eq").setDescription("Set equalizer preset")
+    .addStringOption(o =>
+      o.setName("preset").setDescription("EQ preset").setRequired(true)
+        .addChoices(
+          { name: "flat", value: "flat" },
+          { name: "bass-boost", value: "bass-boost" },
+          { name: "treble", value: "treble" },
+          { name: "pop", value: "pop" }
+        )
+    )
+);
+data.addSubcommand(s => s.setName("lyrics").setDescription("Show lyrics for the current track"));
 
 function requireVoice(interaction) {
   const member = interaction.member;
@@ -1695,6 +1717,49 @@ export async function execute(interaction) {
       return;
     }
 
+    if (sub === "load") {
+      const plName = interaction.options.getString("name", true).trim();
+      const gData = await loadGuildData(guildId);
+      const savedPls = gData.savedPlaylists ?? {};
+      const plTracks = savedPls[plName];
+      if (!Array.isArray(plTracks) || !plTracks.length) {
+        await interaction.reply({ flags: MessageFlags.Ephemeral, embeds: [makeEmbed("Music Playlists", `❌ No saved playlist named '${plName}'.`, [], null, null, 0xFF0000)] });
+        return;
+      }
+      const plVcId = await resolveMemberVoiceId(interaction);
+      if (!plVcId) {
+        await interaction.reply({ flags: MessageFlags.Ephemeral, embeds: [makeEmbed("Music Playlists", "❌ Join a voice channel first.")] });
+        return;
+      }
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+      const plConfig = await getMusicConfig(guildId);
+      const ensureRes = await ensureSessionAgent(guildId, plVcId, { textChannelId: interaction.channelId, ownerUserId: userId });
+      if (!ensureRes.ok) {
+        await interaction.editReply({ embeds: [makeEmbed("Music Playlists", formatMusicError(ensureRes.reason))] });
+        return;
+      }
+      let plQueued = 0;
+      for (const plTrack of plTracks) {
+        if (!plTrack?.uri) continue;
+        try {
+          await sendAgentCommand(ensureRes.agent, "play", {
+            guildId, voiceChannelId: plVcId, textChannelId: interaction.channelId,
+            ownerUserId: userId, actorUserId: userId,
+            controlMode: plConfig.controlMode,
+            searchProviders: plConfig.searchProviders,
+            fallbackProviders: plConfig.fallbackProviders,
+            defaultMode: plConfig.defaultMode,
+            defaultVolume: plConfig.defaultVolume,
+            query: plTrack.uri,
+            requester: buildRequester(interaction.user)
+          });
+          plQueued++;
+        } catch {}
+      }
+      await interaction.editReply({ embeds: [makeEmbed("Music Playlists", `✅ Queued ${plQueued} tracks from playlist '${plName}'.`)] });
+      return;
+    }
+
     await interaction.reply({ flags: MessageFlags.Ephemeral, embeds: [makeEmbed("Music Playlists", "Unknown action.", [], null, null, 0xFF0000)] });
     return;
   }
@@ -2024,6 +2089,112 @@ export async function execute(interaction) {
       await interaction.reply({
         flags: MessageFlags.Ephemeral,
         embeds: [makeEmbed("Music", "Nothing playing in this channel.")]
+      });
+      return;
+    }
+
+    // ── save ──────────────────────────────────────────────────────────────────
+    if (sub === "save") {
+      const ack = await safeDeferEphemeral(interaction);
+      if (!ack.ok) return;
+      const saveName = interaction.options.getString("name", true).trim();
+      let saveResult;
+      try {
+        saveResult = await sendAgentCommand(sess.agent, "queue", {
+          guildId, voiceChannelId: vc.id, textChannelId: interaction.channelId,
+          ownerUserId: userId, actorUserId: userId, controlMode: config.controlMode
+        });
+      } catch (err) {
+        if (String(err?.message ?? err) === "no-session") releaseSession(guildId, vc.id);
+        await interaction.editReply({ embeds: [makeEmbed("Music", formatMusicError(err))] });
+        return;
+      }
+      const saveCurrent = saveResult?.current ?? null;
+      const saveQueue = Array.isArray(saveResult?.tracks) ? saveResult.tracks : [];
+      const saveAll = saveCurrent ? [saveCurrent, ...saveQueue] : saveQueue;
+      if (!saveAll.length) {
+        await interaction.editReply({ embeds: [makeEmbed("Music", "❌ Nothing in queue to save.")] });
+        return;
+      }
+      const saveData = await loadGuildData(guildId);
+      saveData.savedPlaylists ??= {};
+      saveData.savedPlaylists[saveName] = saveAll.map(t => ({ title: t.title, uri: t.uri, requester: t.requester }));
+      await saveGuildData(guildId, saveData);
+      await interaction.editReply({ embeds: [makeEmbed("Music", `✅ Saved playlist '${saveName}' with ${saveAll.length} tracks.`)] });
+      return;
+    }
+
+    // ── eq ────────────────────────────────────────────────────────────────────
+    if (sub === "eq") {
+      const ack = await safeDeferEphemeral(interaction);
+      if (!ack.ok) return;
+      const eqPreset = interaction.options.getString("preset", true);
+      const agentPreset = eqPreset === "bass-boost" ? "bassboost" : eqPreset;
+      try {
+        await sendAgentCommand(sess.agent, "preset", {
+          guildId, voiceChannelId: vc.id, textChannelId: interaction.channelId,
+          ownerUserId: userId, actorUserId: userId, controlMode: config.controlMode,
+          preset: agentPreset
+        });
+      } catch (err) {
+        if (String(err?.message ?? err) === "no-session") releaseSession(guildId, vc.id);
+        await interaction.editReply({ embeds: [makeEmbed("Music", formatMusicError(err))] });
+        return;
+      }
+      await interaction.editReply({ embeds: [makeEmbed("Music", `✅ Equalizer set to ${eqPreset}.`)] });
+      return;
+    }
+
+    // ── lyrics ────────────────────────────────────────────────────────────────
+    if (sub === "lyrics") {
+      const ack = await safeDeferEphemeral(interaction);
+      if (!ack.ok) return;
+      let lyricsStatus;
+      try {
+        lyricsStatus = await sendAgentCommand(sess.agent, "status", {
+          guildId, voiceChannelId: vc.id, textChannelId: interaction.channelId,
+          ownerUserId: userId, actorUserId: userId, controlMode: config.controlMode
+        });
+      } catch (err) {
+        if (String(err?.message ?? err) === "no-session") releaseSession(guildId, vc.id);
+        await interaction.editReply({ embeds: [makeEmbed("Music", formatMusicError(err))] });
+        return;
+      }
+      const lyricsCurrent = lyricsStatus?.current ?? null;
+      if (!lyricsCurrent) {
+        await interaction.editReply({ embeds: [makeEmbed("Music", "❌ Nothing is playing.")] });
+        return;
+      }
+      const rawTitle = String(lyricsCurrent.title ?? "");
+      const rawAuthor = String(lyricsCurrent.author ?? "");
+      let lyricsArtist = rawAuthor;
+      let lyricsSong = rawTitle;
+      if (!lyricsArtist && rawTitle.includes(" - ")) {
+        const sep = rawTitle.indexOf(" - ");
+        lyricsArtist = rawTitle.slice(0, sep).trim();
+        lyricsSong = rawTitle.slice(sep + 3).trim();
+      }
+      if (!lyricsArtist) {
+        await interaction.editReply({ embeds: [makeEmbed("Music", "❌ Cannot determine artist for lyrics lookup.")] });
+        return;
+      }
+      let lyricsText = null;
+      try {
+        const { fetch: lFetch } = await import("undici");
+        const lUrl = `https://api.lyrics.ovh/v1/${encodeURIComponent(lyricsArtist)}/${encodeURIComponent(lyricsSong)}`;
+        const lRes = await lFetch(lUrl, { signal: AbortSignal.timeout(8000) });
+        if (lRes.ok) {
+          const lJson = await lRes.json();
+          if (typeof lJson?.lyrics === "string" && lJson.lyrics.trim()) lyricsText = lJson.lyrics.trim();
+        }
+      } catch {}
+      if (!lyricsText) {
+        await interaction.editReply({ embeds: [makeEmbed("Music", "❌ Lyrics not found for this track.")] });
+        return;
+      }
+      const lyricsTrunc = lyricsText.length > 4000 ? lyricsText.slice(0, 3997) + "..." : lyricsText;
+      await interaction.editReply({
+        embeds: [new EmbedBuilder().setTitle(`Lyrics: ${rawTitle}`).setDescription(lyricsTrunc).setColor(QUEUE_COLOR)]
       });
       return;
     }

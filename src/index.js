@@ -40,6 +40,7 @@ import {
 } from "./commands/voice.js";
 import { handleSelect as handleHelpSelect } from "./commands/help.js";
 import { handleModal as handleModelModal } from "./commands/model.js";
+import { handleAiModal } from "./commands/ai.js";
 import { registerAllCommands } from "../scripts/registerAllCommands.js";
 import { handleButton as handlePurgeButton } from "./commands/purge.js";
 import { handleButton as handleGameButton, handleSelect as handleGameSelect } from "./commands/game.js";
@@ -825,6 +826,7 @@ client.on(Events.InteractionCreate, async interaction => {
       if (await handleMusicModal(interaction)) return;
       if (await handleVoiceModal(interaction)) return;
       if (await handleModelModal(interaction)) return;
+      if (await handleAiModal(interaction)) return;
     } catch (err) {
       console.error("[modal]", err?.stack ?? err?.message ?? err);
       try {

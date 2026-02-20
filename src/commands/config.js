@@ -14,7 +14,8 @@ import { replyEmbed, replyEmbedWithJson } from "../utils/discordOutput.js";
 
 export const meta = {
   guildOnly: true,
-  userPerms: [PermissionFlagsBits.ManageGuild]
+  userPerms: [PermissionFlagsBits.ManageGuild],
+  category: "admin"
 };
 
 export const data = new SlashCommandBuilder()

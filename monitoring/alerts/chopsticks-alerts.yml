@@ -56,3 +56,84 @@ groups:
           description: "More than 5 failed deployment attempts in a 10m window."
           runbook: "docs/OPS.md#alert-runbooks"
 
+  - name: chopsticks-security
+    rules:
+      - alert: ChopsticksRateLimitSpike
+        expr: sum(increase(chopsticks_rate_limit_hits_total[5m])) > 50
+        for: 2m
+        labels:
+          severity: warning
+          service: bot
+        annotations:
+          summary: "Rate limit violations spiking"
+          description: "More than 50 rate limit hits in 5 minutes — potential abuse."
+          runbook: "docs/OPS.md#alert-runbooks"
+
+      - alert: ChopsticksAuthFailureSpike
+        expr: sum(increase(chopsticks_auth_attempts_total{success="false"}[5m])) > 20
+        for: 1m
+        labels:
+          severity: warning
+          service: bot
+        annotations:
+          summary: "Auth failure spike"
+          description: "More than 20 failed auth attempts in 5 minutes."
+          runbook: "docs/OPS.md#alert-runbooks"
+
+      - alert: ChopsticksDiscordRateLimitHit
+        expr: increase(chopsticks_discord_rate_limits_total[5m]) > 5
+        for: 1m
+        labels:
+          severity: warning
+          service: bot
+        annotations:
+          summary: "Hitting Discord API rate limits"
+          description: "Bot hit Discord rate limits more than 5 times in 5 minutes."
+          runbook: "docs/OPS.md#alert-runbooks"
+
+  - name: chopsticks-performance
+    rules:
+      - alert: ChopsticksCommandLatencyHigh
+        expr: histogram_quantile(0.95, rate(chopsticks_command_duration_seconds_bucket[5m])) > 3
+        for: 5m
+        labels:
+          severity: warning
+          service: bot
+        annotations:
+          summary: "Command p95 latency above 3s"
+          description: "95th percentile command execution time exceeds 3 seconds for 5 minutes."
+          runbook: "docs/OPS.md#alert-runbooks"
+
+      - alert: ChopsticksCommandErrorRateHigh
+        expr: sum(rate(chopsticks_commands_total{status="error"}[5m])) / sum(rate(chopsticks_commands_total[5m])) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: bot
+        annotations:
+          summary: "Command error rate above 10%"
+          description: "More than 10% of commands are failing over a 5-minute window."
+          runbook: "docs/OPS.md#alert-runbooks"
+
+      - alert: ChopsticksDbQueryLatencyHigh
+        expr: histogram_quantile(0.95, rate(chopsticks_db_query_duration_seconds_bucket[5m])) > 1
+        for: 5m
+        labels:
+          severity: warning
+          service: database
+        annotations:
+          summary: "DB p95 query latency above 1s"
+          description: "Database queries are slow — check for long-running queries or connection exhaustion."
+          runbook: "docs/OPS.md#alert-runbooks"
+
+      - alert: ChopsticksDbConnectionPoolLow
+        expr: chopsticks_db_connection_pool_size < 2
+        for: 3m
+        labels:
+          severity: critical
+          service: database
+        annotations:
+          summary: "DB connection pool nearly exhausted"
+          description: "Fewer than 2 connections available in the PostgreSQL pool."
+          runbook: "docs/OPS.md#alert-runbooks"
+

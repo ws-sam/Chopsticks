@@ -1,58 +1,21 @@
-MIT License with Fair Use Attribution Clause
+MIT License
 
 Copyright (c) 2026 goot27 and Wok Specialists
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction for personal and non-commercial purposes,
-including without limitation the rights to use, copy, modify, merge, publish,
-distribute, and sublicense copies of the Software, subject to the following
-conditions:
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-1. ATTRIBUTION REQUIREMENT
-   The above copyright notice and this permission notice shall be included in
-   all copies or substantial portions of the Software.
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
-2. FAIR USE ATTRIBUTION THRESHOLD
-   If your use of the Software (or any derivative work) generates annual revenue
-   exceeding USD $500, OR the Software is made available to more than 500 end
-   users (measured as Discord guild members or unique interacting users,
-   whichever is greater), you MUST:
-     a) Clearly credit "Chopsticks by goot27 / Wok Specialists" in any public-
-        facing interface, website, documentation, or "About" section associated
-        with the deployment; and
-     b) Provide a link to the original repository
-        (https://github.com/wokspec/Chopsticks or its successor URL).
-   This attribution requirement applies regardless of whether the Software has
-   been modified.
-
-3. COMMERCIAL RESTRICTION
-   You may NOT sell, license, or offer the Software (or any derivative work) as
-   a commercial product, hosted service, or "bot-as-a-service" to third parties
-   without prior written permission from the copyright holders. This includes,
-   but is not limited to, charging money for bot access, selling subscriptions
-   gated behind the Software's features, or operating a multi-tenant deployment
-   for profit.
-
-4. CONTRIBUTIONS
-   By submitting a contribution (code, documentation, or assets) to this
-   repository, you grant the copyright holders a perpetual, worldwide, royalty-
-   free license to use, modify, and re-license your contribution as part of the
-   Software. You represent that you have the right to grant this license.
-
-5. THIRD-PARTY COMPONENTS
-   The Software may include dependencies governed by separate licenses
-   ("Third-Party Components"). Those licenses apply to the Third-Party
-   Components and are unaffected by this License.
-
-6. DISCLAIMER
-   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-   FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. IN NO EVENT SHALL THE
-   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER
-   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-   SOFTWARE.
-
----
-For commercial licensing inquiries, contact the repository maintainers.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

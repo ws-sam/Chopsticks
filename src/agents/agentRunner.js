@@ -265,11 +265,80 @@ async function startAgent(agentConfig) {
     try {
       lavalink = createAgentLavalink(client);
       await lavalink.start();
+
+      // AI DJ hook — fire-and-forget on every track start
+      try {
+        lavalink.manager?.on?.("trackStart", (player, track) => {
+          const guildId = player?.guildId;
+          if (!guildId) return;
+          fireDJAnnouncement(guildId, player, track).catch(() => {});
+          fireMusicTrivia(guildId, player, track).catch(() => {});
+        });
+      } catch {}
+
       return lavalink;
     } catch (err) {
       lavalink = null;
       throw err;
     }
+  }
+
+  async function fireDJAnnouncement(guildId, player, track) {
+    try {
+      const { isDJEnabled, getGuildDJPersona, generateDJAnnouncement } = await import("../music/dj.js");
+      if (!await isDJEnabled(guildId)) return;
+
+      const { classifyVibe } = await import("../utils/huggingface.js");
+      const textChannelId = player?.textChannelId ?? null;
+      const channel = textChannelId ? client.channels.cache.get(textChannelId) : null;
+
+      // Detect server vibe from recent messages
+      let vibe = "neutral";
+      if (channel?.isTextBased?.()) {
+        try {
+          const msgs = await channel.messages.fetch({ limit: 30 });
+          const texts = msgs.map(m => m.content).filter(Boolean);
+          vibe = await classifyVibe(texts);
+        } catch {}
+      }
+
+      const persona = await getGuildDJPersona(guildId);
+      const serialized = track?.info
+        ? { title: track.info.title, author: track.info.author, uri: track.info.uri }
+        : null;
+
+      const announcement = await generateDJAnnouncement(serialized, vibe, persona);
+      if (!announcement) return;
+
+      if (channel?.isTextBased?.() && typeof channel.send === "function") {
+        await channel.send({ content: `🎙️ ${announcement}` }).catch(() => {});
+      }
+    } catch {}
+  }
+
+  async function fireMusicTrivia(guildId, player, track) {
+    // 15% chance to trigger trivia on track start
+    if (Math.random() > 0.15) return;
+    try {
+      const { startTriviaSession } = await import("../music/trivia.js");
+      const textChannelId = player?.textChannelId ?? null;
+      if (!textChannelId) return;
+
+      const channel = client.channels.cache.get(textChannelId);
+      if (!channel?.isTextBased?.()) return;
+
+      const serialized = track?.info
+        ? { title: track.info.title, author: track.info.author }
+        : null;
+      if (!serialized?.title) return;
+
+      const session = await startTriviaSession(guildId, textChannelId, serialized);
+      if (!session) return;
+
+      await channel.send({
+        content: `🎵 **Music Trivia!** First to answer correctly gets **+75 XP** ⏱️ 30 seconds\n\n❓ ${session.question}`
+      }).catch(() => {});
+    } catch {}
   }
 
   // ... (unchanged helper functions for handleAgentRequest below this line)

@@ -13,10 +13,6 @@
     reverse_proxy bot:8080
   }
 
-  handle_path /wokgen* {
-    reverse_proxy woksite-wokgen-1:3000
-  }
-
   handle_path /site* {
     reverse_proxy woksite-website:3000
   }

@@ -9,7 +9,7 @@ import { logger } from "./logger.js";
 const ALGORITHM = "aes-256-gcm";
 const IV_LENGTH = 16;
 
-export const AI_PROVIDERS = ["none", "ollama", "anthropic", "openai"];
+export const AI_PROVIDERS = ["none", "ollama", "anthropic", "openai", "groq"];
 
 const KEY = process.env.AGENT_TOKEN_KEY;
 const KEY_READY = KEY && KEY.length === 64;

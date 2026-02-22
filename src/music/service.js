@@ -1,14 +1,28 @@
 // src/music/service.js
+import { createPrimarySession, getPrimarySession } from "../music/primarySession.js";
+
 export function getSessionAgent(guildId, voiceChannelId) {
   const mgr = global.agentManager;
   if (!mgr) return { ok: false, reason: "agents-not-ready" };
   return mgr.getSessionAgent(guildId, voiceChannelId);
 }
 
-export function ensureSessionAgent(guildId, voiceChannelId, { textChannelId, ownerUserId } = {}) {
+export async function ensureSessionAgent(guildId, voiceChannelId, { textChannelId, ownerUserId } = {}) {
   const mgr = global.agentManager;
   if (!mgr) return { ok: false, reason: "agents-not-ready" };
-  return mgr.ensureSessionAgent(guildId, voiceChannelId, { textChannelId, ownerUserId });
+
+  const result = await mgr.ensureSessionAgent(guildId, voiceChannelId, { textChannelId, ownerUserId });
+
+  // If no agents deployed, fall back to primary bot session (1 VC at a time)
+  if (!result.ok && result.reason === "no-agents-in-guild") {
+    if (!global.primaryLavalinkReady) {
+      return { ok: false, reason: "no-agents-in-guild" };
+    }
+    const session = createPrimarySession(guildId, voiceChannelId, textChannelId, ownerUserId);
+    return { ok: true, agent: session, isPrimaryMode: true };
+  }
+
+  return result;
 }
 
 export function releaseSession(guildId, voiceChannelId) {
@@ -28,7 +42,7 @@ export function formatMusicError(reasonOrErr) {
 
   // Agent availability issues - provide actionable guidance
   if (msg === "no-agents-in-guild") {
-    return "❌ No agents deployed in this guild.\n💡 **Fix:** Use `/agents deploy 10` to deploy agents for music playback.";
+    return "❌ Music unavailable.\n💡 **Fix:** Use `/agents deploy 10` to enable music, or contact your server admin.";
   }
   if (msg === "no-free-agents") {
     return "⏳ All agents are currently busy.\n💡 **Try again in a few seconds** or deploy more agents with `/agents deploy <count>`.";

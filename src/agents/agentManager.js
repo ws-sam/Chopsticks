@@ -15,6 +15,7 @@ import {
   updateSessionGauges
 } from "../utils/metrics.js";
 import CircuitBreaker from "opossum";
+import { createPrimarySession, getPrimarySession, releasePrimarySession } from "../music/primarySession.js";
 
 // Protocol version - must match agent version
 const PROTOCOL_VERSION = "1.0.0";
@@ -1457,6 +1458,11 @@ export class AgentManager {
   // ===== RPC =====
 
   async request(agent, op, data, timeoutMs = 20_000) {
+    // Primary bot session — handles operations locally without WebSocket
+    if (agent?.isPrimary && typeof agent.handleRequest === "function") {
+      return agent.handleRequest(op, data);
+    }
+
     if (!agent?.ws || !agent?.ready) throw new Error("agent-offline");
 
     return await this.circuitBreaker.fire(agent, op, data, timeoutMs);
@@ -1518,7 +1524,14 @@ export class AgentManager {
     } catch (error) {
       logger.error("Agent reconciliation failed", { error: error.message });
     }
-    logger.info("Agent reconciliation finished.");
+  }
+
+  createPrimaryBotSession(guildId, voiceChannelId, textChannelId, ownerUserId) {
+    return createPrimarySession(guildId, voiceChannelId, textChannelId, ownerUserId);
+  }
+
+  getPrimaryBotSession(guildId) {
+    return getPrimarySession(guildId);
   }
 }
 

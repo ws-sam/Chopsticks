@@ -514,9 +514,9 @@ export async function saveGuildData(guildId, data) {
   throw new Error("save-conflict");
 }
 
-export async function insertAgentBot(agentId, token, clientId, tag, poolId) {
+export async function insertAgentBot(agentId, token, clientId, tag, poolId, contributedBy) {
   const pg = await getPg();
-  return pg.insertAgentBot(agentId, token, clientId, tag, poolId);
+  return pg.insertAgentBot(agentId, token, clientId, tag, poolId, contributedBy);
 }
 
 export async function fetchAgentBots() {
@@ -524,9 +524,19 @@ export async function fetchAgentBots() {
   return pg.fetchAgentBots();
 }
 
-export async function updateAgentBotStatus(agentId, status) {
+export async function fetchAgentToken(agentId) {
   const pg = await getPg();
-  return pg.updateAgentBotStatus(agentId, status);
+  return pg.fetchAgentToken(agentId);
+}
+
+export async function updateAgentBotStatus(agentId, status, actorUserId) {
+  const pg = await getPg();
+  return pg.updateAgentBotStatus(agentId, status, actorUserId);
+}
+
+export async function revokeAgentToken(agentId, revokedBy) {
+  const pg = await getPg();
+  return pg.revokeAgentToken(agentId, revokedBy);
 }
 
 export async function deleteAgentBot(agentId) {
@@ -580,14 +590,19 @@ export async function fetchPoolsByOwner(ownerUserId) {
   return pg.fetchPoolsByOwner(ownerUserId);
 }
 
-export async function updatePool(poolId, updates) {
+export async function updatePool(poolId, updates, actorUserId) {
   const pg = await getPg();
-  return pg.updatePool(poolId, updates);
+  return pg.updatePool(poolId, updates, actorUserId);
 }
 
-export async function deletePool(poolId) {
+export async function deletePool(poolId, actorUserId) {
   const pg = await getPg();
-  return pg.deletePool(poolId);
+  return pg.deletePool(poolId, actorUserId);
+}
+
+export async function transferPool(poolId, newOwnerUserId, actorUserId) {
+  const pg = await getPg();
+  return pg.transferPool(poolId, newOwnerUserId, actorUserId);
 }
 
 export async function fetchPoolAgents(poolId) {
@@ -604,6 +619,59 @@ export async function setGuildSelectedPool(guildId, poolId) {
   const pg = await getPg();
   return pg.setGuildSelectedPool(guildId, poolId);
 }
+
+// Pool security / role helpers
+export async function getUserPoolRole(poolId, userId) {
+  const pg = await getPg();
+  return pg.getUserPoolRole(poolId, userId);
+}
+
+export async function canManagePool(poolId, userId) {
+  const pg = await getPg();
+  return pg.canManagePool(poolId, userId);
+}
+
+export async function logPoolEvent(poolId, actorUserId, eventType, targetId, payload) {
+  const pg = await getPg();
+  return pg.logPoolEvent(poolId, actorUserId, eventType, targetId, payload);
+}
+
+export async function fetchPoolEvents(poolId, limit) {
+  const pg = await getPg();
+  return pg.fetchPoolEvents(poolId, limit);
+}
+
+export async function fetchPoolStats(poolId) {
+  const pg = await getPg();
+  return pg.fetchPoolStats(poolId);
+}
+
+export async function incrementPoolStat(poolId, field, amount) {
+  const pg = await getPg();
+  return pg.incrementPoolStat(poolId, field, amount);
+}
+
+export async function fetchPoolLeaderboard(limit, field) {
+  const pg = await getPg();
+  return pg.fetchPoolLeaderboard(limit, field);
+}
+
+export async function fetchPoolMembers(poolId) {
+  const pg = await getPg();
+  return pg.fetchPoolMembers(poolId);
+}
+
+export async function setPoolMemberRole(poolId, userId, role, grantedBy) {
+  const pg = await getPg();
+  return pg.setPoolMemberRole(poolId, userId, role, grantedBy);
+}
+
+export async function removePoolMember(poolId, userId, actorUserId) {
+  const pg = await getPg();
+  return pg.removePoolMember(poolId, userId, actorUserId);
+}
+
+export { maskToken } from './storage_pg.js';
 
 export async function createPet(userId, type, name) {
   const pg = await getPg();

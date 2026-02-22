@@ -1,7 +1,7 @@
 // src/agents/agentManager.js
 import { WebSocketServer } from "ws";
 import { randomUUID } from "node:crypto";
-import { fetchAgentBots, fetchAgentRunners, fetchPool, loadGuildData, updateAgentBotStatus } from "../utils/storage.js";
+import { fetchAgentBots, fetchAgentToken, fetchAgentRunners, fetchPool, loadGuildData, updateAgentBotStatus } from "../utils/storage.js";
 import { logger, createAgentScopedLogger, generateCorrelationId } from "../utils/logger.js";
 import {
   trackAgentRegistration,
@@ -547,7 +547,9 @@ export class AgentManager {
         diagnostics.inactiveTotal += 1;
         continue; // Only consider active registered agents
       }
-      if (!regAgent.token) {
+      // Check if token is decryptable (fetch separately to avoid token in memory unless needed)
+      const tokenCheck = await fetchAgentToken(regAgent.agent_id);
+      if (!tokenCheck) {
         // Key rotation or corrupt record: identity exists but cannot be started by a runner.
         diagnostics.missingToken += 1;
         diagnostics.inactiveTotal += 1;

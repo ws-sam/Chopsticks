@@ -54,64 +54,116 @@ export function getPool() {
   return pool;
 }
 
-// --- Encryption Configuration ---
-const ALGORITHM = 'aes-256-gcm';
-const IV_LENGTH = 16;
-const TAG_LENGTH = 16; // Authentication tag length
-const ENCRYPTION_KEY = process.env.AGENT_TOKEN_KEY; // Must be 32 bytes (256 bits)
+// ── Encryption Configuration ──────────────────────────────────────────────
+// v1: all tokens encrypted with the shared AGENT_TOKEN_KEY (legacy)
+// v2: each token encrypted with a key derived per-pool via HKDF
+//   derivePoolKey(poolId, createdAt) → unique 32-byte AES key
+//   This means a compromised key for one pool cannot decrypt tokens from another.
+const ALGORITHM  = 'aes-256-gcm';
+const IV_LENGTH  = 16;
+const TAG_LENGTH = 16;
+const MASTER_KEY_HEX = process.env.AGENT_TOKEN_KEY;
+
+if (!MASTER_KEY_HEX || MASTER_KEY_HEX.length !== 64) {
+  logger.warn("AGENT_TOKEN_KEY missing or not 32 bytes — agent tokens will NOT be encrypted at rest.");
+}
+
+/**
+ * Derive a unique 32-byte AES key for a pool using HKDF-SHA256.
+ * @param {string} poolId
+ * @param {number} createdAt — pool's created_at timestamp (non-secret salt)
+ */
+function derivePoolKey(poolId, createdAt) {
+  if (!MASTER_KEY_HEX) return null;
+  const masterKey = Buffer.from(MASTER_KEY_HEX, 'hex');
+  const salt      = Buffer.alloc(8);
+  salt.writeBigUInt64BE(BigInt(createdAt || 0));
+  const info = Buffer.from(`chopsticks-pool-v2:${poolId}`, 'utf8');
+  return crypto.hkdfSync('sha256', masterKey, salt, info, 32);
+}
+
+function _encryptWithKey(text, keyBuf) {
+  const iv      = crypto.randomBytes(IV_LENGTH);
+  const cipher  = crypto.createCipheriv(ALGORITHM, keyBuf, iv);
+  let enc = cipher.update(text, 'utf8', 'hex');
+  enc    += cipher.final('hex');
+  const tag = cipher.getAuthTag();
+  return iv.toString('hex') + ':' + enc + ':' + tag.toString('hex');
+}
+
+function _decryptWithKey(text, keyBuf) {
+  const parts = text.split(':');
+  if (parts.length !== 3) return text; // unencrypted / wrong format
+  const iv  = Buffer.from(parts[0], 'hex');
+  const tag = Buffer.from(parts[2], 'hex');
+  const dec = crypto.createDecipheriv(ALGORITHM, keyBuf, iv);
+  dec.setAuthTag(tag);
+  let out = dec.update(parts[1], 'hex', 'utf8');
+  out    += dec.final('utf8');
+  return out;
+}
+
 const seenDecryptFailures = new Set();
 
-if (!ENCRYPTION_KEY || ENCRYPTION_KEY.length !== 64) {
-  logger.warn("AGENT_TOKEN_KEY environment variable is missing or not 32 bytes. Agent tokens will NOT be encrypted at rest.");
-}
-
-function encrypt(text) {
-  if (!ENCRYPTION_KEY) return text; // If no key, return original text
+/**
+ * Encrypt a token.
+ * @param {string} text
+ * @param {string|null} poolId — when provided uses pool-derived key (v2); else master key (v1)
+ * @param {number} [poolCreatedAt]
+ * @returns {{ ciphertext: string, encVersion: number }}
+ */
+function encrypt(text, poolId = null, poolCreatedAt = 0) {
+  if (!MASTER_KEY_HEX) return { ciphertext: text, encVersion: 0 };
   try {
-    const iv = crypto.randomBytes(IV_LENGTH);
-    const cipher = crypto.createCipheriv(ALGORITHM, Buffer.from(ENCRYPTION_KEY, 'hex'), iv);
-    let encrypted = cipher.update(text, 'utf8', 'hex');
-    encrypted += cipher.final('hex');
-    const tag = cipher.getAuthTag();
-    return iv.toString('hex') + ':' + encrypted + ':' + tag.toString('hex');
+    if (poolId) {
+      const key = derivePoolKey(poolId, poolCreatedAt);
+      return { ciphertext: _encryptWithKey(text, key), encVersion: 2 };
+    }
+    const masterKey = Buffer.from(MASTER_KEY_HEX, 'hex');
+    return { ciphertext: _encryptWithKey(text, masterKey), encVersion: 1 };
   } catch (err) {
     logger.error("Encryption failed:", { error: err });
-    return text; // Fallback to unencrypted if error
+    return { ciphertext: text, encVersion: 0 };
   }
 }
 
-function decrypt(text) {
-  if (!ENCRYPTION_KEY) return text; // If no key, return original text
-  if (!text || typeof text !== 'string') return text;
-
-  const parts = text.split(':');
-  if (parts.length !== 3) {
-    // Not encrypted or invalid format, return as is (could log a warning)
-    return text;
-  }
-
+/**
+ * Decrypt a token, routing to the correct key based on enc_version.
+ * On success upgrades v1 tokens to v2 (lazy re-encryption) when poolId available.
+ * @returns {string|null} plaintext token, or null on failure
+ */
+function decrypt(ciphertext, encVersion = 1, poolId = null, poolCreatedAt = 0) {
+  if (!MASTER_KEY_HEX) return ciphertext;
+  if (!ciphertext || typeof ciphertext !== 'string') return ciphertext;
   try {
-    const iv = Buffer.from(parts[0], 'hex');
-    const encryptedText = parts[1];
-    const tag = Buffer.from(parts[2], 'hex');
-
-    const decipher = crypto.createDecipheriv(ALGORITHM, Buffer.from(ENCRYPTION_KEY, 'hex'), iv);
-    decipher.setAuthTag(tag); // Set the authentication tag
-
-    let decrypted = decipher.update(encryptedText, 'hex', 'utf8');
-    decrypted += decipher.final('utf8');
-    return decrypted;
+    if (encVersion === 2 && poolId) {
+      const key = derivePoolKey(poolId, poolCreatedAt);
+      return _decryptWithKey(ciphertext, key);
+    }
+    // v1 or unknown: use master key
+    const masterKey = Buffer.from(MASTER_KEY_HEX, 'hex');
+    return _decryptWithKey(ciphertext, masterKey);
   } catch (err) {
-    // If the key changed, old values become undecryptable. Fail closed and keep the process stable.
-    const sig = `${String(parts[0]).slice(0, 8)}:${String(parts[1]).slice(0, 8)}`;
+    const sig = `${String(ciphertext).slice(0, 8)}`;
     if (!seenDecryptFailures.has(sig)) {
       seenDecryptFailures.add(sig);
-      logger.warn("Decryption failed (token likely needs re-registration).", { error: err?.message ?? String(err) });
+      logger.warn("Decryption failed (token may need re-registration).", { error: err?.message, encVersion, poolId });
     }
     return null;
   }
 }
-// --- End Encryption Configuration ---
+
+/**
+ * Mask a token for safe display in embeds and logs.
+ * Always use this — never expose a raw token in any UI surface.
+ * @param {string} token — plaintext Discord bot token
+ * @returns {string} e.g. "MTIzNDU2···kXyZ"
+ */
+export function maskToken(token) {
+  if (!token || token.length < 16) return '····';
+  return token.slice(0, 10) + '····' + token.slice(-4);
+}
+// ── End Encryption Configuration ─────────────────────────────────────────
 
 export async function ensureSchema() {
   logger.info("--> ensureSchema() called in storage_pg.js");
@@ -516,59 +568,113 @@ export async function fetchCommandStatsDaily(guildId, days = 7, limit = 50) {
   }));
 }
 
-export async function insertAgentBot(agentId, token, clientId, tag, poolId = 'pool_goot27') {
+export async function insertAgentBot(agentId, token, clientId, tag, poolId = 'pool_goot27', contributedBy = '') {
   const p = getPool();
-  const encryptedToken = encrypt(token);
   const now = Date.now();
+
+  // Fetch pool for its createdAt (used as HKDF salt) and capacity check
+  const pool = await fetchPool(poolId);
+  if (!pool) throw new Error(`Pool not found: ${poolId}`);
+
+  // Enforce hard agent cap
+  const currentCount = await countAgentsByPool(poolId);
+  if (currentCount >= (pool.max_agents || 49)) {
+    throw new Error(`Pool ${poolId} is at capacity (${currentCount}/${pool.max_agents ?? 49} agents).`);
+  }
+
+  const { ciphertext, encVersion } = encrypt(token, poolId, Number(pool.created_at));
+  const resolvedContributor = contributedBy || pool.owner_user_id;
+
   const upsertSql = `
-    INSERT INTO agent_bots (agent_id, token, client_id, tag, pool_id, created_at, updated_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7)
+    INSERT INTO agent_bots
+      (agent_id, token, client_id, tag, pool_id, contributed_by, enc_version, created_at, updated_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
     ON CONFLICT (agent_id) DO UPDATE SET
-      token = EXCLUDED.token,
-      client_id = EXCLUDED.client_id,
-      tag = EXCLUDED.tag,
-      pool_id = EXCLUDED.pool_id,
-      updated_at = EXCLUDED.updated_at
-    RETURNING agent_id, token, client_id, tag, status, pool_id, created_at, updated_at;
+      token         = EXCLUDED.token,
+      client_id     = EXCLUDED.client_id,
+      tag           = EXCLUDED.tag,
+      pool_id       = EXCLUDED.pool_id,
+      contributed_by = EXCLUDED.contributed_by,
+      enc_version   = EXCLUDED.enc_version,
+      updated_at    = EXCLUDED.updated_at
+    RETURNING agent_id, client_id, tag, status, pool_id, contributed_by, enc_version, created_at, updated_at;
   `;
-  logger.info("insertAgentBot: Executing UPSERT", { sql: upsertSql, agentId, clientId, tag, poolId });
-  const res = await p.query(
-    upsertSql,
-    [agentId, encryptedToken, clientId, tag, poolId, now, now]
-  );
+  const res = await p.query(upsertSql, [agentId, ciphertext, clientId, tag, poolId, resolvedContributor, encVersion, now, now]);
   const row = res.rows[0];
+
+  // Ensure contributor has a pool_members row
+  await p.query(`
+    INSERT INTO pool_members (pool_id, user_id, role, granted_by, granted_at)
+    VALUES ($1, $2, 'contributor', $3, $4)
+    ON CONFLICT (pool_id, user_id) DO NOTHING;
+  `, [poolId, resolvedContributor, resolvedContributor, now]);
+
+  // Audit
+  await logPoolEvent(poolId, resolvedContributor, 'token_registered', agentId, { tag, clientId, status: row.status });
+
   return {
-    agentId: row.agent_id,
-    token: decrypt(row.token),
-    clientId: row.client_id,
-    tag: row.tag,
-    status: row.status,
-    poolId: row.pool_id,
-    createdAt: Number(row.created_at),
-    updatedAt: Number(row.updated_at),
-    operation: (row.created_at === now) ? 'inserted' : 'updated'
+    agentId:       row.agent_id,
+    clientId:      row.client_id,
+    tag:           row.tag,
+    status:        row.status,
+    poolId:        row.pool_id,
+    contributedBy: row.contributed_by,
+    created_at:    Number(row.created_at),
+    updated_at:    Number(row.updated_at),
+    // 'inserted' if created_at == updated_at (new row), otherwise 'updated'
+    operation:     Number(row.created_at) === now ? 'inserted' : 'updated',
   };
 }
 
 export async function fetchAgentBots() {
   const p = getPool();
-  const fetchSql = "SELECT agent_id, token, client_id, tag, status, pool_id, created_at, updated_at, profile FROM agent_bots";
-  logger.info("fetchAgentBots: Executing SQL", { sql: fetchSql });
+  // NOTE: token field intentionally excluded — use fetchAgentToken(agentId) when the raw token is needed.
+  const fetchSql = "SELECT agent_id, client_id, tag, status, pool_id, contributed_by, enc_version, created_at, updated_at, profile FROM agent_bots";
   const res = await p.query(fetchSql);
   return res.rows.map(row => ({
     ...row,
-    token: decrypt(row.token),
     created_at: Number(row.created_at),
     updated_at: Number(row.updated_at)
   }));
 }
 
-export async function updateAgentBotStatus(agentId, status) {
+/**
+ * Fetch and decrypt the raw token for a single agent.
+ * Call only when you genuinely need the plaintext (e.g. Discord login).
+ * Never pass the result to any embed or log — use maskToken() for display.
+ */
+export async function fetchAgentToken(agentId) {
   const p = getPool();
-  const updateSql = "UPDATE agent_bots SET status = $1, updated_at = $2 WHERE agent_id = $3 RETURNING agent_id"; // RETURNING agent_id to check for affected rows
-  logger.info("updateAgentBotStatus: Executing SQL", { sql: updateSql, agentId, status });
-  const res = await p.query(updateSql, [status, Date.now(), agentId]);
-  return res.rowCount > 0; // Return true if updated, false if not found
+  const res = await p.query(
+    `SELECT ab.token, ab.enc_version, ab.pool_id, ap.created_at AS pool_created_at
+       FROM agent_bots ab
+       JOIN agent_pools ap ON ab.pool_id = ap.pool_id
+      WHERE ab.agent_id = $1`,
+    [agentId]
+  );
+  if (!res.rows[0]) return null;
+  const { token, enc_version, pool_id, pool_created_at } = res.rows[0];
+  return decrypt(token, Number(enc_version), pool_id, Number(pool_created_at));
+}
+
+export async function updateAgentBotStatus(agentId, status, actorUserId = '') {
+  const p = getPool();
+  // Terminal state — revoked tokens cannot be reactivated
+  if (status !== 'revoked') {
+    const check = await p.query("SELECT status FROM agent_bots WHERE agent_id = $1", [agentId]);
+    if (check.rows[0]?.status === 'revoked') {
+      throw new Error(`Agent ${agentId} is revoked and cannot be reactivated.`);
+    }
+  }
+  const res = await p.query(
+    "UPDATE agent_bots SET status = $1, updated_at = $2 WHERE agent_id = $3 RETURNING agent_id, pool_id",
+    [status, Date.now(), agentId]
+  );
+  if (res.rowCount > 0 && actorUserId) {
+    const poolId = res.rows[0]?.pool_id;
+    if (poolId) await logPoolEvent(poolId, actorUserId, `token_${status}`, agentId, {});
+  }
+  return res.rowCount > 0;
 }
 
 export async function updateAgentBotProfile(agentId, profile) {
@@ -780,108 +886,283 @@ export async function saveGuildDataPg(guildId, data, normalizeFn, mergeOnConflic
 
 // ==================== POOL MANAGEMENT ====================
 
+// ── Pool event audit log ─────────────────────────────────────────────────
+/**
+ * Append an immutable event to agent_pool_events.
+ * Fire-and-forget safe — errors are logged but never thrown.
+ */
+export async function logPoolEvent(poolId, actorUserId, eventType, targetId = null, payload = {}) {
+  try {
+    const p = getPool();
+    await p.query(
+      `INSERT INTO agent_pool_events (pool_id, actor_user_id, event_type, target_id, payload, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [poolId, actorUserId, eventType, targetId ?? null, payload, Date.now()]
+    );
+  } catch (err) {
+    logger.warn('logPoolEvent failed (non-fatal):', { err: err.message, poolId, eventType });
+  }
+}
+
+// ── Pool role / permission helpers ────────────────────────────────────────
+const ROLE_RANK = { owner: 4, manager: 3, contributor: 2, viewer: 1 };
+
+/**
+ * Returns the caller's role in a pool, or null if they have no membership.
+ */
+export async function getUserPoolRole(poolId, userId) {
+  const p = getPool();
+  const res = await p.query(
+    "SELECT role FROM pool_members WHERE pool_id = $1 AND user_id = $2",
+    [poolId, userId]
+  );
+  return res.rows[0]?.role ?? null;
+}
+
+/**
+ * True if the user can manage the pool (owner or manager).
+ * This is the single authority check — replaces all isMaster||owner patterns.
+ */
+export async function canManagePool(poolId, userId) {
+  const role = await getUserPoolRole(poolId, userId);
+  return role === 'owner' || role === 'manager';
+}
+
 export async function createPool(poolId, ownerUserId, name, visibility = 'private') {
   const p = getPool();
   const now = Date.now();
-  const createPoolSql = `
-    INSERT INTO agent_pools (pool_id, owner_user_id, name, visibility, created_at, updated_at)
-    VALUES ($1, $2, $3, $4, $5, $6)
-    RETURNING pool_id, owner_user_id, name, visibility, created_at, updated_at;
-  `;
-  logger.info("createPool: Executing SQL", { sql: createPoolSql, poolId, ownerUserId, name, visibility });
-  const res = await p.query(createPoolSql, [poolId, ownerUserId, name, visibility, now, now]);
-  return res.rows[0];
+  const res = await p.query(
+    `INSERT INTO agent_pools (pool_id, owner_user_id, name, visibility, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6)
+     RETURNING pool_id, owner_user_id, name, visibility, created_at, updated_at, max_agents, recommended_deploy, is_featured;`,
+    [poolId, ownerUserId, name, visibility, now, now]
+  );
+  const pool = res.rows[0];
+
+  // Owner membership row
+  await p.query(
+    `INSERT INTO pool_members (pool_id, user_id, role, granted_by, granted_at)
+     VALUES ($1, $2, 'owner', $3, $4) ON CONFLICT (pool_id, user_id) DO NOTHING`,
+    [poolId, ownerUserId, ownerUserId, now]
+  );
+
+  // Seed stats row
+  await p.query(
+    `INSERT INTO pool_stats (pool_id, window_start, updated_at)
+     VALUES ($1, $2, $3) ON CONFLICT (pool_id) DO NOTHING`,
+    [poolId, now, now]
+  );
+
+  await logPoolEvent(poolId, ownerUserId, 'pool_created', poolId, { name, visibility });
+  return pool;
 }
 
 export async function fetchPool(poolId) {
   const p = getPool();
-  const fetchSql = "SELECT pool_id, owner_user_id, name, visibility, created_at, updated_at, meta FROM agent_pools WHERE pool_id = $1";
-  logger.info("fetchPool: Executing SQL", { sql: fetchSql, poolId });
-  const res = await p.query(fetchSql, [poolId]);
+  const res = await p.query(
+    "SELECT pool_id, owner_user_id, name, visibility, created_at, updated_at, meta, max_agents, recommended_deploy, is_featured FROM agent_pools WHERE pool_id = $1",
+    [poolId]
+  );
   return res.rows[0] || null;
 }
 
 export async function fetchPools(visibility = null) {
   const p = getPool();
-  let fetchSql = "SELECT pool_id, owner_user_id, name, visibility, created_at, updated_at FROM agent_pools";
+  let sql = "SELECT pool_id, owner_user_id, name, visibility, created_at, updated_at, max_agents, recommended_deploy, is_featured FROM agent_pools";
   const params = [];
-  
-  if (visibility) {
-    fetchSql += " WHERE visibility = $1";
-    params.push(visibility);
-  }
-  
-  fetchSql += " ORDER BY created_at DESC";
-  logger.info("fetchPools: Executing SQL", { sql: fetchSql, visibility });
-  const res = await p.query(fetchSql, params);
+  if (visibility) { sql += " WHERE visibility = $1"; params.push(visibility); }
+  sql += " ORDER BY created_at DESC";
+  const res = await p.query(sql, params);
   return res.rows;
 }
 
 export async function fetchPoolsByOwner(ownerUserId) {
   const p = getPool();
-  const fetchSql = "SELECT pool_id, owner_user_id, name, visibility, created_at, updated_at FROM agent_pools WHERE owner_user_id = $1 ORDER BY created_at DESC";
-  logger.info("fetchPoolsByOwner: Executing SQL", { sql: fetchSql, ownerUserId });
-  const res = await p.query(fetchSql, [ownerUserId]);
+  const res = await p.query(
+    "SELECT pool_id, owner_user_id, name, visibility, created_at, updated_at, max_agents, recommended_deploy, is_featured FROM agent_pools WHERE owner_user_id = $1 ORDER BY created_at DESC",
+    [ownerUserId]
+  );
   return res.rows;
 }
 
-export async function updatePool(poolId, updates) {
+export async function updatePool(poolId, updates, actorUserId = '') {
   const p = getPool();
   const now = Date.now();
   const fields = [];
   const values = [];
   let idx = 1;
-  
-  if (updates.name !== undefined) {
-    fields.push(`name = $${idx++}`);
-    values.push(updates.name);
-  }
-  if (updates.visibility !== undefined) {
-    fields.push(`visibility = $${idx++}`);
-    values.push(updates.visibility);
-  }
-  if (updates.meta !== undefined) {
-    fields.push(`meta = $${idx++}`);
-    values.push(updates.meta);
-  }
-  
+
+  if (updates.name              !== undefined) { fields.push(`name = $${idx++}`);               values.push(updates.name); }
+  if (updates.visibility        !== undefined) { fields.push(`visibility = $${idx++}`);          values.push(updates.visibility); }
+  if (updates.meta              !== undefined) { fields.push(`meta = $${idx++}`);                values.push(updates.meta); }
+  if (updates.max_agents        !== undefined) { fields.push(`max_agents = $${idx++}`);          values.push(updates.max_agents); }
+  if (updates.recommended_deploy !== undefined) { fields.push(`recommended_deploy = $${idx++}`); values.push(updates.recommended_deploy); }
+  if (updates.is_featured       !== undefined) { fields.push(`is_featured = $${idx++}`);         values.push(updates.is_featured); }
+
   fields.push(`updated_at = $${idx++}`);
   values.push(now);
-  
   values.push(poolId);
-  
-  const updateSql = `UPDATE agent_pools SET ${fields.join(', ')} WHERE pool_id = $${idx} RETURNING pool_id`;
-  logger.info("updatePool: Executing SQL", { sql: updateSql, poolId });
-  const res = await p.query(updateSql, values);
+
+  const res = await p.query(
+    `UPDATE agent_pools SET ${fields.join(', ')} WHERE pool_id = $${idx} RETURNING pool_id`,
+    values
+  );
+  if (res.rowCount > 0 && actorUserId) {
+    const changed = Object.keys(updates).filter(k => updates[k] !== undefined);
+    await logPoolEvent(poolId, actorUserId, 'pool_updated', poolId, { changed });
+  }
   return res.rowCount > 0;
 }
 
-export async function deletePool(poolId) {
+export async function deletePool(poolId, actorUserId = '') {
   const p = getPool();
-  const deleteSql = "DELETE FROM agent_pools WHERE pool_id = $1 RETURNING pool_id";
-  logger.info("deletePool: Executing SQL", { sql: deleteSql, poolId });
-  const res = await p.query(deleteSql, [poolId]);
+  // Log before cascade-delete removes references
+  if (actorUserId) await logPoolEvent(poolId, actorUserId, 'pool_deleted', poolId, {});
+  const res = await p.query("DELETE FROM agent_pools WHERE pool_id = $1 RETURNING pool_id", [poolId]);
+  return res.rowCount > 0;
+}
+
+/**
+ * Transfer pool ownership to a new user.
+ * Updates agent_pools.owner_user_id and pool_members roles atomically.
+ */
+export async function transferPool(poolId, newOwnerUserId, actorUserId) {
+  const p = getPool();
+  const now = Date.now();
+  await p.query("UPDATE agent_pools SET owner_user_id = $1, updated_at = $2 WHERE pool_id = $3", [newOwnerUserId, now, poolId]);
+  // Demote old owner to manager (preserve access), elevate new owner
+  await p.query(
+    `UPDATE pool_members SET role = 'manager' WHERE pool_id = $1 AND role = 'owner' AND user_id != $2`,
+    [poolId, newOwnerUserId]
+  );
+  await p.query(
+    `INSERT INTO pool_members (pool_id, user_id, role, granted_by, granted_at)
+     VALUES ($1, $2, 'owner', $3, $4)
+     ON CONFLICT (pool_id, user_id) DO UPDATE SET role = 'owner', granted_by = $3, granted_at = $4`,
+    [poolId, newOwnerUserId, actorUserId, now]
+  );
+  await logPoolEvent(poolId, actorUserId, 'pool_transferred', newOwnerUserId, { newOwner: newOwnerUserId });
+}
+
+/**
+ * Immediately revoke an agent token.
+ * Only the contributor or a pool manager/owner may revoke.
+ * Revoked is terminal — the agent cannot be reactivated.
+ */
+export async function revokeAgentToken(agentId, revokedBy) {
+  const p = getPool();
+  const res = await p.query(
+    "UPDATE agent_bots SET status = 'revoked', updated_at = $1 WHERE agent_id = $2 AND status != 'revoked' RETURNING agent_id, pool_id",
+    [Date.now(), agentId]
+  );
+  if (res.rowCount > 0) {
+    const poolId = res.rows[0].pool_id;
+    await logPoolEvent(poolId, revokedBy, 'token_revoked', agentId, {});
+  }
   return res.rowCount > 0;
 }
 
 export async function fetchAgentsByPool(poolId) {
   const p = getPool();
-  const fetchSql = "SELECT agent_id, client_id, tag, status, created_at, updated_at, profile FROM agent_bots WHERE pool_id = $1 ORDER BY created_at DESC";
-  logger.info("fetchAgentsByPool: Executing SQL", { sql: fetchSql, poolId });
-  const res = await p.query(fetchSql, [poolId]);
-  return res.rows.map(row => ({
-    ...row,
-    created_at: Number(row.created_at),
-    updated_at: Number(row.updated_at)
-  }));
+  // token field intentionally excluded — use fetchAgentToken(agentId) when needed
+  const res = await p.query(
+    `SELECT agent_id, client_id, tag, status, pool_id, contributed_by, enc_version, created_at, updated_at, profile
+       FROM agent_bots WHERE pool_id = $1 ORDER BY created_at DESC`,
+    [poolId]
+  );
+  return res.rows.map(row => ({ ...row, created_at: Number(row.created_at), updated_at: Number(row.updated_at) }));
 }
 
 export async function countAgentsByPool(poolId) {
   const p = getPool();
-  const countSql = "SELECT COUNT(*) as count FROM agent_bots WHERE pool_id = $1 AND status = 'active'";
-  logger.info("countAgentsByPool: Executing SQL", { sql: countSql, poolId });
-  const res = await p.query(countSql, [poolId]);
+  const res = await p.query(
+    "SELECT COUNT(*) as count FROM agent_bots WHERE pool_id = $1 AND status IN ('active','approved')",
+    [poolId]
+  );
   return Number(res.rows[0]?.count || 0);
+}
+
+// ── Pool stats ────────────────────────────────────────────────────────────
+export async function fetchPoolStats(poolId) {
+  const p = getPool();
+  const res = await p.query("SELECT * FROM pool_stats WHERE pool_id = $1", [poolId]);
+  return res.rows[0] || null;
+}
+
+export async function incrementPoolStat(poolId, field, amount = 1) {
+  const p = getPool();
+  const allowed = ['songs_played', 'total_deployments'];
+  if (!allowed.includes(field)) throw new Error(`Unknown pool stat field: ${field}`);
+  await p.query(
+    `INSERT INTO pool_stats (pool_id, ${field}, updated_at, window_start)
+     VALUES ($1, $2, $3, $3)
+     ON CONFLICT (pool_id) DO UPDATE
+       SET ${field}   = pool_stats.${field} + $2,
+           updated_at = $3`,
+    [poolId, amount, Date.now()]
+  );
+}
+
+/**
+ * Fetch leaderboard: top N public pools sorted by composite_score (or field).
+ */
+export async function fetchPoolLeaderboard(limit = 10, field = 'composite_score') {
+  const p = getPool();
+  const allowed = ['composite_score', 'songs_played', 'total_deployments', 'active_guild_count'];
+  if (!allowed.includes(field)) throw new Error(`Unknown leaderboard field: ${field}`);
+  const res = await p.query(
+    `SELECT ap.pool_id, ap.name, ap.owner_user_id, ap.visibility, ap.meta,
+            ap.max_agents, ap.is_featured,
+            ps.songs_played, ps.total_deployments, ps.active_guild_count,
+            ps.composite_score,
+            COUNT(ab.agent_id) FILTER (WHERE ab.status = 'active') AS active_agents
+       FROM agent_pools ap
+       LEFT JOIN pool_stats ps ON ap.pool_id = ps.pool_id
+       LEFT JOIN agent_bots  ab ON ap.pool_id = ab.pool_id
+      WHERE ap.visibility = 'public'
+      GROUP BY ap.pool_id, ps.songs_played, ps.total_deployments, ps.active_guild_count, ps.composite_score
+      ORDER BY ps.${field} DESC NULLS LAST
+      LIMIT $1`,
+    [limit]
+  );
+  return res.rows;
+}
+
+// ── Pool members ──────────────────────────────────────────────────────────
+export async function fetchPoolMembers(poolId) {
+  const p = getPool();
+  const res = await p.query(
+    "SELECT user_id, role, granted_by, granted_at FROM pool_members WHERE pool_id = $1 ORDER BY granted_at ASC",
+    [poolId]
+  );
+  return res.rows;
+}
+
+export async function setPoolMemberRole(poolId, userId, role, grantedBy) {
+  const p = getPool();
+  await p.query(
+    `INSERT INTO pool_members (pool_id, user_id, role, granted_by, granted_at)
+     VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT (pool_id, user_id) DO UPDATE SET role = $3, granted_by = $4, granted_at = $5`,
+    [poolId, userId, role, grantedBy, Date.now()]
+  );
+  await logPoolEvent(poolId, grantedBy, 'member_role_set', userId, { role });
+}
+
+export async function removePoolMember(poolId, userId, actorUserId) {
+  const p = getPool();
+  await p.query("DELETE FROM pool_members WHERE pool_id = $1 AND user_id = $2 AND role != 'owner'", [poolId, userId]);
+  await logPoolEvent(poolId, actorUserId, 'member_removed', userId, {});
+}
+
+// ── Pool audit events ─────────────────────────────────────────────────────
+export async function fetchPoolEvents(poolId, limit = 50) {
+  const p = getPool();
+  const res = await p.query(
+    "SELECT id, actor_user_id, event_type, target_id, payload, created_at FROM agent_pool_events WHERE pool_id = $1 ORDER BY created_at DESC LIMIT $2",
+    [poolId, limit]
+  );
+  return res.rows.map(r => ({ ...r, created_at: Number(r.created_at) }));
 }
 
 export async function getGuildSelectedPool(guildId) {

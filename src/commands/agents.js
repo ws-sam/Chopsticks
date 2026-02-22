@@ -15,6 +15,8 @@ import {
 import {
   insertAgentBot,
   fetchAgentBots,
+  fetchAgentToken,
+  revokeAgentToken,
   updateAgentBotStatus,
   deleteAgentBot,
   updateAgentBotProfile,
@@ -26,7 +28,10 @@ import {
   fetchPoolAgents,
   listPools,
   loadGuildData,
-  saveGuildData
+  saveGuildData,
+  getUserPoolRole,
+  canManagePool,
+  maskToken
 } from "../utils/storage.js";
 import {
   replyEmbed,
@@ -1022,6 +1027,17 @@ export const data = new SlashCommandBuilder()
       .setName("delete_token")
       .setDescription("Delete an agent token from the system")
       .addStringOption(o => o.setName("agent_id").setDescription("Agent ID (e.g., agent0001)").setRequired(true))
+  )
+  .addSubcommand(s =>
+    s
+      .setName("revoke")
+      .setDescription("Revoke your contributed agent from a pool (permanent)")
+      .addStringOption(o => o.setName("agent_id").setDescription("Agent ID to revoke").setRequired(true))
+  )
+  .addSubcommand(s =>
+    s
+      .setName("my_agents")
+      .setDescription("View all agents you have contributed across all pools")
   )
   .addSubcommand(s =>
     s
@@ -2041,7 +2057,8 @@ export async function execute(interaction) {
         const recentContributions = await fetchAgentBots();
         const userContributions = recentContributions.filter(a => 
           a.pool_id === poolId && 
-          a.status === 'inactive' && // Pending contributions are inactive
+          a.contributed_by === userId &&
+          a.status === 'pending' &&
           Date.now() - a.created_at < 3600000 // Last hour
         );
         
@@ -2057,9 +2074,8 @@ export async function execute(interaction) {
           });
         }
         
-        // Add as inactive (requires manual activation by pool owner)
-        const result = await insertAgentBot(agentId, token, clientId, botUser.tag, poolId);
-        await updateAgentBotStatus(agentId, 'inactive');
+        // Add as pending (requires manual activation by pool owner)
+        const result = await insertAgentBot(agentId, token, clientId, botUser.tag, poolId, userId);
         
         const operationMsg = result.operation === 'inserted' ? 'submitted' : 'updated';
         await interaction.editReply({
@@ -2071,6 +2087,7 @@ export async function execute(interaction) {
               { name: 'Agent ID', value: `\`${agentId}\``, inline: true },
               { name: 'Pool', value: `\`${poolId}\``, inline: true },
               { name: 'Status', value: 'pending', inline: true },
+              { name: 'Token', value: `\`${maskToken(token)}\``, inline: false },
               { 
                 name: 'Review',
                 value: 'Pool owner reviews and activates if approved.'
@@ -2081,7 +2098,7 @@ export async function execute(interaction) {
         });
       } else {
         // Adding to own pool - direct activation
-        const result = await insertAgentBot(agentId, token, clientId, botUser.tag, poolId);
+        const result = await insertAgentBot(agentId, token, clientId, botUser.tag, poolId, userId);
         const operationMsg = result.operation === 'inserted' ? 'added' : 'updated';
         
         await interaction.editReply({
@@ -2284,6 +2301,102 @@ export async function execute(interaction) {
     } catch (error) {
       console.error(`Error during agent token deletion process: ${error}`);
       await replyEmbed(interaction, "Agent token delete", `Error: ${error.message}`);
+    }
+    return;
+  }
+
+  if (sub === "my_agents") {
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    try {
+      const userId = interaction.user.id;
+      const allAgents = await fetchAgentBots();
+      const myAgents = allAgents.filter(a => a.contributed_by === userId);
+
+      if (myAgents.length === 0) {
+        return await interaction.editReply({
+          embeds: [buildInfoEmbed("My Contributed Agents", "You haven't contributed any agents yet. Use `/agents add_token` to contribute to a pool.", Colors.INFO)]
+        });
+      }
+
+      const poolIds = [...new Set(myAgents.map(a => a.pool_id).filter(Boolean))];
+      const poolMap = new Map();
+      await Promise.all(poolIds.map(async id => {
+        const pool = await fetchPool(id).catch(() => null);
+        if (pool) poolMap.set(id, pool);
+      }));
+
+      const embed = new EmbedBuilder()
+        .setTitle(`Your Contributed Agents (${myAgents.length})`)
+        .setColor(Colors.INFO)
+        .setTimestamp();
+
+      let desc = '';
+      for (const a of myAgents) {
+        const pool = poolMap.get(a.pool_id);
+        const poolName = pool ? pool.name : a.pool_id;
+        const statusEmoji = { active: '🟢', pending: '🟡', suspended: '🟠', revoked: '🔴', approved: '🔵', inactive: '🟡' }[a.status] ?? '⚪';
+        desc += `${statusEmoji} **${a.tag}** \`${a.agent_id}\`\n`;
+        desc += `   Pool: **${poolName}** • Status: \`${a.status}\`\n`;
+      }
+
+      embed.setDescription(desc.slice(0, 4096));
+      await interaction.editReply({ embeds: [embed] });
+    } catch (err) {
+      await interaction.editReply({ embeds: [buildInfoEmbed("My Agents Failed", err.message, Colors.ERROR)] });
+    }
+    return;
+  }
+
+  if (sub === "revoke") {
+    const agentId = interaction.options.getString("agent_id", true);
+    const userId = interaction.user.id;
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    try {
+      const allAgents = await fetchAgentBots();
+      const agent = allAgents.find(a => a.agent_id === agentId);
+
+      if (!agent) {
+        return await interaction.editReply({ embeds: [buildInfoEmbed("Not Found", `Agent \`${agentId}\` not found.`, Colors.ERROR)] });
+      }
+
+      // Only the contributor or a pool manager/owner can revoke
+      const isContributor = agent.contributed_by === userId;
+      const canManage = await canManagePool(agent.pool_id, userId);
+      if (!isContributor && !canManage && !requesterIsBotOwner) {
+        return await interaction.editReply({ embeds: [buildInfoEmbed("Not Authorized", "Only the agent contributor or pool manager can revoke this agent.", Colors.ERROR)] });
+      }
+
+      if (agent.status === 'revoked') {
+        return await interaction.editReply({ embeds: [buildInfoEmbed("Already Revoked", `Agent \`${agentId}\` is already revoked.`, Colors.WARNING)] });
+      }
+
+      const confirmId = `confirm_revoke_${agentId}_${Date.now()}`;
+      const cancelId  = `cancel_revoke_${agentId}_${Date.now()}`;
+      const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId(cancelId).setLabel("Cancel").setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId(confirmId).setLabel("Revoke Agent").setStyle(ButtonStyle.Danger)
+      );
+
+      const reply = await interaction.editReply({
+        embeds: [buildInfoEmbed("Confirm Revocation", `Permanently revoke **${agent.tag}** (\`${agentId}\`) from pool? This cannot be undone.`, Colors.WARNING)],
+        components: [row]
+      });
+
+      const collector = reply.createMessageComponentCollector({ componentType: ComponentType.Button, time: 15000, filter: i => i.user.id === userId });
+      collector.on('collect', async i => {
+        if (i.customId === confirmId) {
+          await revokeAgentToken(agentId, userId);
+          await i.update({ embeds: [buildInfoEmbed("Agent Revoked", `**${agent.tag}** has been permanently revoked and removed from the pool.`, Colors.SUCCESS)], components: [] });
+        } else {
+          await i.update({ embeds: [buildInfoEmbed("Revocation Cancelled", "No changes made.", Colors.INFO)], components: [] });
+        }
+        collector.stop();
+      });
+      collector.on('end', collected => {
+        if (collected.size === 0) interaction.editReply({ embeds: [buildInfoEmbed("Timed Out", "Revocation cancelled.", Colors.INFO)], components: [] });
+      });
+    } catch (err) {
+      await interaction.editReply({ embeds: [buildInfoEmbed("Revoke Failed", err.message, Colors.ERROR)] });
     }
     return;
   }

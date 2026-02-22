@@ -13,6 +13,7 @@ import * as storageLayer from '../utils/storage.js';
 import { isBotOwner } from '../utils/owners.js';
 import { Colors } from '../utils/discordOutput.js';
 import { openAdvisorUiHandoff, openDeployUiHandoff } from './agents.js';
+import { canManagePool, getUserPoolRole, logPoolEvent, maskToken } from '../utils/storage.js';
 
 export const meta = {
   guildOnly: false, // Pool management can be done outside guilds
@@ -261,16 +262,21 @@ function canManageGuild(interaction) {
 }
 
 async function canAccessPool(userId, poolId, pool) {
-  // Master can access everything
-  if (isMaster(userId)) return true;
-  
-  // Owner can access their pool
+  // Pool owner or manager can manage
   if (pool && pool.owner_user_id === userId) return true;
-  
-  // Public pools can be viewed by anyone
+  if (poolId && await canManagePool(poolId, userId)) return true;
+  // Public pools visible to anyone
   if (pool && pool.visibility === 'public') return true;
-  
+  // isMaster gets existence-only view (admin_list / admin_view) — NOT management
   return false;
+}
+
+/**
+ * Build a visual capacity bar: e.g. "████░░░░░░ 4/10"
+ */
+function buildCapacityBar(current, max, width = 10) {
+  const filled = Math.min(Math.round((current / Math.max(max, 1)) * width), width);
+  return '█'.repeat(filled) + '░'.repeat(width - filled) + ` ${current}/${max}`;
 }
 
 function buildPoolEmbed(title, description = '', color = Colors.INFO) {
@@ -530,11 +536,10 @@ function explainNoInviteAvailability(plan) {
 
 async function listAccessiblePoolsForUser(userId) {
   const allPools = await storageLayer.listPools();
-  return allPools.filter(pool => {
-    if (isMaster(userId)) return true;
-    if (pool.owner_user_id === userId) return true;
-    return pool.visibility === 'public';
-  });
+  const accessible = await Promise.all(allPools.map(async pool =>
+    pool.visibility === 'public' || await canManagePool(pool.pool_id, userId)
+  ));
+  return allPools.filter((_, i) => accessible[i]);
 }
 
 async function buildPoolUiContext({ guildId, userId, selectedPoolId = null, desiredTotal = 10 }) {
@@ -783,12 +788,10 @@ async function handleList(interaction) {
   }
 
   // Filter pools based on visibility and ownership
-  const visiblePools = allPools.filter((pool) => {
-    if (isMaster(userId)) return true;
-    if (pool.owner_user_id === userId) return true;
-    if (pool.visibility === 'public') return true;
-    return false;
-  });
+  const accessibleFlags = await Promise.all(allPools.map(async pool =>
+    pool.visibility === 'public' || await canManagePool(pool.pool_id, userId)
+  ));
+  const visiblePools = allPools.filter((_, i) => accessibleFlags[i]);
 
   if (visiblePools.length === 0) {
     return interaction.editReply({
@@ -813,7 +816,7 @@ async function handleList(interaction) {
     const totalAgents = agents ? agents.length : 0;
     
     // Owner display
-    const owner = isMaster(pool.owner_user_id) ? 'Bot Owner' : `<@${pool.owner_user_id}>`;
+    const owner = `<@${pool.owner_user_id}>`;
     
     // Agent status
     let agentStatus = '';
@@ -889,14 +892,17 @@ async function handlePublic(interaction) {
     const agents = allAgents[i];
     const totalAgents = agents ? agents.length : 0;
     const activeAgents = agents ? agents.filter(a => a.status === 'active') : [];
-    const owner = isMaster(pool.owner_user_id) ? 'Bot Owner' : `<@${pool.owner_user_id}>`;
+    const maxAgents = pool.max_agents ?? 49;
+    const recommended = pool.recommended_deploy ?? 10;
+    const owner = `<@${pool.owner_user_id}>`;
     
     let healthLabel = 'Healthy';
     if (totalAgents === 0) healthLabel = 'Empty';
     else if (activeAgents.length === 0 || activeAgents.length < totalAgents / 2) healthLabel = 'Limited';
     
     let fieldValue = `Status: **${healthLabel}**\n`;
-    fieldValue += `Agents: **${totalAgents}** total, **${activeAgents.length}** active\n`;
+    fieldValue += `Capacity: \`${buildCapacityBar(totalAgents, maxAgents)}\`\n`;
+    fieldValue += `Active: **${activeAgents.length}** · Recommended deploy: **${recommended}**\n`;
     fieldValue += `**Owner:** ${owner}\n`;
     fieldValue += `**Contribute:** \`/agents add_token pool:${pool.pool_id}\``;
     
@@ -1042,7 +1048,7 @@ async function handleView(interaction) {
     .setTimestamp();
 
   // Show agent list if owner or public
-  if (pool.owner_user_id === userId || isMaster(userId) || pool.visibility === 'public') {
+  if (pool.visibility === 'public' || await canManagePool(poolId, userId)) {
     if (agentCount > 0) {
       const agentList = agents
         .slice(0, 10) // Max 10 agents
@@ -1107,7 +1113,7 @@ async function handleSelectPool(interaction) {
   }
 
   // Check pool access: non-owners cannot select someone else's private pool.
-  if (!isMaster(userId) && pool.owner_user_id !== userId && pool.visibility !== 'public') {
+  if (pool.visibility !== 'public' && !(await canManagePool(poolId, userId))) {
     return interaction.editReply({
       embeds: [
         buildPoolEmbed(
@@ -1205,7 +1211,7 @@ async function handleDelete(interaction) {
   }
 
   // Check ownership
-  if (pool.owner_user_id !== userId && !isMaster(userId)) {
+  if (!(await canManagePool(poolId, userId))) {
     return interaction.editReply({
       embeds: [buildPoolEmbed('Delete Denied', 'You can only delete pools you own.', Colors.ERROR)]
     });
@@ -1264,7 +1270,7 @@ async function handleTransfer(interaction) {
   }
 
   // Check ownership
-  if (pool.owner_user_id !== userId && !isMaster(userId)) {
+  if (!(await canManagePool(poolId, userId))) {
     return interaction.editReply({
       embeds: [buildPoolEmbed('Transfer Denied', 'You can only transfer pools you own.', Colors.ERROR)]
     });
@@ -1331,7 +1337,7 @@ async function handleContributions(interaction) {
   }
   
   // Check ownership
-  if (pool.owner_user_id !== userId && !isMaster(userId)) {
+  if (!(await canManagePool(poolId, userId))) {
     return interaction.editReply({
       embeds: [buildPoolEmbed('Access Denied', 'You can only view contributions to pools you own.', Colors.ERROR)]
     });
@@ -1410,7 +1416,7 @@ async function handleApprove(interaction) {
     });
   }
   
-  if (pool.owner_user_id !== userId && !isMaster(userId)) {
+  if (!(await canManagePool(pool.pool_id, userId))) {
     return interaction.editReply({
       embeds: [buildPoolEmbed('Approval Denied', 'You can only approve contributions to pools you own.', Colors.ERROR)]
     });
@@ -1463,7 +1469,7 @@ async function handleReject(interaction) {
     });
   }
   
-  if (pool.owner_user_id !== userId && !isMaster(userId)) {
+  if (!(await canManagePool(pool.pool_id, userId))) {
     return interaction.editReply({
       embeds: [buildPoolEmbed('Rejection Denied', 'You can only reject contributions to pools you own.', Colors.ERROR)]
     });
@@ -1632,7 +1638,7 @@ async function handlePoolUiAction(interaction, parsed, actionValue) {
       requested.poolId = null;
       return { requested, note: `Pool \`${parsed.poolId}\` no longer exists.` };
     }
-    if (!isMaster(userId) && pool.owner_user_id !== userId) {
+    if (!(await canManagePool(parsed.poolId, userId))) {
       return { requested, note: 'Visibility changes are limited to the pool owner.' };
     }
     const nextVisibility = pool.visibility === 'public' ? 'private' : 'public';
@@ -1652,7 +1658,7 @@ async function handlePoolUiAction(interaction, parsed, actionValue) {
       requested.poolId = null;
       return { requested, note: `Pool \`${parsed.poolId}\` no longer exists.` };
     }
-    if (!isMaster(userId) && pool.owner_user_id !== userId) {
+    if (!(await canManagePool(parsed.poolId, userId))) {
       return { requested, note: 'Pool deletion is limited to the pool owner.' };
     }
     const agents = await storageLayer.fetchPoolAgents(parsed.poolId).catch(() => []);
@@ -1724,7 +1730,7 @@ export async function handleButton(interaction) {
       });
       return true;
     }
-    if (!canManageGuild(interaction) && !isMaster(interaction.user.id)) {
+    if (!canManageGuild(interaction)) {
       await interaction.reply({
         embeds: [buildPoolEmbed('Permission Required', 'You need `Manage Server` to view invite links.', Colors.ERROR)],
         flags: MessageFlags.Ephemeral
@@ -1816,7 +1822,7 @@ export async function handleButton(interaction) {
       });
       return true;
     }
-    if (!canManageGuild(interaction) && !isMaster(interaction.user.id)) {
+    if (!canManageGuild(interaction)) {
       await interaction.reply({
         embeds: [buildPoolEmbed('Permission Required', 'You need `Manage Server` to open Deploy UI.', Colors.ERROR)],
         flags: MessageFlags.Ephemeral
@@ -1835,7 +1841,7 @@ export async function handleButton(interaction) {
       });
       return true;
     }
-    if (!canManageGuild(interaction) && !isMaster(interaction.user.id)) {
+    if (!canManageGuild(interaction)) {
       await interaction.reply({
         embeds: [buildPoolEmbed('Permission Required', 'You need `Manage Server` to open Advisor UI.', Colors.ERROR)],
         flags: MessageFlags.Ephemeral
@@ -1854,7 +1860,7 @@ export async function handleButton(interaction) {
       });
       return true;
     }
-    if (!canManageGuild(interaction) && !isMaster(interaction.user.id)) {
+    if (!canManageGuild(interaction)) {
       await interaction.reply({
         embeds: [buildPoolEmbed('Permission Required', 'You need `Manage Server` to set guild default pool.', Colors.ERROR)],
         flags: MessageFlags.Ephemeral
@@ -1885,7 +1891,7 @@ export async function handleButton(interaction) {
       });
       return true;
     }
-    if (!canManageGuild(interaction) && !isMaster(interaction.user.id)) {
+    if (!canManageGuild(interaction)) {
       await interaction.reply({
         embeds: [buildPoolEmbed('Permission Required', 'You need `Manage Server` to export invite links.', Colors.ERROR)],
         flags: MessageFlags.Ephemeral
@@ -1934,7 +1940,7 @@ export async function autocomplete(interaction) {
     const subcommand = interaction.options.getSubcommand(false);
     const query = String(focused?.value || '').toLowerCase().trim();
     const userId = interaction.user.id;
-    const master = isMaster(userId);
+    const master = false;
 
     if (focused?.name === 'pool') {
       const pools = await storageLayer.listPools();

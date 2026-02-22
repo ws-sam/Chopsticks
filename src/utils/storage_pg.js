@@ -661,9 +661,21 @@ export async function updateAgentBotStatus(agentId, status, actorUserId = '') {
   const p = getPool();
   // Terminal state — revoked tokens cannot be reactivated
   if (status !== 'revoked') {
-    const check = await p.query("SELECT status FROM agent_bots WHERE agent_id = $1", [agentId]);
-    if (check.rows[0]?.status === 'revoked') {
+    const check = await p.query("SELECT status, pool_id FROM agent_bots WHERE agent_id = $1", [agentId]);
+    const row = check.rows[0];
+    if (row?.status === 'revoked') {
       throw new Error(`Agent ${agentId} is revoked and cannot be reactivated.`);
+    }
+    // Capacity check when activating (active or approved)
+    if ((status === 'active' || status === 'approved') && row?.pool_id) {
+      const currentCount = await countAgentsByPool(row.pool_id);
+      const pool = await fetchPool(row.pool_id);
+      const maxAgents = pool?.max_agents || 49;
+      // Only enforce if agent is currently NOT already in the active/approved count
+      const alreadyActive = row?.status === 'active' || row?.status === 'approved';
+      if (!alreadyActive && currentCount >= maxAgents) {
+        throw new Error(`Pool ${row.pool_id} is at capacity (${currentCount}/${maxAgents}). Cannot activate more agents.`);
+      }
     }
   }
   const res = await p.query(
@@ -1051,8 +1063,9 @@ export async function transferPool(poolId, newOwnerUserId, actorUserId) {
  */
 export async function revokeAgentToken(agentId, revokedBy) {
   const p = getPool();
+  // Null out ciphertext so revoked tokens cannot be decrypted even if DB is compromised
   const res = await p.query(
-    "UPDATE agent_bots SET status = 'revoked', updated_at = $1 WHERE agent_id = $2 AND status != 'revoked' RETURNING agent_id, pool_id",
+    "UPDATE agent_bots SET status = 'revoked', token = NULL, enc_version = NULL, updated_at = $1 WHERE agent_id = $2 AND status != 'revoked' RETURNING agent_id, pool_id",
     [Date.now(), agentId]
   );
   if (res.rowCount > 0) {

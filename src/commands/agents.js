@@ -31,7 +31,8 @@ import {
   saveGuildData,
   getUserPoolRole,
   canManagePool,
-  maskToken
+  maskToken,
+  getGuildPoolConfig,
 } from "../utils/storage.js";
 import {
   replyEmbed,
@@ -112,9 +113,22 @@ function isPoolAccessibleForUser(pool, userId, ownerIds) {
   return pool.visibility === "public";
 }
 
-async function listAccessiblePoolsForUser(userId, ownerIds) {
+async function listAccessiblePoolsForUser(userId, ownerIds, guildId = null) {
   const pools = await listPools();
-  return pools.filter(pool => isPoolAccessibleForUser(pool, userId, ownerIds));
+  const accessible = pools.filter(pool => isPoolAccessibleForUser(pool, userId, ownerIds));
+  // If we have a guild context, sort by specialty preference (local sort — no extra DB call)
+  if (guildId) {
+    const config = await getGuildPoolConfig(guildId).catch(() => null);
+    const specialty = config?.preferred_specialty;
+    if (specialty) {
+      return [...accessible].sort((a, b) => {
+        const aMatch = (a.specialty || a.meta?.specialty) === specialty ? 1 : 0;
+        const bMatch = (b.specialty || b.meta?.specialty) === specialty ? 1 : 0;
+        return bMatch - aMatch; // specialty matches first
+      });
+    }
+  }
+  return accessible;
 }
 
 function selectVisibleRegisteredAgents(allAgents, liveAgents, guildId, selectedPoolId, requesterIsBotOwner) {
@@ -453,7 +467,7 @@ async function resolveAdvisorUiState(guildId, userId, ownerIds, mgr, requested =
   const desiredTotal = clampDeployUiDesired(requested.desiredTotal);
   const requestedPoolId = String(requested.poolId || "").trim();
   const defaultPoolId = await getGuildSelectedPool(guildId);
-  const accessiblePools = await listAccessiblePoolsForUser(userId, ownerIds);
+  const accessiblePools = await listAccessiblePoolsForUser(userId, ownerIds, guildId);
   const rows = await buildAdvisorRows(mgr, guildId, desiredTotal, accessiblePools);
 
   let selectedRow = null;
@@ -604,7 +618,7 @@ async function renderAdvisorUi(interaction, mgr, ownerIds, requested = {}, { upd
 }
 
 async function resolveDeployUiState(guildId, userId, ownerIds, mgr, requested = {}) {
-  const accessiblePools = await listAccessiblePoolsForUser(userId, ownerIds);
+  const accessiblePools = await listAccessiblePoolsForUser(userId, ownerIds, guildId);
   const defaultPoolId = await getGuildSelectedPool(guildId);
   const desired = clampDeployUiDesired(requested.desiredTotal);
   const requestedPoolId = String(requested.poolId || "").trim();

@@ -19,6 +19,15 @@ import { canManagePool, getUserPoolRole, logPoolEvent, maskToken, SPECIALTIES, B
          addGuildSecondaryPool, removeGuildSecondaryPool, getGuildAllPoolIds,
          rankPoolsBySpecialty, evaluatePoolBadges } from '../utils/storage.js';
 
+const _poolWriteRateLimit = new Map();
+function checkPoolWriteRateLimit(userId, cooldownMs = 5000) {
+  const last = _poolWriteRateLimit.get(userId) || 0;
+  const now = Date.now();
+  if (now - last < cooldownMs) return false;
+  _poolWriteRateLimit.set(userId, now);
+  return true;
+}
+
 export const meta = {
   guildOnly: false, // Pool management can be done outside guilds
   userPerms: [],
@@ -261,6 +270,11 @@ export const data = new SlashCommandBuilder()
           { name: 'Remove member', value: 'remove' },
         ))
         .addUserOption(o => o.setName('user').setDescription('User to add/remove'))
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName('help')
+        .setDescription('Show help for the agent pool system — workflows, security promises, and quick-start guide')
     );
 
 export async function execute(interaction) {
@@ -337,6 +351,9 @@ export async function execute(interaction) {
         case 'members':
           await handleMembers(interaction);
           break;
+        case 'help':
+          await handleHelp(interaction);
+          break;
         default:
           await interaction.reply({
             embeds: [buildPoolEmbed('Unknown Subcommand', 'This pool action is not recognized.', Colors.ERROR)],
@@ -388,6 +405,15 @@ async function canAccessPool(userId, poolId, pool) {
 function buildCapacityBar(current, max, width = 10) {
   const filled = Math.min(Math.round((current / Math.max(max, 1)) * width), width);
   return '█'.repeat(filled) + '░'.repeat(width - filled) + ` ${current}/${max}`;
+}
+
+function validatePoolMeta(meta) {
+  const errors = [];
+  if (meta.description && meta.description.length > 500) errors.push('Description must be ≤ 500 characters.');
+  if (meta.color && !/^#[0-9a-fA-F]{6}$/.test(meta.color)) errors.push('Color must be a hex code like #FF5500.');
+  if (meta.banner_url && !/^https?:\/\/.{4,}/.test(meta.banner_url)) errors.push('Banner URL must be a valid http/https URL.');
+  if (meta.emoji && [...meta.emoji].length > 2) errors.push('Emoji must be a single emoji character.');
+  return errors;
 }
 
 function buildPoolEmbed(title, description = '', color = Colors.INFO) {
@@ -1064,6 +1090,9 @@ async function handleSetup(interaction) {
 // ========== CREATE POOL ==========
 
 async function handleCreate(interaction) {
+  if (!checkPoolWriteRateLimit(interaction.user.id)) {
+    return interaction.reply({ embeds: [buildPoolEmbed('Slow Down', 'Please wait a few seconds before doing that again.', Colors.WARNING)], flags: MessageFlags.Ephemeral });
+  }
   await interaction.deferReply({ ephemeral: true });
 
   const userId = interaction.user.id;
@@ -1088,31 +1117,34 @@ async function handleCreate(interaction) {
     });
   }
 
-  // Create the pool
-  const created = await storageLayer.createPool(poolId, userId, poolName, visibility);
-  
-  if (!created) {
-    return interaction.editReply({
-      embeds: [buildPoolEmbed('Create Failed', 'Failed to create pool. Please try again.', Colors.ERROR)]
+  try {
+    const created = await storageLayer.createPool(poolId, userId, poolName, visibility);
+
+    if (!created) {
+      return interaction.editReply({
+        embeds: [buildPoolEmbed('Create Failed', 'Failed to create pool. Please try again.', Colors.ERROR)]
+      });
+    }
+
+    const embed = new EmbedBuilder()
+      .setTitle('Pool Created')
+      .setColor(Colors.SUCCESS)
+      .setDescription(`Your pool **${poolName}** has been created.`)
+      .addFields(
+        { name: 'Pool ID', value: `\`${poolId}\``, inline: true },
+        { name: 'Visibility', value: visibility === 'public' ? 'Public' : 'Private', inline: true },
+        { name: 'Owner', value: `<@${userId}>`, inline: true }
+      )
+      .setFooter({ text: 'Use /agents add_token to add agents to your pool' })
+      .setTimestamp();
+
+    await interaction.editReply({
+      embeds: [embed],
+      components: buildOpenSetupButtonRow(userId, poolId, 10)
     });
+  } catch (err) {
+    return interaction.editReply({ embeds: [buildPoolEmbed('Create Failed', err.message || 'Failed to create pool.', Colors.ERROR)] });
   }
-
-  const embed = new EmbedBuilder()
-    .setTitle('Pool Created')
-    .setColor(Colors.SUCCESS)
-    .setDescription(`Your pool **${poolName}** has been created.`)
-    .addFields(
-      { name: 'Pool ID', value: `\`${poolId}\``, inline: true },
-      { name: 'Visibility', value: visibility === 'public' ? 'Public' : 'Private', inline: true },
-      { name: 'Owner', value: `<@${userId}>`, inline: true }
-    )
-    .setFooter({ text: 'Use /agents add_token to add agents to your pool' })
-    .setTimestamp();
-
-  await interaction.editReply({
-    embeds: [embed],
-    components: buildOpenSetupButtonRow(userId, poolId, 10)
-  });
 }
 
 // ========== VIEW POOL ==========
@@ -1348,25 +1380,28 @@ async function handleDelete(interaction) {
     });
   }
 
-  // Delete the pool
-  const deleted = await storageLayer.deletePool(poolId);
-  
-  if (!deleted) {
-    return interaction.editReply({
-      embeds: [buildPoolEmbed('Delete Failed', 'Failed to delete pool. Please try again.', Colors.ERROR)]
-    });
+  try {
+    const deleted = await storageLayer.deletePool(poolId);
+
+    if (!deleted) {
+      return interaction.editReply({
+        embeds: [buildPoolEmbed('Delete Failed', 'Failed to delete pool. Please try again.', Colors.ERROR)]
+      });
+    }
+
+    const embed = new EmbedBuilder()
+      .setTitle('Pool Deleted')
+      .setColor(Colors.ERROR)
+      .setDescription(`Pool **${pool.name}** has been deleted.`)
+      .addFields(
+        { name: 'Pool ID', value: `\`${poolId}\``, inline: true }
+      )
+      .setTimestamp();
+
+    await interaction.editReply({ embeds: [embed] });
+  } catch (err) {
+    return interaction.editReply({ embeds: [buildPoolEmbed('Delete Failed', err.message || 'Failed to delete pool.', Colors.ERROR)] });
   }
-
-  const embed = new EmbedBuilder()
-    .setTitle('Pool Deleted')
-    .setColor(Colors.ERROR)
-    .setDescription(`Pool **${pool.name}** has been deleted.`)
-    .addFields(
-      { name: 'Pool ID', value: `\`${poolId}\``, inline: true }
-    )
-    .setTimestamp();
-
-  await interaction.editReply({ embeds: [embed] });
 }
 
 // ========== TRANSFER OWNERSHIP ==========
@@ -1393,29 +1428,32 @@ async function handleTransfer(interaction) {
     });
   }
 
-  // Update ownership
-  const updated = await storageLayer.updatePool(poolId, {
-    owner_user_id: newOwner.id,
-  });
-  
-  if (!updated) {
-    return interaction.editReply({
-      embeds: [buildPoolEmbed('Transfer Failed', 'Failed to transfer pool. Please try again.', Colors.ERROR)]
+  try {
+    const updated = await storageLayer.updatePool(poolId, {
+      owner_user_id: newOwner.id,
     });
+
+    if (!updated) {
+      return interaction.editReply({
+        embeds: [buildPoolEmbed('Transfer Failed', 'Failed to transfer pool. Please try again.', Colors.ERROR)]
+      });
+    }
+
+    const embed = new EmbedBuilder()
+      .setTitle('Pool Transferred')
+      .setColor(Colors.WARNING)
+      .setDescription(`Pool **${pool.name}** has been transferred.`)
+      .addFields(
+        { name: 'Pool ID', value: `\`${poolId}\``, inline: true },
+        { name: 'Previous Owner', value: `<@${userId}>`, inline: true },
+        { name: 'New Owner', value: `<@${newOwner.id}>`, inline: true }
+      )
+      .setTimestamp();
+
+    await interaction.editReply({ embeds: [embed] });
+  } catch (err) {
+    return interaction.editReply({ embeds: [buildPoolEmbed('Transfer Failed', err.message || 'Failed to transfer pool.', Colors.ERROR)] });
   }
-
-  const embed = new EmbedBuilder()
-    .setTitle('Pool Transferred')
-    .setColor(Colors.WARNING)
-    .setDescription(`Pool **${pool.name}** has been transferred.`)
-    .addFields(
-      { name: 'Pool ID', value: `\`${poolId}\``, inline: true },
-      { name: 'Previous Owner', value: `<@${userId}>`, inline: true },
-      { name: 'New Owner', value: `<@${newOwner.id}>`, inline: true }
-    )
-    .setTimestamp();
-
-  await interaction.editReply({ embeds: [embed] });
 }
 
 // ========== CONTRIBUTIONS ==========
@@ -1507,35 +1545,39 @@ async function handleApprove(interaction) {
 
   const userId = interaction.user.id;
   const agentId = interaction.options.getString('agent_id');
-  
-  const allAgents = await storageLayer.fetchAgentBots();
-  const agent = allAgents.find(a => a.agent_id === agentId);
-  
-  if (!agent) return interaction.editReply({ embeds: [buildPoolEmbed('Agent Not Found', `Agent \`${agentId}\` was not found.`, Colors.ERROR)] });
-  
-  const pool = await storageLayer.fetchPool(agent.pool_id);
-  if (!pool) return interaction.editReply({ embeds: [buildPoolEmbed('Pool Not Found', 'Pool not found.', Colors.ERROR)] });
-  
-  if (!(await canManagePool(pool.pool_id, userId))) {
-    return interaction.editReply({ embeds: [buildPoolEmbed('Approval Denied', 'Only pool owners and managers can approve contributions.', Colors.ERROR)] });
+
+  try {
+    const allAgents = await storageLayer.fetchAgentBots();
+    const agent = allAgents.find(a => a.agent_id === agentId);
+
+    if (!agent) return interaction.editReply({ embeds: [buildPoolEmbed('Agent Not Found', `Agent \`${agentId}\` was not found.`, Colors.ERROR)] });
+
+    const pool = await storageLayer.fetchPool(agent.pool_id);
+    if (!pool) return interaction.editReply({ embeds: [buildPoolEmbed('Pool Not Found', 'Pool not found.', Colors.ERROR)] });
+
+    if (!(await canManagePool(pool.pool_id, userId))) {
+      return interaction.editReply({ embeds: [buildPoolEmbed('Approval Denied', 'Only pool owners and managers can approve contributions.', Colors.ERROR)] });
+    }
+
+    await storageLayer.updateAgentBotStatus(agentId, 'active', userId);
+    await evaluatePoolBadges(pool.pool_id).catch(() => {});
+
+    await interaction.editReply({ embeds: [
+      new EmbedBuilder()
+        .setTitle('✅ Contribution Approved')
+        .setColor(Colors.SUCCESS)
+        .setDescription(`**${agent.tag}** is now active in **${pool.name}**.`)
+        .addFields(
+          { name: 'Agent ID', value: `\`${agentId}\``, inline: true },
+          { name: 'Pool', value: `\`${agent.pool_id}\``, inline: true },
+          { name: 'Status', value: '🟢 Active', inline: true }
+        )
+        .setFooter({ text: 'AgentRunner will start this agent automatically' })
+        .setTimestamp()
+    ] });
+  } catch (err) {
+    return interaction.editReply({ embeds: [buildPoolEmbed('Approve Failed', err.message || 'Unexpected error.', Colors.ERROR)] });
   }
-  
-  await storageLayer.updateAgentBotStatus(agentId, 'active', userId);
-  await evaluatePoolBadges(pool.pool_id).catch(() => {});
-  
-  await interaction.editReply({ embeds: [
-    new EmbedBuilder()
-      .setTitle('✅ Contribution Approved')
-      .setColor(Colors.SUCCESS)
-      .setDescription(`**${agent.tag}** is now active in **${pool.name}**.`)
-      .addFields(
-        { name: 'Agent ID', value: `\`${agentId}\``, inline: true },
-        { name: 'Pool', value: `\`${agent.pool_id}\``, inline: true },
-        { name: 'Status', value: '🟢 Active', inline: true }
-      )
-      .setFooter({ text: 'AgentRunner will start this agent automatically' })
-      .setTimestamp()
-  ] });
 }
 
 // ========== REJECT ==========
@@ -1545,24 +1587,28 @@ async function handleReject(interaction) {
 
   const userId = interaction.user.id;
   const agentId = interaction.options.getString('agent_id');
-  
-  const allAgents = await storageLayer.fetchAgentBots();
-  const agent = allAgents.find(a => a.agent_id === agentId);
-  
-  if (!agent) return interaction.editReply({ embeds: [buildPoolEmbed('Agent Not Found', `Agent \`${agentId}\` was not found.`, Colors.ERROR)] });
-  
-  const pool = await storageLayer.fetchPool(agent.pool_id);
-  if (!pool) return interaction.editReply({ embeds: [buildPoolEmbed('Pool Not Found', 'Pool not found.', Colors.ERROR)] });
-  
-  if (!(await canManagePool(pool.pool_id, userId))) {
-    return interaction.editReply({ embeds: [buildPoolEmbed('Rejection Denied', 'Only pool owners and managers can reject contributions.', Colors.ERROR)] });
+
+  try {
+    const allAgents = await storageLayer.fetchAgentBots();
+    const agent = allAgents.find(a => a.agent_id === agentId);
+
+    if (!agent) return interaction.editReply({ embeds: [buildPoolEmbed('Agent Not Found', `Agent \`${agentId}\` was not found.`, Colors.ERROR)] });
+
+    const pool = await storageLayer.fetchPool(agent.pool_id);
+    if (!pool) return interaction.editReply({ embeds: [buildPoolEmbed('Pool Not Found', 'Pool not found.', Colors.ERROR)] });
+
+    if (!(await canManagePool(pool.pool_id, userId))) {
+      return interaction.editReply({ embeds: [buildPoolEmbed('Rejection Denied', 'Only pool owners and managers can reject contributions.', Colors.ERROR)] });
+    }
+
+    await storageLayer.revokeAgentToken(agentId, userId);
+
+    await interaction.editReply({ embeds: [
+      buildPoolEmbed('Contribution Rejected', `**${agent.tag}** (\`${agentId}\`) has been rejected and removed from **${pool.name}**.`, Colors.WARNING)
+    ] });
+  } catch (err) {
+    return interaction.editReply({ embeds: [buildPoolEmbed('Reject Failed', err.message || 'Unexpected error.', Colors.ERROR)] });
   }
-  
-  await storageLayer.revokeAgentToken(agentId, userId);
-  
-  await interaction.editReply({ embeds: [
-    buildPoolEmbed('Contribution Rejected', `**${agent.tag}** (\`${agentId}\`) has been rejected and removed from **${pool.name}**.`, Colors.WARNING)
-  ] });
 }
 
 // ========== ADMIN LIST (MASTER ONLY) ==========
@@ -2341,6 +2387,9 @@ async function maybeShowOnboarding(interaction) {
 // /pools profile
 // ──────────────────────────────────────────────────────────────────────────
 async function handleProfile(interaction) {
+  if (!checkPoolWriteRateLimit(interaction.user.id)) {
+    return interaction.reply({ embeds: [buildPoolEmbed('Slow Down', 'Please wait a few seconds before doing that again.', Colors.WARNING)], flags: MessageFlags.Ephemeral });
+  }
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
   const userId = interaction.user.id;
   const poolId = interaction.options.getString('pool');
@@ -2385,12 +2434,18 @@ async function handleProfile(interaction) {
     ...(bannerUrl  !== null ? { banner_url: bannerUrl } : {}),
   };
 
+  const profileErrors = validatePoolMeta(updatedMeta);
+  if (profileErrors.length > 0) {
+    return interaction.editReply({ embeds: [buildPoolEmbed('Invalid Input', profileErrors.join('\n'), Colors.ERROR)] });
+  }
+
   await storageLayer.updatePool(poolId, { meta: updatedMeta }, userId);
 
   const updatedPool = await storageLayer.fetchPool(poolId);
+  const displayPool = updatedPool || pool;
   const agents = await storageLayer.fetchPoolAgents(poolId).catch(() => []);
-  const card = buildPoolCard(updatedPool, agents);
-  card.setTitle(`✅ Profile Updated — ${updatedPool.name}`);
+  const card = buildPoolCard(displayPool, agents);
+  card.setTitle(`✅ Profile Updated — ${displayPool.name}`);
 
   await interaction.editReply({ embeds: [card] });
 }
@@ -2569,89 +2624,106 @@ async function handleDiscover(interaction) {
 // /pools specialty
 // ──────────────────────────────────────────────────────────────────────────
 async function handleSpecialty(interaction) {
-  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-  const userId = interaction.user.id;
-  const poolId = interaction.options.getString('pool');
-  const type   = interaction.options.getString('type');
+  if (!checkPoolWriteRateLimit(interaction.user.id)) {
+    return interaction.reply({ embeds: [buildPoolEmbed('Slow Down', 'Please wait a few seconds before doing that again.', Colors.WARNING)], flags: MessageFlags.Ephemeral });
+  }
+  try {
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    const userId = interaction.user.id;
+    const poolId = interaction.options.getString('pool');
+    const type   = interaction.options.getString('type');
 
-  const pool = await storageLayer.fetchPool(poolId);
-  if (!pool) return interaction.editReply({ embeds: [buildPoolEmbed('Not Found', `Pool \`${poolId}\` not found.`, Colors.ERROR)] });
-  if (!(await canManagePool(poolId, userId))) return interaction.editReply({ embeds: [buildPoolEmbed('Not Authorized', 'Only pool owners and managers can set specialty.', Colors.ERROR)] });
+    const pool = await storageLayer.fetchPool(poolId);
+    if (!pool) return interaction.editReply({ embeds: [buildPoolEmbed('Not Found', `Pool \`${poolId}\` not found.`, Colors.ERROR)] });
+    if (!(await canManagePool(poolId, userId))) return interaction.editReply({ embeds: [buildPoolEmbed('Not Authorized', 'Only pool owners and managers can set specialty.', Colors.ERROR)] });
 
-  await setPoolSpecialty(poolId, type, userId);
+    await setPoolSpecialty(poolId, type, userId);
 
-  const labels = { music: '🎵 Music', voice_assistant: '🤖 Voice Assistant', utility: '🔧 Utility', relay: '📡 Relay', custom: '✨ Custom' };
-  await interaction.editReply({ embeds: [
-    buildPoolEmbed('Specialty Updated', `**${pool.name}** is now specialized in **${labels[type] || type}**.\n\nThis will affect specialty-based matching when guilds deploy agents.`, Colors.SUCCESS)
-  ] });
+    const labels = { music: '🎵 Music', voice_assistant: '🤖 Voice Assistant', utility: '🔧 Utility', relay: '📡 Relay', custom: '✨ Custom' };
+    await interaction.editReply({ embeds: [
+      buildPoolEmbed('Specialty Updated', `**${pool.name}** is now specialized in **${labels[type] || type}**.\n\nThis will affect specialty-based matching when guilds deploy agents.`, Colors.SUCCESS)
+    ] });
+  } catch (err) {
+    return interaction.editReply({ embeds: [buildPoolEmbed('Error', err.message || 'Unexpected error.', Colors.ERROR)] });
+  }
 }
 
 // ──────────────────────────────────────────────────────────────────────────
 // /pools ally
 // ──────────────────────────────────────────────────────────────────────────
 async function handleAlly(interaction) {
-  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-  const userId = interaction.user.id;
-  const poolId  = interaction.options.getString('pool');
-  const target  = interaction.options.getString('target');
-  const action  = interaction.options.getString('action');
+  if (!checkPoolWriteRateLimit(interaction.user.id)) {
+    return interaction.reply({ embeds: [buildPoolEmbed('Slow Down', 'Please wait a few seconds before doing that again.', Colors.WARNING)], flags: MessageFlags.Ephemeral });
+  }
+  try {
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    const userId = interaction.user.id;
+    const poolId  = interaction.options.getString('pool');
+    const target  = interaction.options.getString('target');
+    const action  = interaction.options.getString('action');
 
-  if (poolId === target) return interaction.editReply({ embeds: [buildPoolEmbed('Invalid', 'Cannot ally a pool with itself.', Colors.ERROR)] });
+    if (poolId === target) return interaction.editReply({ embeds: [buildPoolEmbed('Invalid', 'Cannot ally a pool with itself.', Colors.ERROR)] });
 
-  const [pool, targetPool] = await Promise.all([storageLayer.fetchPool(poolId), storageLayer.fetchPool(target)]);
-  if (!pool) return interaction.editReply({ embeds: [buildPoolEmbed('Not Found', `Your pool \`${poolId}\` not found.`, Colors.ERROR)] });
-  if (!targetPool) return interaction.editReply({ embeds: [buildPoolEmbed('Not Found', `Target pool \`${target}\` not found.`, Colors.ERROR)] });
+    const [pool, targetPool] = await Promise.all([storageLayer.fetchPool(poolId), storageLayer.fetchPool(target)]);
+    if (!pool) return interaction.editReply({ embeds: [buildPoolEmbed('Not Found', `Your pool \`${poolId}\` not found.`, Colors.ERROR)] });
+    if (!targetPool) return interaction.editReply({ embeds: [buildPoolEmbed('Not Found', `Target pool \`${target}\` not found.`, Colors.ERROR)] });
 
-  if (action === 'view') {
-    const alliances = await fetchPoolAlliances(poolId, null);
-    if (alliances.length === 0) {
-      return interaction.editReply({ embeds: [buildPoolEmbed('No Alliances', `**${pool.name}** has no alliances.`, Colors.INFO)] });
+    if (action === 'view') {
+      const alliances = await fetchPoolAlliances(poolId, null);
+      if (alliances.length === 0) {
+        return interaction.editReply({ embeds: [buildPoolEmbed('No Alliances', `**${pool.name}** has no alliances.`, Colors.INFO)] });
+      }
+      const partnerIds = alliances.map(a => a.partner_pool_id);
+      const partners = await Promise.all(partnerIds.map(id => storageLayer.fetchPool(id).catch(() => null)));
+      const embed = new EmbedBuilder()
+        .setTitle(`🤝 Alliances — ${pool.name}`)
+        .setColor(Colors.INFO)
+        .setTimestamp();
+      for (let i = 0; i < alliances.length; i++) {
+        const a = alliances[i];
+        const partner = partners[i];
+        const statusEmoji = { active: '🤜🤛', pending: '⏳', dissolved: '💔' }[a.status] || '❓';
+        embed.addFields({
+          name: `${statusEmoji} ${partner?.name || a.partner_pool_id}`,
+          value: `Status: **${a.status}** · Initiated by: <@${a.initiated_by}> · \`${a.partner_pool_id}\``,
+          inline: false,
+        });
+      }
+      return interaction.editReply({ embeds: [embed] });
     }
-    const partnerIds = alliances.map(a => a.partner_pool_id);
-    const partners = await Promise.all(partnerIds.map(id => storageLayer.fetchPool(id).catch(() => null)));
-    const embed = new EmbedBuilder()
-      .setTitle(`🤝 Alliances — ${pool.name}`)
-      .setColor(Colors.INFO)
-      .setTimestamp();
-    for (let i = 0; i < alliances.length; i++) {
-      const a = alliances[i];
-      const partner = partners[i];
-      const statusEmoji = { active: '🤜��', pending: '⏳', dissolved: '💔' }[a.status] || '❓';
-      embed.addFields({
-        name: `${statusEmoji} ${partner?.name || a.partner_pool_id}`,
-        value: `Status: **${a.status}** · Initiated by: <@${a.initiated_by}> · \`${a.partner_pool_id}\``,
-        inline: false,
-      });
+
+    if (action === 'dissolve') {
+      if (!(await canManagePool(poolId, userId)) && !(await canManagePool(target, userId))) {
+        return interaction.editReply({ embeds: [buildPoolEmbed('Not Authorized', 'You must own or manage one of the pools to dissolve this alliance.', Colors.ERROR)] });
+      }
+      await dissolveAlliance(poolId, target, userId);
+      return interaction.editReply({ embeds: [
+        buildPoolEmbed('Alliance Dissolved', `Alliance between **${pool.name}** and **${targetPool.name}** has been dissolved.`, Colors.WARNING)
+      ] });
     }
-    return interaction.editReply({ embeds: [embed] });
-  }
 
-  // Management actions require owning YOUR pool
-  if (!(await canManagePool(poolId, userId))) return interaction.editReply({ embeds: [buildPoolEmbed('Not Authorized', 'You must own or manage your pool to manage alliances.', Colors.ERROR)] });
+    // Management actions require owning YOUR pool
+    if (!(await canManagePool(poolId, userId))) return interaction.editReply({ embeds: [buildPoolEmbed('Not Authorized', 'You must own or manage your pool to manage alliances.', Colors.ERROR)] });
 
-  if (action === 'propose') {
-    await proposeAlliance(poolId, target, userId);
-    return interaction.editReply({ embeds: [
-      buildPoolEmbed('Alliance Proposed', `Alliance proposal sent from **${pool.name}** to **${targetPool.name}**.\n\nThe target pool owner must accept with \`/pools ally pool:${target} target:${poolId} action:accept\`.`, Colors.SUCCESS)
-    ] });
-  }
+    if (action === 'propose') {
+      await proposeAlliance(poolId, target, userId);
+      return interaction.editReply({ embeds: [
+        buildPoolEmbed('Alliance Proposed', `Alliance proposal sent from **${pool.name}** to **${targetPool.name}**.\n\nThe target pool owner must accept with \`/pools ally pool:${target} target:${poolId} action:accept\`.`, Colors.SUCCESS)
+      ] });
+    }
 
-  if (action === 'accept') {
-    // The accepting party should be the target pool owner
-    if (!(await canManagePool(target, userId))) return interaction.editReply({ embeds: [buildPoolEmbed('Not Authorized', 'You must manage the target pool to accept its alliances.', Colors.ERROR)] });
-    await acceptAlliance(poolId, target, userId);
-    await evaluatePoolBadges(poolId).catch(() => {});
-    await evaluatePoolBadges(target).catch(() => {});
-    return interaction.editReply({ embeds: [
-      buildPoolEmbed('🤜🤛 Alliance Formed!', `**${pool.name}** and **${targetPool.name}** are now allied!\n\nAllied pools cross-promote in discovery and gain the **Allied** badge.`, Colors.SUCCESS)
-    ] });
-  }
-
-  if (action === 'dissolve') {
-    await dissolveAlliance(poolId, target, userId);
-    return interaction.editReply({ embeds: [
-      buildPoolEmbed('Alliance Dissolved', `Alliance between **${pool.name}** and **${targetPool.name}** has been dissolved.`, Colors.WARNING)
-    ] });
+    if (action === 'accept') {
+      // The accepting party should be the target pool owner
+      if (!(await canManagePool(target, userId))) return interaction.editReply({ embeds: [buildPoolEmbed('Not Authorized', 'You must manage the target pool to accept its alliances.', Colors.ERROR)] });
+      await acceptAlliance(poolId, target, userId);
+      await evaluatePoolBadges(poolId).catch(() => {});
+      await evaluatePoolBadges(target).catch(() => {});
+      return interaction.editReply({ embeds: [
+        buildPoolEmbed('🤜🤛 Alliance Formed!', `**${pool.name}** and **${targetPool.name}** are now allied!\n\nAllied pools cross-promote in discovery and gain the **Allied** badge.`, Colors.SUCCESS)
+      ] });
+    }
+  } catch (err) {
+    return interaction.editReply({ embeds: [buildPoolEmbed('Error', err.message || 'Unexpected error.', Colors.ERROR)] });
   }
 }
 
@@ -2709,8 +2781,12 @@ async function handleSecondary(interaction) {
   }
 
   if (action === 'remove') {
-    await removeGuildSecondaryPool(guildId, poolId);
-    return interaction.editReply({ embeds: [buildPoolEmbed('Secondary Pool Removed', `Pool \`${poolId}\` removed from secondary slots.`, Colors.SUCCESS)] });
+    try {
+      await removeGuildSecondaryPool(guildId, poolId);
+      return interaction.editReply({ embeds: [buildPoolEmbed('Secondary Pool Removed', `Pool \`${poolId}\` removed from secondary slots.`, Colors.SUCCESS)] });
+    } catch (err) {
+      return interaction.editReply({ embeds: [buildPoolEmbed('Error', err.message, Colors.ERROR)] });
+    }
   }
 }
 
@@ -2718,47 +2794,51 @@ async function handleSecondary(interaction) {
 // /pools members — roster management UI
 // ──────────────────────────────────────────────────────────────────────────
 async function handleMembers(interaction) {
-  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-  const userId = interaction.user.id;
-  const poolId = interaction.options.getString('pool');
-  const action = interaction.options.getString('action') || 'view';
-  const target = interaction.options.getUser('user');
+  try {
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    const userId = interaction.user.id;
+    const poolId = interaction.options.getString('pool');
+    const action = interaction.options.getString('action') || 'view';
+    const target = interaction.options.getUser('user');
 
-  const pool = await storageLayer.fetchPool(poolId);
-  if (!pool) return interaction.editReply({ embeds: [buildPoolEmbed('Not Found', `Pool \`${poolId}\` not found.`, Colors.ERROR)] });
-  if (!(await canManagePool(poolId, userId))) return interaction.editReply({ embeds: [buildPoolEmbed('Not Authorized', 'Only pool owners and managers can manage members.', Colors.ERROR)] });
+    const pool = await storageLayer.fetchPool(poolId);
+    if (!pool) return interaction.editReply({ embeds: [buildPoolEmbed('Not Found', `Pool \`${poolId}\` not found.`, Colors.ERROR)] });
+    if (!(await canManagePool(poolId, userId))) return interaction.editReply({ embeds: [buildPoolEmbed('Not Authorized', 'Only pool owners and managers can manage members.', Colors.ERROR)] });
 
-  if (action === 'view') {
-    const members = await storageLayer.fetchPoolMembers(poolId);
-    const roleEmoji = { owner: '👑', manager: '⚙️', contributor: '🤝', viewer: '👁️' };
-    const embed = new EmbedBuilder()
-      .setTitle(`👥 Members — ${pool.name}`)
-      .setColor(Colors.INFO)
-      .setTimestamp()
-      .setFooter({ text: `${members.length} member${members.length !== 1 ? 's' : ''}` });
+    if (action === 'view') {
+      const members = await storageLayer.fetchPoolMembers(poolId);
+      const roleEmoji = { owner: '👑', manager: '⚙️', contributor: '🤝', viewer: '👁️' };
+      const embed = new EmbedBuilder()
+        .setTitle(`👥 Members — ${pool.name}`)
+        .setColor(Colors.INFO)
+        .setTimestamp()
+        .setFooter({ text: `${members.length} member${members.length !== 1 ? 's' : ''}` });
 
-    if (members.length === 0) {
-      embed.setDescription('No members registered yet (pool owner is implicitly always owner).');
-    } else {
-      const lines = members.map(m => `${roleEmoji[m.role] || '•'} <@${m.user_id}> — **${m.role}**`);
-      embed.setDescription(lines.join('\n').slice(0, 4096));
+      if (members.length === 0) {
+        embed.setDescription('No members registered yet (pool owner is implicitly always owner).');
+      } else {
+        const lines = members.map(m => `${roleEmoji[m.role] || '•'} <@${m.user_id}> — **${m.role}**`);
+        embed.setDescription(lines.join('\n').slice(0, 4096));
+      }
+      return interaction.editReply({ embeds: [embed] });
     }
-    return interaction.editReply({ embeds: [embed] });
-  }
 
-  if (!target) return interaction.editReply({ embeds: [buildPoolEmbed('Missing User', 'Provide a user with the `user` option.', Colors.ERROR)] });
+    if (!target) return interaction.editReply({ embeds: [buildPoolEmbed('Missing User', 'Provide a user with the `user` option.', Colors.ERROR)] });
 
-  if (action === 'add_manager') {
-    if (pool.owner_user_id !== userId) return interaction.editReply({ embeds: [buildPoolEmbed('Owner Only', 'Only the pool owner can assign managers.', Colors.ERROR)] });
-    await storageLayer.setPoolMemberRole(poolId, target.id, 'manager', userId);
-    return interaction.editReply({ embeds: [buildPoolEmbed('Manager Added', `<@${target.id}> is now a **manager** of **${pool.name}**.`, Colors.SUCCESS)] });
-  }
+    if (action === 'add_manager') {
+      if (pool.owner_user_id !== userId) return interaction.editReply({ embeds: [buildPoolEmbed('Owner Only', 'Only the pool owner can assign managers.', Colors.ERROR)] });
+      await storageLayer.setPoolMemberRole(poolId, target.id, 'manager', userId);
+      return interaction.editReply({ embeds: [buildPoolEmbed('Manager Added', `<@${target.id}> is now a **manager** of **${pool.name}**.`, Colors.SUCCESS)] });
+    }
 
-  if (action === 'remove') {
-    if (pool.owner_user_id !== userId) return interaction.editReply({ embeds: [buildPoolEmbed('Owner Only', 'Only the pool owner can remove members.', Colors.ERROR)] });
-    if (target.id === pool.owner_user_id) return interaction.editReply({ embeds: [buildPoolEmbed('Cannot Remove', 'Cannot remove the pool owner.', Colors.ERROR)] });
-    await storageLayer.removePoolMember(poolId, target.id, userId);
-    return interaction.editReply({ embeds: [buildPoolEmbed('Member Removed', `<@${target.id}> has been removed from **${pool.name}**.`, Colors.SUCCESS)] });
+    if (action === 'remove') {
+      if (pool.owner_user_id !== userId) return interaction.editReply({ embeds: [buildPoolEmbed('Owner Only', 'Only the pool owner can remove members.', Colors.ERROR)] });
+      if (target.id === pool.owner_user_id) return interaction.editReply({ embeds: [buildPoolEmbed('Cannot Remove', 'Cannot remove the pool owner.', Colors.ERROR)] });
+      await storageLayer.removePoolMember(poolId, target.id, userId);
+      return interaction.editReply({ embeds: [buildPoolEmbed('Member Removed', `<@${target.id}> has been removed from **${pool.name}**.`, Colors.SUCCESS)] });
+    }
+  } catch (err) {
+    return interaction.editReply({ embeds: [buildPoolEmbed('Error', err.message || 'Unexpected error.', Colors.ERROR)] });
   }
 }
 
@@ -2817,4 +2897,65 @@ export async function handleContribBulkButton(interaction) {
   }
 
   return false;
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// /pools help — inline guide for new users
+// ──────────────────────────────────────────────────────────────────────────
+async function handleHelp(interaction) {
+  const pages = [
+    new EmbedBuilder()
+      .setTitle('\uD83C\uDFB8 Agent Pools — Quick Start Guide')
+      .setColor(0x5865F2)
+      .setDescription(
+        'Agent pools are groups of Discord bot tokens that power music playback and assistant features in your server.\n\n' +
+        'Pools are owned and managed by community members. You can use a public pool or create your own.'
+      )
+      .addFields(
+        { name: '\uD83D\uDE80 Use a Public Pool (easiest)', value:
+          '1. `/pools list` — browse available pools\n' +
+          '2. `/pools select pool:<id>` — attach a pool to your server\n' +
+          '3. `/agents deploy` — deploy an agent to your voice channel', inline: false },
+        { name: '\uD83D\uDD11 Create Your Own Pool', value:
+          '1. `/pools create name:<name>` — create a pool\n' +
+          '2. `/agents add_token` — contribute your own Discord bot token\n' +
+          '3. `/agents deploy` — start using your pool', inline: false },
+        { name: '\uD83E\uDD1D Contribute to a Pool', value:
+          '1. `/pools public` — view pools accepting contributions\n' +
+          '2. `/agents add_token pool:<id>` — submit a bot token\n' +
+          '3. Wait for the pool owner to approve your contribution', inline: false },
+      )
+      .setFooter({ text: 'Page 1/3 — Workflows' }),
+
+    new EmbedBuilder()
+      .setTitle('\uD83D\uDD12 Security Promises')
+      .setColor(0x57F287)
+      .addFields(
+        { name: 'Token Storage', value: 'Bot tokens are AES-256-GCM encrypted at rest using a per-pool HKDF-derived key. The plaintext token is never logged or shown in embeds — only a masked version like `BOT_***...***_xyz` is ever displayed.', inline: false },
+        { name: 'Token Revocation', value: 'When you revoke a token (`/agents revoke`), the ciphertext is **immediately nulled in the database** — not just status-flagged. Revoked tokens cannot be recovered or reactivated.', inline: false },
+        { name: 'Pool Ownership', value: 'Only the pool owner and appointed managers can approve contributions, change settings, or transfer ownership. Admins of other servers **cannot** manage your pool.', inline: false },
+        { name: 'Capacity Limits', value: 'Each pool holds a maximum of 49 agents (recommended: 10 active). Going over capacity is blocked at every insertion and activation point.', inline: false },
+      )
+      .setFooter({ text: 'Page 2/3 — Security' }),
+
+    new EmbedBuilder()
+      .setTitle('\u2699\uFE0F Pool Commands Reference')
+      .setColor(0xFEE75C)
+      .addFields(
+        { name: '\uD83D\uDCCB Discovery & Stats', value:
+          '`/pools list` · `/pools discover` · `/pools leaderboard` · `/pools stats`', inline: false },
+        { name: '\uD83D\uDD27 Pool Management', value:
+          '`/pools create` · `/pools view` · `/pools settings` · `/pools profile` · `/pools delete` · `/pools transfer`', inline: false },
+        { name: '\uD83E\uDD1D Contributions', value:
+          '`/pools contributions` · `/pools approve` · `/pools reject`', inline: false },
+        { name: '\uD83C\uDF10 Multi-Pool & Alliances', value:
+          '`/pools secondary` · `/pools ally` · `/pools specialty` · `/pools members`', inline: false },
+        { name: '\uD83E\uDD16 Agents', value:
+          '`/agents deploy` · `/agents list` · `/agents add_token` · `/agents revoke` · `/agents my_agents`', inline: false },
+      )
+      .setFooter({ text: 'Page 3/3 — Commands' }),
+  ];
+
+  // Send all 3 pages as separate embeds in one reply
+  await interaction.reply({ embeds: pages, flags: MessageFlags.Ephemeral });
 }

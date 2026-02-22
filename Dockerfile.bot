@@ -37,12 +37,13 @@ RUN npm ci --no-optional \
 # Copy application
 COPY . .
 
-# Create non-root runtime user
+# Create non-root runtime user and fix ownership
+# Chown only src/scripts/migrations (not node_modules) for speed
 RUN set -eux; \
     addgroup --system app || true; \
     adduser --system --ingroup app app || true; \
-
-    id -u app >/dev/null 2>&1 && chown -R app:app /app || true
+    id -u app >/dev/null 2>&1 && \
+      chown -R app:app /app/src /app/scripts /app/migrations /app/package*.json /app/ecosystem.config.cjs || true
 
 RUN mkdir -p /app/.npm/_logs && chown -R app:app /app/.npm || true
 USER app

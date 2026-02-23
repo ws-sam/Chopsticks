@@ -11,9 +11,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and
 ### Added
 - `/pools help` — 3-page inline guide covering workflows, security promises, and full command reference
 - `/statschannel set/clear/list` — auto-updating voice channel stats (members, online, bots, channels, roles, boosts); refreshes every 10 min
-- `/profilecard` — canvas-rendered profile image card (avatar, level bar, XP, economy, rarity breakdown, achievement badges)
+- `/profilecard` — canvas-rendered profile image card (avatar ring, level bar, XP, economy, rarity breakdown, achievement emoji badges)
 - `/profile` achievements section — up to 8 most-recent guild achievements surfaced directly in the text embed
-- OpenTelemetry auto-instrumentation — every `pool.query` call is now wrapped in an OTel span (`db.SELECT`, `db.INSERT`, etc.) with `db.statement` attribute; zero per-callsite changes required
+- OpenTelemetry auto-instrumentation — every `pool.query` call now wrapped in an OTel span (`db.SELECT`, `db.INSERT`, etc.) with `db.statement` attribute; zero per-callsite changes required
+- Smart-queue music autoplay wired — `queueEnd` event in `agentLavalink.js` calls `buildAutoNextSuggestion` via Last.fm when autoplay is enabled; graceful no-op when key absent
+- `npm run loadtest` — autocannon load test script targeting `/health` and `/api/internal/status`; exits non-zero if p99 > 500ms
+
+### Fixed
+- Complete `console.*` → `logger.*` sweep: `lavalink/client.js`, `audiobook/player.js`, `events/messageReactionAdd.js`, `events/messageReactionRemove.js`, `events/voiceStateUpdate.js`, `dev-dashboard/server.js` — zero `console.*` calls remain in application code
+- `agentLavalink.js` had undefined `logger` reference — added import
 
 ### Changed
 - License changed from modified MIT to standard MIT (OSI-compliant)

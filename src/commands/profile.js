@@ -6,6 +6,7 @@ import { progressToNextLevel } from "../game/progression.js";
 import { Colors, replyError } from "../utils/discordOutput.js";
 import { getGlobalCommandUsage, getInventorySummary, getRecentEconomyActivity, getUserCommandUsage } from "../profile/usage.js";
 import { getUserProfilePrivacy, updateUserProfilePrivacy } from "../profile/privacy.js";
+import { getUserAchievements } from "../utils/storage_pg.js";
 import { botLogger } from "../utils/modernLogger.js";
 
 function bar(pct, len = 12) {
@@ -150,6 +151,12 @@ export default {
         keys.push("lastEconomy");
       }
 
+      // Achievements — guild-scoped, always load when in a guild
+      if (interaction.guildId) {
+        tasks.push(getUserAchievements(targetUser.id, interaction.guildId).catch(() => []));
+        keys.push("achievements");
+      }
+
       const values = await Promise.all(tasks);
       const data = {};
       for (let i = 0; i < keys.length; i += 1) {
@@ -256,6 +263,18 @@ export default {
         });
       } else {
         embed.addFields({ name: "Activity", value: "Hidden by user preference.", inline: false });
+      }
+
+      // Achievements section
+      if (interaction.guildId && Array.isArray(data.achievements) && data.achievements.length > 0) {
+        const achList = data.achievements.slice(0, 8); // show up to 8 most recent
+        const achText = achList.map(a => `${a.emoji || "🏅"} **${a.name}** — ${a.description ?? ""}`).join("\n");
+        const moreCount = data.achievements.length - achList.length;
+        embed.addFields({
+          name: `🏆 Achievements (${data.achievements.length})`,
+          value: achText + (moreCount > 0 ? `\n*… and ${moreCount} more*` : ""),
+          inline: false,
+        });
       }
 
       if (!isSelfView) {

@@ -1250,3 +1250,11 @@ setInterval(async () => {
     }
   } catch {}
 }, 60 * 60 * 1000).unref(); // every hour
+
+// Stats channels — refresh channel names every 10 minutes
+setInterval(async () => {
+  try {
+    const { refreshStatsChannels } = await import("./commands/statschannel.js");
+    await refreshStatsChannels(client);
+  } catch {}
+}, 10 * 60 * 1000).unref();

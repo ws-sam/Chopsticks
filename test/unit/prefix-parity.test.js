@@ -29,29 +29,33 @@ describe("Prefix Parity — applyMetaPerms", () => {
   });
 
   it("blocks guild-only command in DM", async () => {
-    const result = await checkMetaPerms(makeMessage({ guild: false }), "ban");
+    // mod is guildOnly: true
+    const result = await checkMetaPerms(makeMessage({ guild: false }), "mod");
     assert.strictEqual(result.ok, false);
     assert.ok(result.reason.includes("server"));
   });
 
   it("allows user with correct permission", async () => {
-    const msg = makeMessage({ member: makeMember([PermissionFlagsBits.BanMembers]) });
-    const result = await checkMetaPerms(msg, "ban");
+    // lockdown requires ManageChannels
+    const msg = makeMessage({ member: makeMember([PermissionFlagsBits.ManageChannels]) });
+    const result = await checkMetaPerms(msg, "lockdown");
     assert.strictEqual(result.ok, true);
   });
 
   it("blocks user missing required permission", async () => {
+    // lockdown requires ManageChannels, member has none
     const msg = makeMessage({ member: makeMember([]) });
-    const result = await checkMetaPerms(msg, "ban");
+    const result = await checkMetaPerms(msg, "lockdown");
     assert.strictEqual(result.ok, false);
     assert.ok(result.missingPerms.length > 0);
   });
 
   it("caches meta on second call (no re-import)", async () => {
+    // lockdown requires ManageChannels — member has BanMembers only, should block
     const msg = makeMessage({ member: makeMember([PermissionFlagsBits.BanMembers]) });
-    await checkMetaPerms(msg, "kick"); // prime cache
-    const result = await checkMetaPerms(msg, "kick");
-    assert.strictEqual(result.ok, false); // kick needs KickMembers not BanMembers
+    await checkMetaPerms(msg, "lockdown"); // prime cache
+    const result = await checkMetaPerms(msg, "lockdown");
+    assert.strictEqual(result.ok, false); // ManageChannels not in perms
   });
 
   it("allows command for nonexistent command file (graceful)", async () => {

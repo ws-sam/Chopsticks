@@ -52,6 +52,10 @@ function makeInteraction({ guildId = "guild1", userId = "1234567890123456789", s
         has: (perm) => memberPerms !== null ? memberPerms : true
       }
     },
+    // Discord.js exposes memberPermissions directly on the interaction
+    memberPermissions: {
+      has: (perm) => memberPerms !== null ? memberPerms : true
+    },
     channelId: "channel1",
     options: {
       getSubcommand: () => subcommand,

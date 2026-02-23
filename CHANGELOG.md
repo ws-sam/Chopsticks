@@ -10,6 +10,21 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and
 
 ---
 
+## [1.5.1] — feat/harden-and-polish (Cycles 16–18)
+
+### Added
+- **Cycle 16 — 50 unit tests** for fun commands (`test/unit/fun-commands-cycle1012.test.js`): roasts.json (50+ entries, no dups), /roast (options, vibes), wyr.json (50+ pairs), /wouldyourather, /compliment (options, styles), /ship deterministic score (4 sub-tests: same=same, commutative, 0–100 range, low collision), /battle (guildOnly, wager min/max), riddles.json (75+ entries, q/a fields), /riddle (reveal boolean), /imagine (prompt maxLength, 6 styles). Total: 935 passing.
+- **`/8ball` upgrade (Cycle 17):** Expanded from 10 to 20 canonical answers (10 positive/5 neutral/5 negative), colour-coded embeds (green/yellow/red), proper `sanitizeString`, no longer guild-only.
+- **`/truthordare` (Cycle 17):** 50 prompts (15 mild truths, 10 spicy truths, 15 mild dares, 10 spicy dares). Type choice (truth/dare/random) + intensity choice (mild/spicy).
+- **`/quote` (Cycle 17):** 4 categories (inspirational/funny/programming/random). Live ZenQuotes API for inspirational with 10-entry local fallback per category.
+- **`/meme` (Cycle 17):** Live meme-api.com fetch with NSFW filter, 5 subreddit choices + random, per-channel 30s rate limit, 5-entry fallback bank.
+- **`docs/COMMANDS.md` (Cycle 18):** Complete command reference — all slash commands (grouped by category), all 64 prefix commands (grouped by category), rate limit table, operator-only command list.
+
+### Changed
+- Global slash commands: ~104 → ~107 (3 below Discord's 110 hard limit)
+
+---
+
 ## [1.5.0] — feat/harden-and-polish
 
 ### Added — Phase 1: Hardening (Cycles 1–4)

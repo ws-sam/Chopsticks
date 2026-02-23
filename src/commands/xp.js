@@ -9,6 +9,7 @@ import {
   Colors,
 } from 'discord.js';
 import { upsertGuildXpConfig, getGuildXpConfig } from '../utils/storage.js';
+import { withTimeout } from '../utils/interactionTimeout.js';
 
 export const meta = {
   name: 'xp',
@@ -123,95 +124,97 @@ export async function execute(interaction) {
 
     await interaction.deferReply({ ephemeral: true });
 
-    if (sub === 'view') {
-      const cfg = await getGuildXpConfig(interaction.guildId) || {};
-      const def = { xp_per_message: 5, xp_per_vc_minute: 2, xp_per_work: 40, xp_per_gather: 30, xp_per_fight_win: 50, xp_per_trivia_win: 60, xp_per_daily: 80, xp_per_command: 1, xp_per_agent_action: 20, message_xp_cooldown_s: 60, xp_multiplier: 1.0 };
-      const c = { ...def, ...cfg };
-      const embed = new EmbedBuilder()
-        .setTitle('⚡ Guild XP Configuration')
-        .setColor(c.enabled === false ? Colors.Red : Colors.Yellow)
-        .addFields(
-          { name: 'Status', value: c.enabled === false ? '🔴 Disabled' : '🟢 Enabled', inline: true },
-          { name: 'Multiplier', value: `${Number(c.xp_multiplier || 1.0).toFixed(1)}×`, inline: true },
-          { name: 'Msg Cooldown', value: `${c.message_xp_cooldown_s}s`, inline: true },
-          { name: '💬 Message XP', value: String(c.xp_per_message), inline: true },
-          { name: '🎙️ VC/min XP', value: String(c.xp_per_vc_minute), inline: true },
-          { name: '💼 Work XP', value: String(c.xp_per_work), inline: true },
-          { name: '⛏️ Gather XP', value: String(c.xp_per_gather), inline: true },
-          { name: '⚔️ Fight Win XP', value: String(c.xp_per_fight_win), inline: true },
-          { name: '🧠 Trivia Win XP', value: String(c.xp_per_trivia_win), inline: true },
-          { name: '📅 Daily XP', value: String(c.xp_per_daily), inline: true },
-          { name: '⌨️ Command XP', value: String(c.xp_per_command), inline: true },
-          { name: '🤖 Agent Action XP', value: String(c.xp_per_agent_action), inline: true },
-          { name: '📢 Levelup Channel', value: c.levelup_channel_id ? `<#${c.levelup_channel_id}>` : 'Not set', inline: true },
-          { name: '🔄 Sync Global XP', value: c.sync_global_xp === false ? 'Off' : 'On', inline: true },
-        )
-        .setFooter({ text: 'Use /xp config set to adjust individual values, or /xp config preset for quick setup.' });
-      await interaction.editReply({ embeds: [embed] });
-      return;
-    }
+    await withTimeout(interaction, async () => {
+      if (sub === 'view') {
+        const cfg = await getGuildXpConfig(interaction.guildId) || {};
+        const def = { xp_per_message: 5, xp_per_vc_minute: 2, xp_per_work: 40, xp_per_gather: 30, xp_per_fight_win: 50, xp_per_trivia_win: 60, xp_per_daily: 80, xp_per_command: 1, xp_per_agent_action: 20, message_xp_cooldown_s: 60, xp_multiplier: 1.0 };
+        const c = { ...def, ...cfg };
+        const embed = new EmbedBuilder()
+          .setTitle('⚡ Guild XP Configuration')
+          .setColor(c.enabled === false ? Colors.Red : Colors.Yellow)
+          .addFields(
+            { name: 'Status', value: c.enabled === false ? '🔴 Disabled' : '🟢 Enabled', inline: true },
+            { name: 'Multiplier', value: `${Number(c.xp_multiplier || 1.0).toFixed(1)}×`, inline: true },
+            { name: 'Msg Cooldown', value: `${c.message_xp_cooldown_s}s`, inline: true },
+            { name: '💬 Message XP', value: String(c.xp_per_message), inline: true },
+            { name: '🎙️ VC/min XP', value: String(c.xp_per_vc_minute), inline: true },
+            { name: '💼 Work XP', value: String(c.xp_per_work), inline: true },
+            { name: '⛏️ Gather XP', value: String(c.xp_per_gather), inline: true },
+            { name: '⚔️ Fight Win XP', value: String(c.xp_per_fight_win), inline: true },
+            { name: '🧠 Trivia Win XP', value: String(c.xp_per_trivia_win), inline: true },
+            { name: '📅 Daily XP', value: String(c.xp_per_daily), inline: true },
+            { name: '⌨️ Command XP', value: String(c.xp_per_command), inline: true },
+            { name: '🤖 Agent Action XP', value: String(c.xp_per_agent_action), inline: true },
+            { name: '📢 Levelup Channel', value: c.levelup_channel_id ? `<#${c.levelup_channel_id}>` : 'Not set', inline: true },
+            { name: '🔄 Sync Global XP', value: c.sync_global_xp === false ? 'Off' : 'On', inline: true },
+          )
+          .setFooter({ text: 'Use /xp config set to adjust individual values, or /xp config preset for quick setup.' });
+        await interaction.editReply({ embeds: [embed] });
+        return;
+      }
 
-    if (sub === 'toggle') {
-      const on = interaction.options.getString('state') === 'on';
-      await upsertGuildXpConfig(interaction.guildId, { enabled: on });
-      await interaction.editReply({ content: `✅ Guild leveling is now **${on ? 'enabled' : 'disabled'}**.` });
-      return;
-    }
+      if (sub === 'toggle') {
+        const on = interaction.options.getString('state') === 'on';
+        await upsertGuildXpConfig(interaction.guildId, { enabled: on });
+        await interaction.editReply({ content: `✅ Guild leveling is now **${on ? 'enabled' : 'disabled'}**.` });
+        return;
+      }
 
-    if (sub === 'preset') {
-      const preset = interaction.options.getString('preset');
-      const vals = PRESETS[preset];
-      if (!vals) { await interaction.editReply({ content: '❌ Unknown preset.' }); return; }
-      await upsertGuildXpConfig(interaction.guildId, vals);
-      const labels = { relaxed: '🌿 Relaxed', balanced: '⚖️ Balanced', grind: '🔥 Grind' };
-      await interaction.editReply({ content: `✅ Applied **${labels[preset]}** XP preset.` });
-      return;
-    }
+      if (sub === 'preset') {
+        const preset = interaction.options.getString('preset');
+        const vals = PRESETS[preset];
+        if (!vals) { await interaction.editReply({ content: '❌ Unknown preset.' }); return; }
+        await upsertGuildXpConfig(interaction.guildId, vals);
+        const labels = { relaxed: '🌿 Relaxed', balanced: '⚖️ Balanced', grind: '🔥 Grind' };
+        await interaction.editReply({ content: `✅ Applied **${labels[preset]}** XP preset.` });
+        return;
+      }
 
-    if (sub === 'set') {
-      const source = interaction.options.getString('source');
-      const amount = interaction.options.getInteger('amount');
-      const field = SOURCE_FIELD_MAP[source];
-      if (!field) { await interaction.editReply({ content: '❌ Unknown source.' }); return; }
-      await upsertGuildXpConfig(interaction.guildId, { [field]: amount });
-      await interaction.editReply({ content: `✅ Set **${source}** XP to **${amount}**.` });
-      return;
-    }
+      if (sub === 'set') {
+        const source = interaction.options.getString('source');
+        const amount = interaction.options.getInteger('amount');
+        const field = SOURCE_FIELD_MAP[source];
+        if (!field) { await interaction.editReply({ content: '❌ Unknown source.' }); return; }
+        await upsertGuildXpConfig(interaction.guildId, { [field]: amount });
+        await interaction.editReply({ content: `✅ Set **${source}** XP to **${amount}**.` });
+        return;
+      }
 
-    if (sub === 'multiplier') {
-      const val = Math.round(interaction.options.getNumber('value') * 10) / 10;
-      await upsertGuildXpConfig(interaction.guildId, { xp_multiplier: val });
-      await interaction.editReply({ content: `✅ Global XP multiplier set to **${val.toFixed(1)}×**.` });
-      return;
-    }
+      if (sub === 'multiplier') {
+        const val = Math.round(interaction.options.getNumber('value') * 10) / 10;
+        await upsertGuildXpConfig(interaction.guildId, { xp_multiplier: val });
+        await interaction.editReply({ content: `✅ Global XP multiplier set to **${val.toFixed(1)}×**.` });
+        return;
+      }
 
-    if (sub === 'cooldown') {
-      const secs = interaction.options.getInteger('seconds');
-      await upsertGuildXpConfig(interaction.guildId, { message_xp_cooldown_s: secs });
-      await interaction.editReply({ content: `✅ Message XP cooldown set to **${secs}s**.` });
-      return;
-    }
+      if (sub === 'cooldown') {
+        const secs = interaction.options.getInteger('seconds');
+        await upsertGuildXpConfig(interaction.guildId, { message_xp_cooldown_s: secs });
+        await interaction.editReply({ content: `✅ Message XP cooldown set to **${secs}s**.` });
+        return;
+      }
 
-    if (sub === 'levelup_channel') {
-      const ch = interaction.options.getChannel('channel');
-      await upsertGuildXpConfig(interaction.guildId, { levelup_channel_id: ch?.id || null });
-      await interaction.editReply({ content: ch ? `✅ Level-up announcements will go to ${ch}.` : '✅ Level-up channel cleared.' });
-      return;
-    }
+      if (sub === 'levelup_channel') {
+        const ch = interaction.options.getChannel('channel');
+        await upsertGuildXpConfig(interaction.guildId, { levelup_channel_id: ch?.id || null });
+        await interaction.editReply({ content: ch ? `✅ Level-up announcements will go to ${ch}.` : '✅ Level-up channel cleared.' });
+        return;
+      }
 
-    if (sub === 'levelup_message') {
-      const msg = interaction.options.getString('message');
-      await upsertGuildXpConfig(interaction.guildId, { levelup_message: msg });
-      await interaction.editReply({ content: `✅ Level-up message set to:\n> ${msg}` });
-      return;
-    }
+      if (sub === 'levelup_message') {
+        const msg = interaction.options.getString('message');
+        await upsertGuildXpConfig(interaction.guildId, { levelup_message: msg });
+        await interaction.editReply({ content: `✅ Level-up message set to:\n> ${msg}` });
+        return;
+      }
 
-    if (sub === 'sync') {
-      const on = interaction.options.getString('state') === 'on';
-      await upsertGuildXpConfig(interaction.guildId, { sync_global_xp: on });
-      await interaction.editReply({ content: `✅ Global XP sync is now **${on ? 'on' : 'off'}**.` });
-      return;
-    }
+      if (sub === 'sync') {
+        const on = interaction.options.getString('state') === 'on';
+        await upsertGuildXpConfig(interaction.guildId, { sync_global_xp: on });
+        await interaction.editReply({ content: `✅ Global XP sync is now **${on ? 'on' : 'off'}**.` });
+        return;
+      }
+    }, { label: "xp" });
   }
 
   await interaction.reply({ content: '❌ Unknown subcommand.', ephemeral: true });

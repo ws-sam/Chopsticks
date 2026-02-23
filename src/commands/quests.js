@@ -9,6 +9,7 @@ import {
 import { Colors, replyError } from "../utils/discordOutput.js";
 import { claimQuestRewards, getDailyQuests } from "../game/quests.js";
 import { botLogger } from "../utils/modernLogger.js";
+import { withTimeout } from "../utils/interactionTimeout.js";
 
 const QUEST_UI_PREFIX = "questui";
 
@@ -81,14 +82,17 @@ function buildComponents(userId) {
 
 export async function execute(interaction) {
   await interaction.deferReply({ ephemeral: true });
-  try {
-    const embed = await buildQuestsEmbed(interaction.user.id);
-    const components = buildComponents(interaction.user.id);
-    await interaction.editReply({ embeds: [embed], components });
-  } catch (err) {
-    botLogger.error({ err: err }, "[quests] error:");
-    await replyError(interaction, "Quests Failed", "Couldn't load quests right now.", true);
-  }
+
+  await withTimeout(interaction, async () => {
+    try {
+      const embed = await buildQuestsEmbed(interaction.user.id);
+      const components = buildComponents(interaction.user.id);
+      await interaction.editReply({ embeds: [embed], components });
+    } catch (err) {
+      botLogger.error({ err: err }, "[quests] error:");
+      await replyError(interaction, "Quests Failed", "Couldn't load quests right now.", true);
+    }
+  }, { label: "quests" });
 }
 
 export default { data, execute };

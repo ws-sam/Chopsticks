@@ -1,5 +1,6 @@
 import { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } from "discord.js";
 import { botLogger } from "../utils/modernLogger.js";
+import { withTimeout } from "../utils/interactionTimeout.js";
 
 export const meta = {
   category: "utility",
@@ -72,42 +73,44 @@ export async function execute(interaction) {
 
   await interaction.deferReply({ ephemeral: true });
 
-  const colorInt = parseInt(hex.slice(1), 16);
+  await withTimeout(interaction, async () => {
+    const colorInt = parseInt(hex.slice(1), 16);
 
-  try {
-    let role = guild.roles.cache.find(r => r.name === roleName);
+    try {
+      let role = guild.roles.cache.find(r => r.name === roleName);
 
-    if (role) {
-      // Update existing role color
-      await role.edit({ color: colorInt, reason: "colorrole set" });
-    } else {
-      // Create new color role below the bot's highest role
-      const botHighestPos = me.roles.highest.position;
-      role = await guild.roles.create({
-        name: roleName,
-        color: colorInt,
-        reason: `colorrole for ${interaction.user.tag}`,
-        position: Math.max(1, botHighestPos - 1),
-        hoist: false,
-        mentionable: false,
-      });
+      if (role) {
+        // Update existing role color
+        await role.edit({ color: colorInt, reason: "colorrole set" });
+      } else {
+        // Create new color role below the bot's highest role
+        const botHighestPos = me.roles.highest.position;
+        role = await guild.roles.create({
+          name: roleName,
+          color: colorInt,
+          reason: `colorrole for ${interaction.user.tag}`,
+          position: Math.max(1, botHighestPos - 1),
+          hoist: false,
+          mentionable: false,
+        });
+      }
+
+      // Assign to member if not already present
+      if (!member.roles.cache.has(role.id)) {
+        await member.roles.add(role);
+      }
+
+      const embed = new EmbedBuilder()
+        .setTitle("🎨 Color Role Set")
+        .setDescription(`Your color is now **${hex}**`)
+        .setColor(colorInt)
+        .setFooter({ text: "Use /colorrole clear to remove it" })
+        .setTimestamp();
+
+      return interaction.editReply({ embeds: [embed] });
+    } catch (err) {
+      botLogger.warn({ err }, "[colorrole] set failed");
+      return interaction.editReply({ content: "❌ Failed to set color role. Check my role position and permissions." });
     }
-
-    // Assign to member if not already present
-    if (!member.roles.cache.has(role.id)) {
-      await member.roles.add(role);
-    }
-
-    const embed = new EmbedBuilder()
-      .setTitle("🎨 Color Role Set")
-      .setDescription(`Your color is now **${hex}**`)
-      .setColor(colorInt)
-      .setFooter({ text: "Use /colorrole clear to remove it" })
-      .setTimestamp();
-
-    return interaction.editReply({ embeds: [embed] });
-  } catch (err) {
-    botLogger.warn({ err }, "[colorrole] set failed");
-    return interaction.editReply({ content: "❌ Failed to set color role. Check my role position and permissions." });
-  }
+  }, { label: "colorrole" });
 }

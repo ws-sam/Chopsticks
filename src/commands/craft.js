@@ -10,6 +10,7 @@ import {
 import itemsData from "../economy/items.json" with { type: "json" };
 import { Colors, replyError } from "../utils/discordOutput.js";
 import { listRecipes, craftRecipe, getRecipe } from "../game/crafting.js";
+import { withTimeout } from "../utils/interactionTimeout.js";
 
 const UI_PREFIX = "craftui";
 
@@ -112,46 +113,49 @@ export async function execute(interaction) {
   const sub = interaction.options.getSubcommand();
   await interaction.deferReply({ ephemeral: true });
 
-  if (sub === "bench") {
-    const recipes = listRecipes();
-    const first = recipes[0]?.id || "energy_drink";
-    const embed = buildEmbed(first);
-    const components = buildComponents(interaction.user.id, first);
-    await interaction.editReply({ embeds: [embed], components });
-    return;
-  }
+  await withTimeout(interaction, async () => {
 
-  if (sub === "make") {
-    const recipeId = interaction.options.getString("recipe", true);
-    const times = interaction.options.getInteger("times") || 1;
-    const res = await craftRecipe(interaction.user.id, recipeId, times);
-    if (!res.ok) {
-      if (res.reason === "insufficient") {
-        await replyError(
-          interaction,
-          "Insufficient Materials",
-          `Need **${res.need}x** \`${res.itemId}\`, you have **${res.have}x**.\n\nTip: gather with \`/gather\` or work with \`/work\`.`,
-          true
-        );
-        return;
-      }
-      await replyError(interaction, "Craft Failed", "Could not craft that recipe.", true);
+    if (sub === "bench") {
+      const recipes = listRecipes();
+      const first = recipes[0]?.id || "energy_drink";
+      const embed = buildEmbed(first);
+      const components = buildComponents(interaction.user.id, first);
+      await interaction.editReply({ embeds: [embed], components });
       return;
     }
 
-    const embed = new EmbedBuilder()
-      .setTitle("Craft Complete")
-      .setColor(Colors.SUCCESS)
-      .setDescription(`Crafted **${res.times}x** **${res.recipe.name}** -> \`${res.recipe.output.itemId}\` ×${res.outQty}`)
-      .setTimestamp();
-    if (res.xpRes?.applied) {
-      embed.addFields({ name: "XP", value: `${res.xpRes.applied} XP${res.xpRes.leveledUp ? ` • ${res.xpRes.fromLevel} -> ${res.xpRes.toLevel}` : ""}`, inline: false });
-    }
-    await interaction.editReply({ embeds: [embed] });
-    return;
-  }
+    if (sub === "make") {
+      const recipeId = interaction.options.getString("recipe", true);
+      const times = interaction.options.getInteger("times") || 1;
+      const res = await craftRecipe(interaction.user.id, recipeId, times);
+      if (!res.ok) {
+        if (res.reason === "insufficient") {
+          await replyError(
+            interaction,
+            "Insufficient Materials",
+            `Need **${res.need}x** \`${res.itemId}\`, you have **${res.have}x**.\n\nTip: gather with \`/gather\` or work with \`/work\`.`,
+            true
+          );
+          return;
+        }
+        await replyError(interaction, "Craft Failed", "Could not craft that recipe.", true);
+        return;
+      }
 
-  await replyError(interaction, "Unknown Action", "This craft action is not available.", true);
+      const embed = new EmbedBuilder()
+        .setTitle("Craft Complete")
+        .setColor(Colors.SUCCESS)
+        .setDescription(`Crafted **${res.times}x** **${res.recipe.name}** -> \`${res.recipe.output.itemId}\` ×${res.outQty}`)
+        .setTimestamp();
+      if (res.xpRes?.applied) {
+        embed.addFields({ name: "XP", value: `${res.xpRes.applied} XP${res.xpRes.leveledUp ? ` • ${res.xpRes.fromLevel} -> ${res.xpRes.toLevel}` : ""}`, inline: false });
+      }
+      await interaction.editReply({ embeds: [embed] });
+      return;
+    }
+
+    await replyError(interaction, "Unknown Action", "This craft action is not available.", true);
+  }, { label: "craft" });
 }
 
 export default { data, execute };

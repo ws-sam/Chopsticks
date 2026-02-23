@@ -7,6 +7,7 @@ import { getUserAchievements } from "../utils/storage_pg.js";
 import { getCollectionStats } from "../economy/collections.js";
 import { botLogger } from "../utils/modernLogger.js";
 import { Colors } from "../utils/discordOutput.js";
+import { withTimeout } from "../utils/interactionTimeout.js";
 
 export const meta = {
   category: "profile",
@@ -224,44 +225,46 @@ export async function execute(interaction) {
   const targetUser = interaction.options.getUser("user") ?? interaction.user;
   await interaction.deferReply();
 
-  try {
-    const [profile, wallet, collection, achievements] = await Promise.all([
-      getGameProfile(targetUser.id),
-      getWallet(targetUser.id),
-      getCollectionStats(targetUser.id),
-      interaction.guildId
-        ? getUserAchievements(targetUser.id, interaction.guildId).catch(() => [])
-        : Promise.resolve([]),
-    ]);
-
-    let buffer = null;
+  await withTimeout(interaction, async () => {
     try {
-      buffer = await buildCard(targetUser, profile, wallet, collection, achievements);
-    } catch (canvasErr) {
-      botLogger.warn({ err: canvasErr }, "[profilecard] canvas render failed");
+      const [profile, wallet, collection, achievements] = await Promise.all([
+        getGameProfile(targetUser.id),
+        getWallet(targetUser.id),
+        getCollectionStats(targetUser.id),
+        interaction.guildId
+          ? getUserAchievements(targetUser.id, interaction.guildId).catch(() => [])
+          : Promise.resolve([]),
+      ]);
+
+      let buffer = null;
+      try {
+        buffer = await buildCard(targetUser, profile, wallet, collection, achievements);
+      } catch (canvasErr) {
+        botLogger.warn({ err: canvasErr }, "[profilecard] canvas render failed");
+      }
+
+      if (!buffer) {
+        return interaction.editReply({ content: "⚠️ Could not render profile card right now." });
+      }
+
+      const attachment = new AttachmentBuilder(buffer, { name: "profilecard.png" });
+      const prog = progressToNextLevel(profile.xp);
+      const embed = new EmbedBuilder()
+        .setColor(Colors.PRIMARY)
+        .setTitle(`${targetUser.username}'s Profile Card`)
+        .setImage("attachment://profilecard.png")
+        .addFields(
+          { name: "Level", value: `**${prog.level}**`, inline: true },
+          { name: "XP", value: `${profile.xp.toLocaleString()}`, inline: true },
+          { name: "Wallet", value: `${wallet.balance.toLocaleString()} cr`, inline: true },
+        )
+        .setFooter({ text: "Use /profile for full stats • /profilecard for the image" })
+        .setTimestamp();
+
+      await interaction.editReply({ embeds: [embed], files: [attachment] });
+    } catch (err) {
+      botLogger.error({ err }, "[profilecard] error");
+      await interaction.editReply({ content: "❌ Failed to generate profile card.", flags: MessageFlags.Ephemeral });
     }
-
-    if (!buffer) {
-      return interaction.editReply({ content: "⚠️ Could not render profile card right now." });
-    }
-
-    const attachment = new AttachmentBuilder(buffer, { name: "profilecard.png" });
-    const prog = progressToNextLevel(profile.xp);
-    const embed = new EmbedBuilder()
-      .setColor(Colors.PRIMARY)
-      .setTitle(`${targetUser.username}'s Profile Card`)
-      .setImage("attachment://profilecard.png")
-      .addFields(
-        { name: "Level", value: `**${prog.level}**`, inline: true },
-        { name: "XP", value: `${profile.xp.toLocaleString()}`, inline: true },
-        { name: "Wallet", value: `${wallet.balance.toLocaleString()} cr`, inline: true },
-      )
-      .setFooter({ text: "Use /profile for full stats • /profilecard for the image" })
-      .setTimestamp();
-
-    await interaction.editReply({ embeds: [embed], files: [attachment] });
-  } catch (err) {
-    botLogger.error({ err }, "[profilecard] error");
-    await interaction.editReply({ content: "❌ Failed to generate profile card.", flags: MessageFlags.Ephemeral });
-  }
+  }, { label: "profilecard" });
 }

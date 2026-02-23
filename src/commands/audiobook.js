@@ -26,6 +26,7 @@ import {
   getVoicePrefs, saveVoicePrefs,
   addBookmark, getBookmarks,
 } from '../audiobook/session.js';
+import { withTimeout } from "../utils/interactionTimeout.js";
 
 export const meta = {
   name: 'audiobook',
@@ -120,85 +121,89 @@ export async function execute(interaction) {
 
 async function handleStart(interaction, db) {
   await interaction.deferReply({ ephemeral: true });
-  const { user, guild, channel } = interaction;
+  await withTimeout(interaction, async () => {
+    const { user, guild, channel } = interaction;
 
-  // Check for existing open thread
-  for (const [tid, info] of audiobookThreads) {
-    if (info.userId === user.id && info.guildId === guild.id) {
-      const existing = guild.channels.cache.get(tid);
-      if (existing) {
-        return interaction.editReply({
-          content: `📖 You already have a book-drop thread open: <#${tid}>\nDrop files there or use **/audiobook library** to manage your books.`,
-        });
+    // Check for existing open thread
+    for (const [tid, info] of audiobookThreads) {
+      if (info.userId === user.id && info.guildId === guild.id) {
+        const existing = guild.channels.cache.get(tid);
+        if (existing) {
+          return interaction.editReply({
+            content: `📖 You already have a book-drop thread open: <#${tid}>\nDrop files there or use **/audiobook library** to manage your books.`,
+          });
+        }
+        audiobookThreads.delete(tid);
       }
-      audiobookThreads.delete(tid);
     }
-  }
 
-  const thread = await tryCreateAudiobookThread(interaction);
-  if (!thread) {
+    const thread = await tryCreateAudiobookThread(interaction);
+    if (!thread) {
+      return interaction.editReply({
+        content: '❌ Could not create a private thread. Make sure I have **Create Private Threads** permission in this channel.',
+      });
+    }
+
+    audiobookThreads.set(thread.id, { userId: user.id, guildId: guild.id, bookId: null });
+
+    // Pin welcome panel in thread
+    const panel = await thread.send({ embeds: [buildDropPanelEmbed(user)], components: [buildDropPanelRow()] });
+    await panel.pin().catch(() => {});
+
     return interaction.editReply({
-      content: '❌ Could not create a private thread. Make sure I have **Create Private Threads** permission in this channel.',
+      content: `📖 Your book-drop thread is ready: <#${thread.id}>\n\n**Drop any supported file in there to upload it.**\nSupported: ${SUPPORTED_EXTS.join(' · ')} (max ${MAX_FILE_SIZE / 1024 / 1024}MB)`,
     });
-  }
-
-  audiobookThreads.set(thread.id, { userId: user.id, guildId: guild.id, bookId: null });
-
-  // Pin welcome panel in thread
-  const panel = await thread.send({ embeds: [buildDropPanelEmbed(user)], components: [buildDropPanelRow()] });
-  await panel.pin().catch(() => {});
-
-  return interaction.editReply({
-    content: `📖 Your book-drop thread is ready: <#${thread.id}>\n\n**Drop any supported file in there to upload it.**\nSupported: ${SUPPORTED_EXTS.join(' · ')} (max ${MAX_FILE_SIZE / 1024 / 1024}MB)`,
-  });
+  }, { label: "audiobook" });
 }
 
 // ── /audiobook play ───────────────────────────────────────────────────────────
 
 async function handlePlay(interaction, db) {
   await interaction.deferReply({ ephemeral: true });
-  const { user, guild } = interaction;
+  await withTimeout(interaction, async () => {
+    const { user, guild } = interaction;
 
-  const vcChannel = interaction.member?.voice?.channel;
-  if (!vcChannel) return interaction.editReply({ content: '🔊 Join a voice channel first.' });
+    const vcChannel = interaction.member?.voice?.channel;
+    if (!vcChannel) return interaction.editReply({ content: '🔊 Join a voice channel first.' });
 
-  const session = await getOrCreateSession(db, user.id, guild.id);
-  if (!session.book_id) {
-    return interaction.editReply({
-      content: `📚 No book selected. Use **/audiobook start** to upload a book, or **/audiobook library** to pick one.`,
+    const session = await getOrCreateSession(db, user.id, guild.id);
+    if (!session.book_id) {
+      return interaction.editReply({
+        content: `📚 No book selected. Use **/audiobook start** to upload a book, or **/audiobook library** to pick one.`,
+      });
+    }
+
+    const [book, chapters] = await Promise.all([
+      getBook(db, session.book_id),
+      getChapters(db, session.book_id),
+    ]);
+    if (!book || !chapters.length) {
+      return interaction.editReply({ content: '❌ Book not found or has no chapters.' });
+    }
+
+    const prefs = await getVoicePrefs(db, user.id);
+    session.voice_id = prefs.voice_id;
+    session.speed    = parseFloat(prefs.speed ?? 1.0);
+
+    const connection = joinVoiceChannel({
+      channelId:      vcChannel.id,
+      guildId:        guild.id,
+      adapterCreator: guild.voiceAdapterCreator,
+      selfDeaf:       true,
     });
-  }
 
-  const [book, chapters] = await Promise.all([
-    getBook(db, session.book_id),
-    getChapters(db, session.book_id),
-  ]);
-  if (!book || !chapters.length) {
-    return interaction.editReply({ content: '❌ Book not found or has no chapters.' });
-  }
+    const player = getOrCreatePlayer(guild.id, db);
+    await player.load(session, book, chapters);
+    await player.play(connection);
 
-  const prefs = await getVoicePrefs(db, user.id);
-  session.voice_id = prefs.voice_id;
-  session.speed    = parseFloat(prefs.speed ?? 1.0);
+    await updateSession(db, session.id, { state: PlayerState.PLAYING, book_id: session.book_id });
 
-  const connection = joinVoiceChannel({
-    channelId:      vcChannel.id,
-    guildId:        guild.id,
-    adapterCreator: guild.voiceAdapterCreator,
-    selfDeaf:       true,
-  });
-
-  const player = getOrCreatePlayer(guild.id, db);
-  await player.load(session, book, chapters);
-  await player.play(connection);
-
-  await updateSession(db, session.id, { state: PlayerState.PLAYING, book_id: session.book_id });
-
-  const progress = player.getProgress();
-  return interaction.editReply({
-    embeds: [buildNowReadingEmbed(progress)],
-    components: [buildControlRow(guild.id)],
-  });
+    const progress = player.getProgress();
+    return interaction.editReply({
+      embeds: [buildNowReadingEmbed(progress)],
+      components: [buildControlRow(guild.id)],
+    });
+  }, { label: "audiobook" });
 }
 
 // ── /audiobook pause ──────────────────────────────────────────────────────────
@@ -310,49 +315,51 @@ async function handleVoice(interaction, db) {
 
 async function handleLibrary(interaction, db) {
   await interaction.deferReply({ ephemeral: true });
-  const books = await listBooks(db, interaction.user.id, interaction.guildId);
+  await withTimeout(interaction, async () => {
+    const books = await listBooks(db, interaction.user.id, interaction.guildId);
 
-  if (!books.length) {
-    return interaction.editReply({
-      content: '📚 Your library is empty.\nUse **/audiobook start** to open a drop thread and upload a book.',
-    });
-  }
+    if (!books.length) {
+      return interaction.editReply({
+        content: '📚 Your library is empty.\nUse **/audiobook start** to open a drop thread and upload a book.',
+      });
+    }
 
-  const session = await getSession(db, interaction.user.id, interaction.guildId);
+    const session = await getSession(db, interaction.user.id, interaction.guildId);
 
-  const embed = new EmbedBuilder()
-    .setTitle(`📚 ${interaction.user.displayName}'s Library`)
-    .setColor(Colors.DarkGold)
-    .setDescription(`${books.length} book${books.length !== 1 ? 's' : ''} in your collection`)
-    .addFields(
-      books.slice(0, 10).map((b, i) => {
-        const isCurrent = session?.book_id === b.id;
-        const prog = isCurrent && session?.current_chapter
-          ? `\`${buildMiniBar(Math.round(session.current_chapter / b.total_chapters * 100))}\``
-          : '`░░░░░░░░░░ 0%`';
-        return {
-          name: `${isCurrent ? '▶️ ' : `${i + 1}. `}${b.title}${b.author ? ` — ${b.author}` : ''}`,
-          value: `${formatIcon(b.format)} ${b.total_chapters} chapters · ${Math.round(b.total_words / 1000)}k words\n${prog}`,
-          inline: false,
-        };
-      })
+    const embed = new EmbedBuilder()
+      .setTitle(`📚 ${interaction.user.displayName}'s Library`)
+      .setColor(Colors.DarkGold)
+      .setDescription(`${books.length} book${books.length !== 1 ? 's' : ''} in your collection`)
+      .addFields(
+        books.slice(0, 10).map((b, i) => {
+          const isCurrent = session?.book_id === b.id;
+          const prog = isCurrent && session?.current_chapter
+            ? `\`${buildMiniBar(Math.round(session.current_chapter / b.total_chapters * 100))}\``
+            : '`░░░░░░░░░░ 0%`';
+          return {
+            name: `${isCurrent ? '▶️ ' : `${i + 1}. `}${b.title}${b.author ? ` — ${b.author}` : ''}`,
+            value: `${formatIcon(b.format)} ${b.total_chapters} chapters · ${Math.round(b.total_words / 1000)}k words\n${prog}`,
+            inline: false,
+          };
+        })
+      );
+
+    const selectRow = new ActionRowBuilder().addComponents(
+      new StringSelectMenuBuilder()
+        .setCustomId(`audiobook:selectbook:${interaction.guildId}`)
+        .setPlaceholder('📖 Switch to a book...')
+        .addOptions(
+          books.slice(0, 25).map(b => ({
+            label: b.title.slice(0, 50),
+            description: `${b.total_chapters} chapters · ${b.author ?? 'Unknown author'}`.slice(0, 50),
+            value: b.id,
+            emoji: formatIcon(b.format),
+          }))
+        )
     );
 
-  const selectRow = new ActionRowBuilder().addComponents(
-    new StringSelectMenuBuilder()
-      .setCustomId(`audiobook:selectbook:${interaction.guildId}`)
-      .setPlaceholder('📖 Switch to a book...')
-      .addOptions(
-        books.slice(0, 25).map(b => ({
-          label: b.title.slice(0, 50),
-          description: `${b.total_chapters} chapters · ${b.author ?? 'Unknown author'}`.slice(0, 50),
-          value: b.id,
-          emoji: formatIcon(b.format),
-        }))
-      )
-  );
-
-  return interaction.editReply({ embeds: [embed], components: [selectRow] });
+    return interaction.editReply({ embeds: [embed], components: [selectRow] });
+  }, { label: "audiobook" });
 }
 
 // ── /audiobook bookmark ───────────────────────────────────────────────────────
@@ -376,43 +383,45 @@ async function handleBookmark(interaction, db) {
 
 async function handleBookmarks(interaction, db) {
   await interaction.deferReply({ ephemeral: true });
-  const session = await getSession(db, interaction.user.id, interaction.guildId);
-  if (!session?.book_id) {
-    return interaction.editReply({ content: '📖 No active book.' });
-  }
-  const [book, marks] = await Promise.all([
-    getBook(db, session.book_id),
-    getBookmarks(db, interaction.user.id, session.book_id),
-  ]);
-  if (!marks.length) {
-    return interaction.editReply({ content: '🔖 No bookmarks saved yet.' });
-  }
+  await withTimeout(interaction, async () => {
+    const session = await getSession(db, interaction.user.id, interaction.guildId);
+    if (!session?.book_id) {
+      return interaction.editReply({ content: '📖 No active book.' });
+    }
+    const [book, marks] = await Promise.all([
+      getBook(db, session.book_id),
+      getBookmarks(db, interaction.user.id, session.book_id),
+    ]);
+    if (!marks.length) {
+      return interaction.editReply({ content: '🔖 No bookmarks saved yet.' });
+    }
 
-  const embed = new EmbedBuilder()
-    .setTitle(`🔖 Bookmarks — ${book?.title ?? 'Unknown'}`)
-    .setColor(Colors.Gold)
-    .addFields(
-      marks.slice(0, 10).map((m, i) => ({
-        name: `#${i + 1} — Chapter ${m.chapter_index + 1}`,
-        value: `${m.note ? `*${m.note}*\n` : ''}${new Date(m.created_at).toLocaleDateString()}`,
-        inline: true,
-      }))
+    const embed = new EmbedBuilder()
+      .setTitle(`🔖 Bookmarks — ${book?.title ?? 'Unknown'}`)
+      .setColor(Colors.Gold)
+      .addFields(
+        marks.slice(0, 10).map((m, i) => ({
+          name: `#${i + 1} — Chapter ${m.chapter_index + 1}`,
+          value: `${m.note ? `*${m.note}*\n` : ''}${new Date(m.created_at).toLocaleDateString()}`,
+          inline: true,
+        }))
+      );
+
+    const jumpRow = new ActionRowBuilder().addComponents(
+      new StringSelectMenuBuilder()
+        .setCustomId(`audiobook:jumpbookmark:${interaction.guildId}`)
+        .setPlaceholder('Jump to bookmark...')
+        .addOptions(
+          marks.slice(0, 25).map((m, i) => ({
+            label: `#${i + 1} — Chapter ${m.chapter_index + 1}`,
+            description: m.note?.slice(0, 50) ?? `Saved ${new Date(m.created_at).toLocaleDateString()}`,
+            value: String(m.chapter_index),
+          }))
+        )
     );
 
-  const jumpRow = new ActionRowBuilder().addComponents(
-    new StringSelectMenuBuilder()
-      .setCustomId(`audiobook:jumpbookmark:${interaction.guildId}`)
-      .setPlaceholder('Jump to bookmark...')
-      .addOptions(
-        marks.slice(0, 25).map((m, i) => ({
-          label: `#${i + 1} — Chapter ${m.chapter_index + 1}`,
-          description: m.note?.slice(0, 50) ?? `Saved ${new Date(m.created_at).toLocaleDateString()}`,
-          value: String(m.chapter_index),
-        }))
-      )
-  );
-
-  return interaction.editReply({ embeds: [embed], components: [jumpRow] });
+    return interaction.editReply({ embeds: [embed], components: [jumpRow] });
+  }, { label: "audiobook" });
 }
 
 // ── Button handler ─────────────────────────────────────────────────────────────

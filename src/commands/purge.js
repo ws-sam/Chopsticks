@@ -8,6 +8,7 @@ import {
 } from "discord.js";
 import { buildModEmbed, replyModEmbed, replyModError, sanitizeText } from "../moderation/output.js";
 import { dispatchModerationLog } from "../utils/modLogs.js";
+import { withTimeout } from "../utils/interactionTimeout.js";
 
 const PURGE_UI_PREFIX = "purgeui";
 const PURGE_TTL_MS = 10 * 60_000;
@@ -281,64 +282,67 @@ export async function execute(interaction) {
     flags: filters.publicResult ? undefined : MessageFlags.Ephemeral
   });
 
-  const { scanned, candidates } = await collectCandidates(channel, filters);
-  const split = splitByAge(candidates);
-  const matched = candidates.length;
-  const requestedBy = interaction.user?.tag || interaction.user?.username || "unknown";
+  await withTimeout(interaction, async () => {
 
-  if (!matched) {
-    await replyModEmbed(interaction, {
-      embeds: [buildModEmbed({
-        title: "Purge Preview",
-        summary: "No messages matched your filters.",
-        fields: [
-          { name: "Filters", value: filterSummary(filters) || "none" },
-          { name: "Scanned", value: String(scanned), inline: true },
-          { name: "Matched", value: "0", inline: true }
-        ],
-        actor: requestedBy
-      })]
-    }, { ephemeral: !filters.publicResult });
-    return;
-  }
+    const { scanned, candidates } = await collectCandidates(channel, filters);
+    const split = splitByAge(candidates);
+    const matched = candidates.length;
+    const requestedBy = interaction.user?.tag || interaction.user?.username || "unknown";
 
-  const preview = buildPreviewEmbed({
-    filters,
-    scanned,
-    matched,
-    younger: split.younger.length,
-    older: split.older.length,
-    requestedBy
-  });
+    if (!matched) {
+      await replyModEmbed(interaction, {
+        embeds: [buildModEmbed({
+          title: "Purge Preview",
+          summary: "No messages matched your filters.",
+          fields: [
+            { name: "Filters", value: filterSummary(filters) || "none" },
+            { name: "Scanned", value: String(scanned), inline: true },
+            { name: "Matched", value: "0", inline: true }
+          ],
+          actor: requestedBy
+        })]
+      }, { ephemeral: !filters.publicResult });
+      return;
+    }
 
-  if (filters.dryRun) {
-    await replyModEmbed(interaction, { embeds: [preview] }, { ephemeral: !filters.publicResult });
-    return;
-  }
+    const preview = buildPreviewEmbed({
+      filters,
+      scanned,
+      matched,
+      younger: split.younger.length,
+      older: split.older.length,
+      requestedBy
+    });
 
-  const token = makeToken();
-  pendingPurges.set(token, {
-    token,
-    createdAt: Date.now(),
-    requesterId: interaction.user.id,
-    requestedBy,
-    channelId: channel.id,
-    guildId: interaction.guildId,
-    messageIds: candidates.map(m => m.id),
-    scanned,
-    matched,
-    filters,
-    publicResult: filters.publicResult
-  });
+    if (filters.dryRun) {
+      await replyModEmbed(interaction, { embeds: [preview] }, { ephemeral: !filters.publicResult });
+      return;
+    }
 
-  await replyModEmbed(
-    interaction,
-    {
-      embeds: [preview],
-      components: previewComponents(interaction.user.id, token)
-    },
-    { ephemeral: !filters.publicResult }
-  );
+    const token = makeToken();
+    pendingPurges.set(token, {
+      token,
+      createdAt: Date.now(),
+      requesterId: interaction.user.id,
+      requestedBy,
+      channelId: channel.id,
+      guildId: interaction.guildId,
+      messageIds: candidates.map(m => m.id),
+      scanned,
+      matched,
+      filters,
+      publicResult: filters.publicResult
+    });
+
+    await replyModEmbed(
+      interaction,
+      {
+        embeds: [preview],
+        components: previewComponents(interaction.user.id, token)
+      },
+      { ephemeral: !filters.publicResult }
+    );
+  }, { label: "purge" });
 }
 
 export async function handleButton(interaction) {

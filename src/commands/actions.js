@@ -12,6 +12,7 @@ import {
   ChannelType,
 } from 'discord.js';
 import { getPool } from '../utils/storage_pg.js';
+import { withTimeout } from '../utils/interactionTimeout.js';
 
 export const meta = {
   name: 'actions',
@@ -127,49 +128,51 @@ export async function execute(interaction) {
     }
     await interaction.deferReply({ ephemeral: true });
 
-    if (sub === 'enable') {
-      const type = interaction.options.getString('type');
-      const cost = interaction.options.getInteger('cost');
-      const cooldown = interaction.options.getInteger('cooldown') ?? ACTION_DEFAULTS[type]?.cooldown_s ?? 300;
-      const def = ACTION_DEFAULTS[type];
-      if (!def) { await interaction.editReply({ content: '❌ Unknown action type.' }); return; }
+    await withTimeout(interaction, async () => {
+      if (sub === 'enable') {
+        const type = interaction.options.getString('type');
+        const cost = interaction.options.getInteger('cost');
+        const cooldown = interaction.options.getInteger('cooldown') ?? ACTION_DEFAULTS[type]?.cooldown_s ?? 300;
+        const def = ACTION_DEFAULTS[type];
+        if (!def) { await interaction.editReply({ content: '❌ Unknown action type.' }); return; }
 
-      const p = getPool();
-      await p.query(
-        `INSERT INTO guild_agent_actions (guild_id, action_type, name, description, cost, cooldown_s, enabled, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6, true, $7)
-         ON CONFLICT DO NOTHING`,
-        [interaction.guildId, type, def.name, def.description, cost, cooldown, Date.now()]
-      ).catch(() => {});
-      // Also update if already exists
-      await p.query(
-        `UPDATE guild_agent_actions SET enabled = true, cost = $1, cooldown_s = $2
-         WHERE guild_id = $3 AND action_type = $4`,
-        [cost, cooldown, interaction.guildId, type]
-      ).catch(() => {});
+        const p = getPool();
+        await p.query(
+          `INSERT INTO guild_agent_actions (guild_id, action_type, name, description, cost, cooldown_s, enabled, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, true, $7)
+           ON CONFLICT DO NOTHING`,
+          [interaction.guildId, type, def.name, def.description, cost, cooldown, Date.now()]
+        ).catch(() => {});
+        // Also update if already exists
+        await p.query(
+          `UPDATE guild_agent_actions SET enabled = true, cost = $1, cooldown_s = $2
+           WHERE guild_id = $3 AND action_type = $4`,
+          [cost, cooldown, interaction.guildId, type]
+        ).catch(() => {});
 
-      await interaction.editReply({ content: `✅ **${def.emoji} ${def.name}** enabled — costs **${cost} credits**, **${cooldown}s** cooldown.` });
-      return;
-    }
-
-    if (sub === 'disable') {
-      const type = interaction.options.getString('type');
-      const p = getPool();
-      await p.query(`UPDATE guild_agent_actions SET enabled = false WHERE guild_id = $1 AND action_type = $2`, [interaction.guildId, type]).catch(() => {});
-      await interaction.editReply({ content: `✅ **${type}** action disabled.` });
-      return;
-    }
-
-    if (sub === 'list') {
-      const actions = await getGuildActions(interaction.guildId);
-      if (!actions.length) {
-        await interaction.editReply({ content: 'No actions configured yet. Use `/actions admin enable` to set one up.' });
+        await interaction.editReply({ content: `✅ **${def.emoji} ${def.name}** enabled — costs **${cost} credits**, **${cooldown}s** cooldown.` });
         return;
       }
-      const lines = actions.map(a => `${a.enabled ? '✅' : '❌'} **${a.name}** — ${a.cost}cr, ${a.cooldown_s}s cooldown`);
-      await interaction.editReply({ content: lines.join('\n') });
-      return;
-    }
+
+      if (sub === 'disable') {
+        const type = interaction.options.getString('type');
+        const p = getPool();
+        await p.query(`UPDATE guild_agent_actions SET enabled = false WHERE guild_id = $1 AND action_type = $2`, [interaction.guildId, type]).catch(() => {});
+        await interaction.editReply({ content: `✅ **${type}** action disabled.` });
+        return;
+      }
+
+      if (sub === 'list') {
+        const actions = await getGuildActions(interaction.guildId);
+        if (!actions.length) {
+          await interaction.editReply({ content: 'No actions configured yet. Use `/actions admin enable` to set one up.' });
+          return;
+        }
+        const lines = actions.map(a => `${a.enabled ? '✅' : '❌'} **${a.name}** — ${a.cost}cr, ${a.cooldown_s}s cooldown`);
+        await interaction.editReply({ content: lines.join('\n') });
+        return;
+      }
+    }, { label: "actions" });
     return;
   }
 
@@ -177,32 +180,34 @@ export async function execute(interaction) {
 
   if (sub === 'list') {
     await interaction.deferReply({ ephemeral: true });
-    const actions = await getGuildActions(interaction.guildId);
-    if (!actions.length) {
-      await interaction.editReply({ content: 'No agent actions are enabled in this server yet.\nAsk an admin to set them up with `/actions admin enable`.' });
-      return;
-    }
-    const enabled = actions.filter(a => a.enabled);
-    if (!enabled.length) {
-      await interaction.editReply({ content: 'All actions are currently disabled. Ask an admin to re-enable them.' });
-      return;
-    }
+    await withTimeout(interaction, async () => {
+      const actions = await getGuildActions(interaction.guildId);
+      if (!actions.length) {
+        await interaction.editReply({ content: 'No agent actions are enabled in this server yet.\nAsk an admin to set them up with `/actions admin enable`.' });
+        return;
+      }
+      const enabled = actions.filter(a => a.enabled);
+      if (!enabled.length) {
+        await interaction.editReply({ content: 'All actions are currently disabled. Ask an admin to re-enable them.' });
+        return;
+      }
 
-    const embed = new EmbedBuilder()
-      .setTitle('🤖 Agent Actions')
-      .setDescription('Spend credits to have agents perform actions in voice channels.')
-      .setColor(Colors.Blurple);
+      const embed = new EmbedBuilder()
+        .setTitle('🤖 Agent Actions')
+        .setDescription('Spend credits to have agents perform actions in voice channels.')
+        .setColor(Colors.Blurple);
 
-    for (const a of enabled) {
-      const def = ACTION_DEFAULTS[a.action_type] || {};
-      embed.addFields({
-        name: `${def.emoji || '⚡'} ${a.name}`,
-        value: `${a.description || def.description || ''}\n**Cost:** ${a.cost} credits  •  **Cooldown:** ${a.cooldown_s}s`,
-        inline: false,
-      });
-    }
+      for (const a of enabled) {
+        const def = ACTION_DEFAULTS[a.action_type] || {};
+        embed.addFields({
+          name: `${def.emoji || '⚡'} ${a.name}`,
+          value: `${a.description || def.description || ''}\n**Cost:** ${a.cost} credits  •  **Cooldown:** ${a.cooldown_s}s`,
+          inline: false,
+        });
+      }
 
-    await interaction.editReply({ embeds: [embed] });
+      await interaction.editReply({ embeds: [embed] });
+    }, { label: "actions" });
     return;
   }
 
@@ -213,65 +218,67 @@ export async function execute(interaction) {
 
     await interaction.deferReply({ ephemeral: true });
 
-    // Find action config
-    const p = getPool();
-    const actionRes = await p.query(
-      `SELECT * FROM guild_agent_actions WHERE guild_id = $1 AND action_type = $2 AND enabled = true LIMIT 1`,
-      [interaction.guildId, actionType]
-    ).catch(() => ({ rows: [] }));
+    await withTimeout(interaction, async () => {
+      // Find action config
+      const p = getPool();
+      const actionRes = await p.query(
+        `SELECT * FROM guild_agent_actions WHERE guild_id = $1 AND action_type = $2 AND enabled = true LIMIT 1`,
+        [interaction.guildId, actionType]
+      ).catch(() => ({ rows: [] }));
 
-    const action = actionRes.rows[0];
-    if (!action) {
-      await interaction.editReply({ content: `❌ **${actionType}** is not enabled in this server. Ask an admin to enable it.` });
-      return;
-    }
-
-    // Cooldown check
-    const remaining = await getUserCooldownFor(interaction.guildId, interaction.user.id, actionType, action.cooldown_s);
-    if (remaining) {
-      await interaction.editReply({ content: `⏳ This action is on cooldown for **${remaining}s**.` });
-      return;
-    }
-
-    // Credit check
-    if (action.cost > 0) {
-      try {
-        const { getWallet, removeCredits } = await import('../economy/wallet.js');
-        const wallet = await getWallet(interaction.user.id);
-        if (!wallet || Number(wallet.balance) < action.cost) {
-          await interaction.editReply({ content: `❌ You need **${action.cost} credits** to use this action (you have ${wallet ? Number(wallet.balance).toLocaleString() : 0}).` });
-          return;
-        }
-        await removeCredits(interaction.user.id, action.cost, `agent_action:${actionType}`);
-      } catch (e) {
-        await interaction.editReply({ content: `❌ Failed to process payment: ${e.message}` });
+      const action = actionRes.rows[0];
+      if (!action) {
+        await interaction.editReply({ content: `❌ **${actionType}** is not enabled in this server. Ask an admin to enable it.` });
         return;
       }
-    }
 
-    // Determine target VC
-    const memberVoice = interaction.member?.voice?.channel;
-    const vc = targetChannel?.type === ChannelType.GuildVoice ? targetChannel : memberVoice;
-    if (!vc) {
-      await interaction.editReply({ content: '❌ You need to be in a voice channel (or specify one) to use this action.' });
-      return;
-    }
+      // Cooldown check
+      const remaining = await getUserCooldownFor(interaction.guildId, interaction.user.id, actionType, action.cooldown_s);
+      if (remaining) {
+        await interaction.editReply({ content: `⏳ This action is on cooldown for **${remaining}s**.` });
+        return;
+      }
 
-    // Log the use
-    await logActionUse(interaction.guildId, interaction.user.id, actionType, vc.id, action.cost);
+      // Credit check
+      if (action.cost > 0) {
+        try {
+          const { getWallet, removeCredits } = await import('../economy/wallet.js');
+          const wallet = await getWallet(interaction.user.id);
+          if (!wallet || Number(wallet.balance) < action.cost) {
+            await interaction.editReply({ content: `❌ You need **${action.cost} credits** to use this action (you have ${wallet ? Number(wallet.balance).toLocaleString() : 0}).` });
+            return;
+          }
+          await removeCredits(interaction.user.id, action.cost, `agent_action:${actionType}`);
+        } catch (e) {
+          await interaction.editReply({ content: `❌ Failed to process payment: ${e.message}` });
+          return;
+        }
+      }
 
-    // Stats + XP
-    void (async () => {
-      try {
-        const { addStat } = await import('../game/activityStats.js');
-        const { addGuildXp } = await import('../game/guildXp.js');
-        addStat(interaction.user.id, interaction.guildId, 'agent_actions_used', 1);
-        await addGuildXp(interaction.user.id, interaction.guildId, 'agent_action', { client: interaction.client }).catch(() => {});
-      } catch {}
-    })();
+      // Determine target VC
+      const memberVoice = interaction.member?.voice?.channel;
+      const vc = targetChannel?.type === ChannelType.GuildVoice ? targetChannel : memberVoice;
+      if (!vc) {
+        await interaction.editReply({ content: '❌ You need to be in a voice channel (or specify one) to use this action.' });
+        return;
+      }
 
-    // Dispatch action via AgentManager
-    await dispatchAgentAction(interaction, actionType, vc, messageText, action);
+      // Log the use
+      await logActionUse(interaction.guildId, interaction.user.id, actionType, vc.id, action.cost);
+
+      // Stats + XP
+      void (async () => {
+        try {
+          const { addStat } = await import('../game/activityStats.js');
+          const { addGuildXp } = await import('../game/guildXp.js');
+          addStat(interaction.user.id, interaction.guildId, 'agent_actions_used', 1);
+          await addGuildXp(interaction.user.id, interaction.guildId, 'agent_action', { client: interaction.client }).catch(() => {});
+        } catch {}
+      })();
+
+      // Dispatch action via AgentManager
+      await dispatchAgentAction(interaction, actionType, vc, messageText, action);
+    }, { label: "actions" });
     return;
   }
 }

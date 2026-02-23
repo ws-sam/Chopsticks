@@ -1,6 +1,7 @@
 import { SlashCommandBuilder, EmbedBuilder } from "discord.js";
 import { httpRequest } from "../utils/httpFetch.js";
 import { botLogger } from "../utils/modernLogger.js";
+import { withTimeout } from "../utils/interactionTimeout.js";
 
 export const meta = {
   category: "info",
@@ -40,61 +41,63 @@ const COLORS = { 0: 0x7289da, 1: 0x57f287, 2: 0xed4245, 3: 0xfee75c };
 export async function execute(interaction) {
   await interaction.deferReply();
 
-  const input = interaction.options.getString("profile", true);
-  const { type, value } = resolveIdentifier(input);
-  const url = `https://steamcommunity.com/${type}/${encodeURIComponent(value)}?xml=1`;
+  await withTimeout(interaction, async () => {
+    const input = interaction.options.getString("profile", true);
+    const { type, value } = resolveIdentifier(input);
+    const url = `https://steamcommunity.com/${type}/${encodeURIComponent(value)}?xml=1`;
 
-  let xml = "";
-  try {
-    const { statusCode, body } = await httpRequest("steam", url, {
-      headers: { "User-Agent": "Chopsticks-Discord-Bot/1.0" },
-      bodyTimeout: 8000,
-      headersTimeout: 8000,
-    });
-    if (statusCode !== 200) {
-      return interaction.editReply({ content: "❌ Steam profile not found or unavailable." });
+    let xml = "";
+    try {
+      const { statusCode, body } = await httpRequest("steam", url, {
+        headers: { "User-Agent": "Chopsticks-Discord-Bot/1.0" },
+        bodyTimeout: 8000,
+        headersTimeout: 8000,
+      });
+      if (statusCode !== 200) {
+        return interaction.editReply({ content: "❌ Steam profile not found or unavailable." });
+      }
+      xml = await body.text();
+    } catch (err) {
+      botLogger.warn({ err }, "[steam] fetch failed");
+      return interaction.editReply({ content: "❌ Could not reach Steam. Try again later." });
     }
-    xml = await body.text();
-  } catch (err) {
-    botLogger.warn({ err }, "[steam] fetch failed");
-    return interaction.editReply({ content: "❌ Could not reach Steam. Try again later." });
-  }
 
-  if (xml.includes("<error>")) {
-    return interaction.editReply({ content: "❌ Steam profile not found. Check the vanity URL." });
-  }
+    if (xml.includes("<error>")) {
+      return interaction.editReply({ content: "❌ Steam profile not found. Check the vanity URL." });
+    }
 
-  const name = xmlText(xml, "steamID");
-  const realName = xmlText(xml, "realname");
-  const stateCode = parseInt(xmlText(xml, "onlineState") || "0", 10) || 0;
-  const stateName = STATE_MAP[stateCode] ?? "Offline";
-  const avatar = xmlText(xml, "avatarFull");
-  const location = xmlText(xml, "location");
-  const summary = xmlText(xml, "summary");
-  const memberSince = xmlText(xml, "memberSince");
-  const steamId64 = xmlText(xml, "steamID64");
-  const profileUrl = xmlText(xml, "customURL")
-    ? `https://steamcommunity.com/id/${xmlText(xml, "customURL")}`
-    : `https://steamcommunity.com/profiles/${steamId64}`;
+    const name = xmlText(xml, "steamID");
+    const realName = xmlText(xml, "realname");
+    const stateCode = parseInt(xmlText(xml, "onlineState") || "0", 10) || 0;
+    const stateName = STATE_MAP[stateCode] ?? "Offline";
+    const avatar = xmlText(xml, "avatarFull");
+    const location = xmlText(xml, "location");
+    const summary = xmlText(xml, "summary");
+    const memberSince = xmlText(xml, "memberSince");
+    const steamId64 = xmlText(xml, "steamID64");
+    const profileUrl = xmlText(xml, "customURL")
+      ? `https://steamcommunity.com/id/${xmlText(xml, "customURL")}`
+      : `https://steamcommunity.com/profiles/${steamId64}`;
 
-  const color = stateCode === 1 ? COLORS[1] : stateCode >= 2 && stateCode <= 4 ? COLORS[3] : COLORS[0];
+    const color = stateCode === 1 ? COLORS[1] : stateCode >= 2 && stateCode <= 4 ? COLORS[3] : COLORS[0];
 
-  const embed = new EmbedBuilder()
-    .setTitle(`🎮 ${name || "Steam Profile"}`)
-    .setURL(profileUrl)
-    .setColor(color)
-    .setThumbnail(avatar || null);
+    const embed = new EmbedBuilder()
+      .setTitle(`🎮 ${name || "Steam Profile"}`)
+      .setURL(profileUrl)
+      .setColor(color)
+      .setThumbnail(avatar || null);
 
-  if (realName) embed.addFields({ name: "Real Name", value: realName, inline: true });
-  embed.addFields({ name: "Status", value: stateName, inline: true });
-  if (location) embed.addFields({ name: "Location", value: location, inline: true });
-  if (memberSince) embed.addFields({ name: "Member Since", value: memberSince, inline: true });
-  if (steamId64) embed.addFields({ name: "Steam ID", value: `\`${steamId64}\``, inline: true });
-  if (summary && summary.length > 0) {
-    embed.setDescription(summary.replace(/<[^>]+>/g, "").slice(0, 300) + (summary.length > 300 ? "…" : ""));
-  }
+    if (realName) embed.addFields({ name: "Real Name", value: realName, inline: true });
+    embed.addFields({ name: "Status", value: stateName, inline: true });
+    if (location) embed.addFields({ name: "Location", value: location, inline: true });
+    if (memberSince) embed.addFields({ name: "Member Since", value: memberSince, inline: true });
+    if (steamId64) embed.addFields({ name: "Steam ID", value: `\`${steamId64}\``, inline: true });
+    if (summary && summary.length > 0) {
+      embed.setDescription(summary.replace(/<[^>]+>/g, "").slice(0, 300) + (summary.length > 300 ? "…" : ""));
+    }
 
-  embed.setFooter({ text: "Data from Steam Community" }).setTimestamp();
+    embed.setFooter({ text: "Data from Steam Community" }).setTimestamp();
 
-  await interaction.editReply({ embeds: [embed] });
+    await interaction.editReply({ embeds: [embed] });
+  }, { label: "steam" });
 }

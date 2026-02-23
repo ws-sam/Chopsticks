@@ -4,6 +4,7 @@
 import { SlashCommandBuilder, EmbedBuilder, Colors } from 'discord.js';
 import { generateText } from '../utils/textLlm.js';
 import { checkRateLimit } from '../utils/ratelimit.js';
+import { withTimeout } from "../utils/interactionTimeout.js";
 
 export const meta = {
   name: 'roast',
@@ -67,27 +68,28 @@ export async function execute(interaction) {
   }
 
   await interaction.deferReply();
+  await withTimeout(interaction, async () => {
+    const targetName = target.displayName || target.username;
+    const prompt = `Write a ${vibe} roast for a Discord user named "${targetName}". Keep it under 3 sentences.`;
+    const system = SYSTEM_PROMPTS[vibe] || SYSTEM_PROMPTS.playful;
 
-  const targetName = target.displayName || target.username;
-  const prompt = `Write a ${vibe} roast for a Discord user named "${targetName}". Keep it under 3 sentences.`;
-  const system = SYSTEM_PROMPTS[vibe] || SYSTEM_PROMPTS.playful;
+    let roastText = '';
+    try {
+      roastText = await generateText({ prompt, system, guildId: interaction.guildId });
+    } catch {}
 
-  let roastText = '';
-  try {
-    roastText = await generateText({ prompt, system, guildId: interaction.guildId });
-  } catch {}
+    if (!roastText || roastText.trim().length < 10) {
+      // Fallback roast
+      roastText = FALLBACK_ROASTS[Math.floor(Math.random() * FALLBACK_ROASTS.length)];
+    }
 
-  if (!roastText || roastText.trim().length < 10) {
-    // Fallback roast
-    roastText = FALLBACK_ROASTS[Math.floor(Math.random() * FALLBACK_ROASTS.length)];
-  }
+    const embed = new EmbedBuilder()
+      .setTitle(`🔥 ${isSelf ? interaction.user.username + ' roasted themselves' : interaction.user.username + ' roasted ' + targetName}`)
+      .setDescription(roastText)
+      .setColor(Colors.Orange)
+      .setThumbnail(target.displayAvatarURL({ size: 64 }))
+      .setFooter({ text: 'Keep it fun, not mean 😄' });
 
-  const embed = new EmbedBuilder()
-    .setTitle(`🔥 ${isSelf ? interaction.user.username + ' roasted themselves' : interaction.user.username + ' roasted ' + targetName}`)
-    .setDescription(roastText)
-    .setColor(Colors.Orange)
-    .setThumbnail(target.displayAvatarURL({ size: 64 }))
-    .setFooter({ text: 'Keep it fun, not mean 😄' });
-
-  await interaction.editReply({ embeds: [embed] });
+    await interaction.editReply({ embeds: [embed] });
+  }, { label: "roast" });
 }

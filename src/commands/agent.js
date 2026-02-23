@@ -1,6 +1,7 @@
 import { SlashCommandBuilder, EmbedBuilder, MessageFlags } from "discord.js";
 import { Colors, replyError } from "../utils/discordOutput.js";
 import { generateText } from "../utils/textLlm.js";
+import { withTimeout } from "../utils/interactionTimeout.js";
 
 function fallbackReply(style, msg) {
   const s = String(style || "helper").toLowerCase();
@@ -96,76 +97,78 @@ export default {
 
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-    const mgr = global.agentManager;
-    if (!mgr) return await replyError(interaction, "Agents Not Ready", "Agents are starting up. Try again shortly.", true);
+    await withTimeout(interaction, async () => {
+      const mgr = global.agentManager;
+      if (!mgr) return await replyError(interaction, "Agents Not Ready", "Agents are starting up. Try again shortly.", true);
 
-    const message = interaction.options.getString("message") || "";
-    const style = interaction.options.getString("style") || "helper";
-    const pub = interaction.options.getBoolean("public");
-    const publicMode = pub === null ? true : Boolean(pub);
+      const message = interaction.options.getString("message") || "";
+      const style = interaction.options.getString("style") || "helper";
+      const pub = interaction.options.getBoolean("public");
+      const publicMode = pub === null ? true : Boolean(pub);
 
-    const lease = await mgr.ensureTextSessionAgent(guildId, channelId, {
-      ownerUserId: interaction.user.id,
-      kind: "chat"
-    });
-    if (!lease.ok) {
-      const msg =
-        lease.reason === "no-agents-in-guild"
-          ? "No agents deployed in this guild. Use `/agents deploy 3` first."
-          : "All agents are currently busy. Try again in a few seconds, or deploy more agents.";
-      return await replyError(interaction, "Agent Unavailable", msg, true);
-    }
-
-    const agentTag = lease.agent.tag ? lease.agent.tag : `Agent ${lease.agent.agentId}`;
-
-    let reply = "";
-    try {
-      const system =
-        style === "dungeon_master"
-          ? "You are a Dungeon Master in a fast-paced Discord bot. Be concise, vivid, and interactive. End with a question or a clear next action."
-          : style === "coach"
-          ? "You are a pragmatic coach. Give short, actionable steps. No fluff."
-          : style === "roast"
-          ? "You are a sarcastic but not hateful critic. Keep it PG-13, short, and safe."
-          : "You are a helpful assistant. Be concise and concrete.";
-
-      const prompt =
-        `User: ${interaction.user.username}\n` +
-        `Message: ${message}\n` +
-        `Reply as ${agentTag}.`;
-
-      reply = await generateText({ prompt, system });
-    } catch (err) {
-      reply = fallbackReply(style, message);
-    }
-
-    const embed = new EmbedBuilder()
-      .setTitle(`🛰️ ${agentTag}`)
-      .setColor(Colors.INFO)
-      .setDescription(String(reply).slice(0, 3500))
-      .setFooter({ text: publicMode ? "Public reply" : "Private reply" })
-      .setTimestamp();
-
-    try {
-      if (publicMode) {
-        await sendViaAgent({
-          agent: lease.agent,
-          guildId,
-          channelId,
-          actorUserId: interaction.user.id,
-          embeds: [embed.toJSON()]
-        });
-      } else {
-        await interaction.user.send({ embeds: [embed] });
+      const lease = await mgr.ensureTextSessionAgent(guildId, channelId, {
+        ownerUserId: interaction.user.id,
+        kind: "chat"
+      });
+      if (!lease.ok) {
+        const msg =
+          lease.reason === "no-agents-in-guild"
+            ? "No agents deployed in this guild. Use `/agents deploy 3` first."
+            : "All agents are currently busy. Try again in a few seconds, or deploy more agents.";
+        return await replyError(interaction, "Agent Unavailable", msg, true);
       }
-    } catch (err) {
-      mgr.releaseTextSession(guildId, channelId, { ownerUserId: interaction.user.id, kind: "chat" });
-      return await replyError(interaction, "Send Failed", "The agent couldn't deliver the message (missing perms or DMs blocked).", true);
-    } finally {
-      mgr.releaseTextSession(guildId, channelId, { ownerUserId: interaction.user.id, kind: "chat" });
-    }
 
-    await interaction.editReply({ embeds: [new EmbedBuilder().setColor(Colors.SUCCESS).setTitle("Sent").setDescription("Agent response delivered.")] });
+      const agentTag = lease.agent.tag ? lease.agent.tag : `Agent ${lease.agent.agentId}`;
+
+      let reply = "";
+      try {
+        const system =
+          style === "dungeon_master"
+            ? "You are a Dungeon Master in a fast-paced Discord bot. Be concise, vivid, and interactive. End with a question or a clear next action."
+            : style === "coach"
+            ? "You are a pragmatic coach. Give short, actionable steps. No fluff."
+            : style === "roast"
+            ? "You are a sarcastic but not hateful critic. Keep it PG-13, short, and safe."
+            : "You are a helpful assistant. Be concise and concrete.";
+
+        const prompt =
+          `User: ${interaction.user.username}\n` +
+          `Message: ${message}\n` +
+          `Reply as ${agentTag}.`;
+
+        reply = await generateText({ prompt, system });
+      } catch (err) {
+        reply = fallbackReply(style, message);
+      }
+
+      const embed = new EmbedBuilder()
+        .setTitle(`🛰️ ${agentTag}`)
+        .setColor(Colors.INFO)
+        .setDescription(String(reply).slice(0, 3500))
+        .setFooter({ text: publicMode ? "Public reply" : "Private reply" })
+        .setTimestamp();
+
+      try {
+        if (publicMode) {
+          await sendViaAgent({
+            agent: lease.agent,
+            guildId,
+            channelId,
+            actorUserId: interaction.user.id,
+            embeds: [embed.toJSON()]
+          });
+        } else {
+          await interaction.user.send({ embeds: [embed] });
+        }
+      } catch (err) {
+        mgr.releaseTextSession(guildId, channelId, { ownerUserId: interaction.user.id, kind: "chat" });
+        return await replyError(interaction, "Send Failed", "The agent couldn't deliver the message (missing perms or DMs blocked).", true);
+      } finally {
+        mgr.releaseTextSession(guildId, channelId, { ownerUserId: interaction.user.id, kind: "chat" });
+      }
+
+      await interaction.editReply({ embeds: [new EmbedBuilder().setColor(Colors.SUCCESS).setTitle("Sent").setDescription("Agent response delivered.")] });
+    }, { label: "agent" });
   }
 };
 

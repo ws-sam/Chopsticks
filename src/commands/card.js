@@ -10,6 +10,7 @@ import {
   ApplicationCommandType,
 } from 'discord.js';
 import { fetchAvatar, roundRect, drawCircleImage, drawWrappedText, drawProgressBar, createDarkCard, toPngBuffer } from '../utils/canvas.js';
+import { withTimeout } from '../utils/interactionTimeout.js';
 
 export const meta = {
   name: 'card',
@@ -45,30 +46,32 @@ export async function execute(interaction) {
   const sub = interaction.options.getSubcommand();
   await interaction.deferReply();
 
-  try {
-    if (sub === 'tweet') {
-      const buf = await buildTweetCard(interaction);
-      const att = new AttachmentBuilder(buf, { name: 'tweet.png' });
-      await interaction.editReply({ files: [att] });
-      return;
-    }
+  await withTimeout(interaction, async () => {
+    try {
+      if (sub === 'tweet') {
+        const buf = await buildTweetCard(interaction);
+        const att = new AttachmentBuilder(buf, { name: 'tweet.png' });
+        await interaction.editReply({ files: [att] });
+        return;
+      }
 
-    if (sub === 'quote') {
-      const buf = await buildQuoteCard(interaction);
-      const att = new AttachmentBuilder(buf, { name: 'quote.png' });
-      await interaction.editReply({ files: [att] });
-      return;
-    }
+      if (sub === 'quote') {
+        const buf = await buildQuoteCard(interaction);
+        const att = new AttachmentBuilder(buf, { name: 'quote.png' });
+        await interaction.editReply({ files: [att] });
+        return;
+      }
 
-    if (sub === 'profile') {
-      const buf = await buildProfileCard(interaction);
-      const att = new AttachmentBuilder(buf, { name: 'profile.png' });
-      await interaction.editReply({ files: [att] });
-      return;
+      if (sub === 'profile') {
+        const buf = await buildProfileCard(interaction);
+        const att = new AttachmentBuilder(buf, { name: 'profile.png' });
+        await interaction.editReply({ files: [att] });
+        return;
+      }
+    } catch (err) {
+      await interaction.editReply({ content: `❌ Failed to generate card: ${err.message}` });
     }
-  } catch (err) {
-    await interaction.editReply({ content: `❌ Failed to generate card: ${err.message}` });
-  }
+  }, { label: "card" });
 }
 
 // ── Tweet Card ────────────────────────────────────────────────────────────────

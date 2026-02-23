@@ -23,6 +23,7 @@ import {
 import { addCredits } from "../economy/wallet.js";
 import { addGameXp } from "../game/profile.js";
 import { recordQuestEvent } from "../game/quests.js";
+import { withTimeout } from "../utils/interactionTimeout.js";
 
 const SESSION_TTL_SECONDS = 15 * 60;
 const QUESTION_TIME_LIMIT_MS = 30_000;
@@ -1690,19 +1691,22 @@ export default {
 
     if (sub === "stop") {
       await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-      const active = await getActiveTriviaSessionId({ guildId, channelId, userId: interaction.user.id });
-      if (!active) {
-        return await replyError(interaction, "No Active Match", "You have no active trivia match in this channel.", true);
-      }
-      await finalizeSession(interaction.client, String(active), { reason: "forfeit", actorUserId: interaction.user.id });
-      return await interaction.editReply({
-        embeds: [
-          new EmbedBuilder()
-            .setColor(Colors.SUCCESS)
-            .setTitle("Forfeited")
-            .setDescription("Your trivia match has been ended.")
-        ]
-      });
+      await withTimeout(interaction, async () => {
+        const active = await getActiveTriviaSessionId({ guildId, channelId, userId: interaction.user.id });
+        if (!active) {
+          return await replyError(interaction, "No Active Match", "You have no active trivia match in this channel.", true);
+        }
+        await finalizeSession(interaction.client, String(active), { reason: "forfeit", actorUserId: interaction.user.id });
+        await interaction.editReply({
+          embeds: [
+            new EmbedBuilder()
+              .setColor(Colors.SUCCESS)
+              .setTitle("Forfeited")
+              .setDescription("Your trivia match has been ended.")
+          ]
+        });
+      }, { label: "trivia" });
+      return;
     }
 
     const isPublic = interaction.options.getBoolean("public");
@@ -1719,7 +1723,7 @@ export default {
     }
 
     await interaction.deferReply({ flags: publicMode ? undefined : MessageFlags.Ephemeral });
-
+    await withTimeout(interaction, async () => {
     const existing = await getActiveTriviaSessionId({ guildId, channelId, userId: interaction.user.id });
     if (existing) {
       const still = normalizeSession(await loadTriviaSession(String(existing)));
@@ -1839,6 +1843,7 @@ export default {
         await finalizeSession(interaction.client, sessionId, { reason: "lobby-timeout" });
       })().catch(() => {});
     }, LOBBY_TIMEOUT_MS);
+    }, { label: "trivia" });
   }
 };
 

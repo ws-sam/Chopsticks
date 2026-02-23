@@ -21,6 +21,7 @@ import {
   ALLOWED_PROVIDERS,
 } from "../utils/voiceConfig.js";
 import { validateProviderKey } from "../utils/voiceValidation.js";
+import { withTimeout } from "../utils/interactionTimeout.js";
 
 export const meta = {
   guildOnly: true,
@@ -98,51 +99,55 @@ export async function execute(interaction) {
 
 async function handleGet(interaction) {
   await interaction.deferReply({ ephemeral: true });
-  const cfg = await getGuildVoiceConfig(interaction.guildId);
+  await withTimeout(interaction, async () => {
+    const cfg = await getGuildVoiceConfig(interaction.guildId);
 
-  const embed = new EmbedBuilder()
-    .setTitle("🎙️ Voice AI Provider")
-    .setColor(cfg.provider === "none" ? 0x888888 : 0x00b4d8)
-    .addFields(
-      { name: "Provider", value: PROVIDER_LABELS[cfg.provider] ?? cfg.provider, inline: true },
-      { name: "API Key", value: cfg.hasApiKey ? "🔐 Linked" : "❌ Not linked", inline: true },
-    )
-    .setFooter({ text: "Use /model set to change provider • /model link to add your key" });
+    const embed = new EmbedBuilder()
+      .setTitle("🎙️ Voice AI Provider")
+      .setColor(cfg.provider === "none" ? 0x888888 : 0x00b4d8)
+      .addFields(
+        { name: "Provider", value: PROVIDER_LABELS[cfg.provider] ?? cfg.provider, inline: true },
+        { name: "API Key", value: cfg.hasApiKey ? "🔐 Linked" : "❌ Not linked", inline: true },
+      )
+      .setFooter({ text: "Use /model set to change provider • /model link to add your key" });
 
-  if (cfg.provider === "ollama" && cfg.ollamaUrl) {
-    embed.addFields({ name: "Ollama URL", value: cfg.ollamaUrl, inline: false });
-  }
+    if (cfg.provider === "ollama" && cfg.ollamaUrl) {
+      embed.addFields({ name: "Ollama URL", value: cfg.ollamaUrl, inline: false });
+    }
 
-  await interaction.editReply({ embeds: [embed] });
+    await interaction.editReply({ embeds: [embed] });
+  }, { label: "model" });
 }
 
 // ── /model set ───────────────────────────────────────────────────────────────
 
 async function handleSet(interaction) {
   await interaction.deferReply({ ephemeral: true });
-  const provider = interaction.options.getString("provider", true);
+  await withTimeout(interaction, async () => {
+    const provider = interaction.options.getString("provider", true);
 
-  await setGuildVoiceProvider(interaction.guildId, provider);
+    await setGuildVoiceProvider(interaction.guildId, provider);
 
-  const embed = new EmbedBuilder()
-    .setColor(0x00b4d8)
-    .setTitle("✅ Provider Updated")
-    .setDescription(`Voice AI provider set to **${PROVIDER_LABELS[provider] ?? provider}**`);
+    const embed = new EmbedBuilder()
+      .setColor(0x00b4d8)
+      .setTitle("✅ Provider Updated")
+      .setDescription(`Voice AI provider set to **${PROVIDER_LABELS[provider] ?? provider}**`);
 
-  const needsKey = provider === "anthropic" || provider === "openai";
-  if (needsKey) {
-    embed.addFields({
-      name: "⚠️ Next Step",
-      value: "Run `/model link` to connect your API key — voice AI won't work without it.",
-    });
-  } else if (provider === "ollama") {
-    embed.addFields({
-      name: "⚠️ Next Step",
-      value: "Run `/model link` with `ollama` selected to set your Ollama server URL.",
-    });
-  }
+    const needsKey = provider === "anthropic" || provider === "openai";
+    if (needsKey) {
+      embed.addFields({
+        name: "⚠️ Next Step",
+        value: "Run `/model link` to connect your API key — voice AI won't work without it.",
+      });
+    } else if (provider === "ollama") {
+      embed.addFields({
+        name: "⚠️ Next Step",
+        value: "Run `/model link` with `ollama` selected to set your Ollama server URL.",
+      });
+    }
 
-  await interaction.editReply({ embeds: [embed] });
+    await interaction.editReply({ embeds: [embed] });
+  }, { label: "model" });
 }
 
 // ── /model link ──────────────────────────────────────────────────────────────
@@ -184,16 +189,18 @@ async function handleLink(interaction) {
 
 async function handleUnset(interaction) {
   await interaction.deferReply({ ephemeral: true });
-  await clearGuildVoiceConfig(interaction.guildId);
+  await withTimeout(interaction, async () => {
+    await clearGuildVoiceConfig(interaction.guildId);
 
-  await interaction.editReply({
-    embeds: [
-      new EmbedBuilder()
-        .setColor(0xf03e3e)
-        .setTitle("🗑️ Voice AI Disabled")
-        .setDescription("Provider and API key removed. Voice AI will return empty responses."),
-    ],
-  });
+    await interaction.editReply({
+      embeds: [
+        new EmbedBuilder()
+          .setColor(0xf03e3e)
+          .setTitle("🗑️ Voice AI Disabled")
+          .setDescription("Provider and API key removed. Voice AI will return empty responses."),
+      ],
+    });
+  }, { label: "model" });
 }
 
 // ── Modal handler (registered in index.js) ────────────────────────────────────

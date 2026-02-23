@@ -19,6 +19,7 @@ import { listGuildScripts, upsertGuildScript } from "../scripting/store.js";
 import { validateScriptDefinition } from "../scripting/validator.js";
 import { normalizeModLogConfig } from "../utils/modLogs.js";
 import { normalizeTicketsConfig } from "../utils/tickets.js";
+import { withTimeout } from "../utils/interactionTimeout.js";
 
 const UI_PREFIX = "setupui";
 
@@ -261,26 +262,28 @@ export async function execute(interaction) {
 
   if (sub === "leveling") {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-    const { upsertGuildXpConfig } = await import('../utils/storage.js');
-    const preset = interaction.options.getString("preset") || "balanced";
-    const lvlupCh = interaction.options.getChannel("levelup_channel");
+    await withTimeout(interaction, async () => {
+      const { upsertGuildXpConfig } = await import('../utils/storage.js');
+      const preset = interaction.options.getString("preset") || "balanced";
+      const lvlupCh = interaction.options.getChannel("levelup_channel");
 
-    const PRESETS = {
-      relaxed:  { enabled: true,  xp_per_message: 3,  xp_per_vc_minute: 1, xp_per_work: 20, xp_per_gather: 15, xp_per_fight_win: 25, xp_per_trivia_win: 30, xp_per_daily: 50, xp_multiplier: 1.0, message_xp_cooldown_s: 120 },
-      balanced: { enabled: true,  xp_per_message: 5,  xp_per_vc_minute: 2, xp_per_work: 40, xp_per_gather: 30, xp_per_fight_win: 50, xp_per_trivia_win: 60, xp_per_daily: 80, xp_multiplier: 1.0, message_xp_cooldown_s: 60 },
-      grind:    { enabled: true,  xp_per_message: 10, xp_per_vc_minute: 5, xp_per_work: 80, xp_per_gather: 60, xp_per_fight_win: 100, xp_per_trivia_win: 120, xp_per_daily: 160, xp_multiplier: 1.5, message_xp_cooldown_s: 30 },
-      off:      { enabled: false },
-    };
+      const PRESETS = {
+        relaxed:  { enabled: true,  xp_per_message: 3,  xp_per_vc_minute: 1, xp_per_work: 20, xp_per_gather: 15, xp_per_fight_win: 25, xp_per_trivia_win: 30, xp_per_daily: 50, xp_multiplier: 1.0, message_xp_cooldown_s: 120 },
+        balanced: { enabled: true,  xp_per_message: 5,  xp_per_vc_minute: 2, xp_per_work: 40, xp_per_gather: 30, xp_per_fight_win: 50, xp_per_trivia_win: 60, xp_per_daily: 80, xp_multiplier: 1.0, message_xp_cooldown_s: 60 },
+        grind:    { enabled: true,  xp_per_message: 10, xp_per_vc_minute: 5, xp_per_work: 80, xp_per_gather: 60, xp_per_fight_win: 100, xp_per_trivia_win: 120, xp_per_daily: 160, xp_multiplier: 1.5, message_xp_cooldown_s: 30 },
+        off:      { enabled: false },
+      };
 
-    const vals = { ...(PRESETS[preset] || PRESETS.balanced) };
-    if (lvlupCh?.id) vals.levelup_channel_id = lvlupCh.id;
-    await upsertGuildXpConfig(interaction.guildId, vals);
+      const vals = { ...(PRESETS[preset] || PRESETS.balanced) };
+      if (lvlupCh?.id) vals.levelup_channel_id = lvlupCh.id;
+      await upsertGuildXpConfig(interaction.guildId, vals);
 
-    const lines = [`✅ **Per-guild leveling configured** — preset: **${preset}**`];
-    if (lvlupCh) lines.push(`📢 Level-up announcements → ${lvlupCh}`);
-    lines.push('');
-    lines.push('Fine-tune with `/xp config set`, `/xp config multiplier`, etc.');
-    await interaction.editReply({ content: lines.join('\n') });
+      const lines = [`✅ **Per-guild leveling configured** — preset: **${preset}**`];
+      if (lvlupCh) lines.push(`📢 Level-up announcements → ${lvlupCh}`);
+      lines.push('');
+      lines.push('Fine-tune with `/xp config set`, `/xp config multiplier`, etc.');
+      await interaction.editReply({ content: lines.join('\n') });
+    }, { label: "setup" });
     return;
   }
 

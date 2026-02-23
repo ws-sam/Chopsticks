@@ -1,6 +1,7 @@
 import { SlashCommandBuilder, EmbedBuilder, AttachmentBuilder } from "discord.js";
 import { createCanvas } from "@napi-rs/canvas";
 import { botLogger } from "../utils/modernLogger.js";
+import { withTimeout } from "../utils/interactionTimeout.js";
 
 export const meta = {
   category: "utility",
@@ -74,33 +75,35 @@ export async function execute(interaction) {
 
   await interaction.deferReply();
 
-  const [r, g, b] = hexToRgb(hex);
-  const [h, s, l] = rgbToHsl(r, g, b);
-  const colorInt = parseInt(hex.slice(1), 16);
+  await withTimeout(interaction, async () => {
+    const [r, g, b] = hexToRgb(hex);
+    const [h, s, l] = rgbToHsl(r, g, b);
+    const colorInt = parseInt(hex.slice(1), 16);
 
-  let buffer = null;
-  try {
-    buffer = makePreview(hex, r, g, b);
-  } catch (err) {
-    botLogger.warn({ err }, "[color] canvas preview failed");
-  }
+    let buffer = null;
+    try {
+      buffer = makePreview(hex, r, g, b);
+    } catch (err) {
+      botLogger.warn({ err }, "[color] canvas preview failed");
+    }
 
-  const embed = new EmbedBuilder()
-    .setTitle(`🎨 Color Preview: ${hex.toUpperCase()}`)
-    .setColor(colorInt)
-    .addFields(
-      { name: "HEX", value: `\`${hex.toUpperCase()}\``, inline: true },
-      { name: "RGB", value: `\`rgb(${r}, ${g}, ${b})\``, inline: true },
-      { name: "HSL", value: `\`hsl(${h}°, ${s}%, ${l}%)\``, inline: true },
-      { name: "Decimal", value: `\`${colorInt}\``, inline: true },
-    )
-    .setTimestamp();
+    const embed = new EmbedBuilder()
+      .setTitle(`🎨 Color Preview: ${hex.toUpperCase()}`)
+      .setColor(colorInt)
+      .addFields(
+        { name: "HEX", value: `\`${hex.toUpperCase()}\``, inline: true },
+        { name: "RGB", value: `\`rgb(${r}, ${g}, ${b})\``, inline: true },
+        { name: "HSL", value: `\`hsl(${h}°, ${s}%, ${l}%)\``, inline: true },
+        { name: "Decimal", value: `\`${colorInt}\``, inline: true },
+      )
+      .setTimestamp();
 
-  if (buffer) {
-    const attachment = new AttachmentBuilder(buffer, { name: "color.png" });
-    embed.setImage("attachment://color.png");
-    return interaction.editReply({ embeds: [embed], files: [attachment] });
-  }
+    if (buffer) {
+      const attachment = new AttachmentBuilder(buffer, { name: "color.png" });
+      embed.setImage("attachment://color.png");
+      return interaction.editReply({ embeds: [embed], files: [attachment] });
+    }
 
-  await interaction.editReply({ embeds: [embed] });
+    await interaction.editReply({ embeds: [embed] });
+  }, { label: "color" });
 }

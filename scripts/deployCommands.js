@@ -53,6 +53,13 @@ for (const file of commandFiles) {
 
   if (!cmd?.data?.toJSON) continue;
 
+  // Skip commands marked deployGlobal: false when doing global deploy
+  const cmdMeta = mod.meta ?? mod.default?.meta ?? null;
+  if (DEPLOY_MODE === "global" && cmdMeta?.deployGlobal === false) {
+    console.log(`⏭️  Skipping global deploy: ${cmd.data.name} (deployGlobal: false)`);
+    continue;
+  }
+
   commands.push(cmd.data.toJSON());
   console.log(`✅ Loaded command: ${cmd.data.name}`);
 }

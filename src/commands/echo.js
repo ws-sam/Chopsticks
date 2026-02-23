@@ -4,6 +4,7 @@ import { replyEmbed } from "../utils/discordOutput.js";
 export const meta = {
   category: "util",
   guildOnly: true,
+  deployGlobal: false,
 };
 
 export const data = new SlashCommandBuilder()

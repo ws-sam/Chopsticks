@@ -6,7 +6,8 @@ import { dispatchModerationLog } from "../utils/modLogs.js";
 export const meta = {
   guildOnly: true,
   userPerms: [PermissionFlagsBits.ManageNicknames],
-  category: "mod"
+  category: "mod",
+  deployGlobal: false,
 };
 
 export const data = new SlashCommandBuilder()

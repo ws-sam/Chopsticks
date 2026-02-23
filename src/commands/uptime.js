@@ -3,6 +3,7 @@ import { SlashCommandBuilder, MessageFlags } from "discord.js";
 export const meta = {
   category: "util",
   guildOnly: true,
+  deployGlobal: false,
 };
 
 export const data = new SlashCommandBuilder()

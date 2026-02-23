@@ -4,7 +4,8 @@ import { replySuccess, replyError } from "../utils/discordOutput.js";
 export const meta = {
   category: "tools",
   userPerms: ["ManageMessages"],
-  guildOnly: true
+  guildOnly: true,
+  deployGlobal: false,
 };
 
 /**

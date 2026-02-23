@@ -232,6 +232,19 @@ export const data = new SlashCommandBuilder()
   .addSubcommand(sub =>
     sub.setName("status").setDescription("Show current setup status summary")
   )
+  .addSubcommand(sub =>
+    sub
+      .setName("leveling")
+      .setDescription("Quick-configure per-guild XP leveling")
+      .addStringOption(o => o.setName("preset").setDescription("Leveling preset").setRequired(false)
+        .addChoices(
+          { name: "🌿 Relaxed — slow, chill progression", value: "relaxed" },
+          { name: "⚖️ Balanced — default rates", value: "balanced" },
+          { name: "🔥 Grind — fast, high engagement", value: "grind" },
+          { name: "🔴 Off — disable guild leveling", value: "off" },
+        ))
+      .addChannelOption(o => o.setName("levelup_channel").setDescription("Channel for level-up announcements").setRequired(false))
+  )
   .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild);
 
 export async function execute(interaction) {
@@ -243,6 +256,31 @@ export async function execute(interaction) {
   if (sub === "status") {
     const embed = await buildStatusEmbed(interaction.guild, guildData, channelId);
     await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+    return;
+  }
+
+  if (sub === "leveling") {
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    const { upsertGuildXpConfig } = await import('../utils/storage.js');
+    const preset = interaction.options.getString("preset") || "balanced";
+    const lvlupCh = interaction.options.getChannel("levelup_channel");
+
+    const PRESETS = {
+      relaxed:  { enabled: true,  xp_per_message: 3,  xp_per_vc_minute: 1, xp_per_work: 20, xp_per_gather: 15, xp_per_fight_win: 25, xp_per_trivia_win: 30, xp_per_daily: 50, xp_multiplier: 1.0, message_xp_cooldown_s: 120 },
+      balanced: { enabled: true,  xp_per_message: 5,  xp_per_vc_minute: 2, xp_per_work: 40, xp_per_gather: 30, xp_per_fight_win: 50, xp_per_trivia_win: 60, xp_per_daily: 80, xp_multiplier: 1.0, message_xp_cooldown_s: 60 },
+      grind:    { enabled: true,  xp_per_message: 10, xp_per_vc_minute: 5, xp_per_work: 80, xp_per_gather: 60, xp_per_fight_win: 100, xp_per_trivia_win: 120, xp_per_daily: 160, xp_multiplier: 1.5, message_xp_cooldown_s: 30 },
+      off:      { enabled: false },
+    };
+
+    const vals = { ...(PRESETS[preset] || PRESETS.balanced) };
+    if (lvlupCh?.id) vals.levelup_channel_id = lvlupCh.id;
+    await upsertGuildXpConfig(interaction.guildId, vals);
+
+    const lines = [`✅ **Per-guild leveling configured** — preset: **${preset}**`];
+    if (lvlupCh) lines.push(`📢 Level-up announcements → ${lvlupCh}`);
+    lines.push('');
+    lines.push('Fine-tune with `/xp config set`, `/xp config multiplier`, etc.');
+    await interaction.editReply({ content: lines.join('\n') });
     return;
   }
 

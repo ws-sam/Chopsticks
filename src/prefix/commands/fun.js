@@ -1,4 +1,4 @@
-import { EmbedBuilder } from "discord.js";
+import { EmbedBuilder, Colors } from "discord.js";
 import { reply, parseIntSafe } from "../helpers.js";
 import { clampIntensity } from "../../fun/variants.js";
 import {
@@ -7,6 +7,93 @@ import {
   renderFunFromRuntime,
   resolveVariantId
 } from "../../fun/runtime.js";
+import { createRequire } from "module";
+import { httpRequest } from "../../utils/httpFetch.js";
+
+const require = createRequire(import.meta.url);
+const RIDDLES = require("../../fun/riddles.json");
+const WYR_LIST = require("../../fun/wyr.json");
+
+// ── Ship helpers ──────────────────────────────────────────────────────────────
+const SHIP_FLAVOR = [
+  [0,  19,  "💔 Not meant to be. At all. The universe said no."],
+  [20, 39,  "😬 Rough start. Maybe as friends first?"],
+  [40, 54,  "🙂 There's potential — work on communication."],
+  [55, 69,  "😊 Pretty compatible! Things could go well."],
+  [70, 84,  "💕 Strong chemistry! You two really click."],
+  [85, 94,  "🔥 Power couple alert. Very high compatibility!"],
+  [95, 100, "💍 PERFECT MATCH. Absolutely destined. A love story for the ages."],
+];
+function shipScore(idA, idB) {
+  const [lo, hi] = [idA, idB].sort();
+  let h = 5381;
+  for (const c of `${lo}:${hi}`) h = ((h << 5) + h + c.charCodeAt(0)) >>> 0;
+  return h % 101;
+}
+function shipHearts(score) {
+  const filled = Math.round(score / 10);
+  return "❤️".repeat(filled) + "🖤".repeat(10 - filled);
+}
+
+// ── Truth or Dare prompts ─────────────────────────────────────────────────────
+const TOD_PROMPTS = {
+  truth: {
+    mild: [
+      "What's the most embarrassing song on your playlist?",
+      "What's a weird habit you have that you don't tell people about?",
+      "What's the last thing you Googled?",
+      "What's the most childish thing you still do?",
+      "Have you ever laughed so hard you snorted in public?",
+      "What's a food you secretly hate but pretend to like?",
+      "What's the most useless talent you have?",
+      "What's the weirdest dream you've ever had?",
+      "What's a movie everyone loves that you actually hate?",
+    ],
+    spicy: [
+      "What's the most awkward thing that's happened to you on a first date?",
+      "What's the pettiest reason you've ever unfollowed someone?",
+      "Have you ever ghosted someone? Tell the story.",
+      "What's something you've done that you'd never admit in public?",
+      "Who in this server do you think has the worst music taste?",
+    ],
+  },
+  dare: {
+    mild: [
+      "Send a voice message saying 'I love hot dogs' in the most dramatic voice possible.",
+      "Change your nickname to something embarrassing for the next 10 minutes.",
+      "Send the last GIF in your GIF history.",
+      "Type the next message with your eyes closed.",
+      "Share the most zoomed-in selfie you can take right now.",
+    ],
+    spicy: [
+      "Send a 'thinking of you' message to the last person you texted.",
+      "Post your most embarrassing photo from 3 years ago.",
+      "Impersonate another server member for the next 3 messages.",
+      "Rate everyone currently online in this server out of 10.",
+    ],
+  },
+};
+
+// ── Quote fallback bank ───────────────────────────────────────────────────────
+const QUOTE_FALLBACK = [
+  { text: "The only way to do great work is to love what you do.", author: "Steve Jobs" },
+  { text: "In the middle of every difficulty lies opportunity.", author: "Albert Einstein" },
+  { text: "Hard work beats talent when talent doesn't work hard.", author: "Tim Notke" },
+  { text: "You miss 100% of the shots you don't take.", author: "Wayne Gretzky" },
+  { text: "Why do programmers prefer dark mode? Because light attracts bugs.", author: "Anonymous" },
+  { text: "It's not a bug — it's an undocumented feature.", author: "Anonymous" },
+  { text: "Code is like humor. When you have to explain it, it's bad.", author: "Cory House" },
+];
+
+// ── Meme subs + fallbacks ─────────────────────────────────────────────────────
+const MEME_SUBS = ["dankmemes", "me_irl", "ProgrammerHumor", "memes", "funny"];
+const MEME_FALLBACK = [
+  { title: "This is fine 🔥", url: "https://i.imgur.com/c4jt321.png", sub: "r/me_irl" },
+  { title: "Expanding Brain", url: "https://i.imgur.com/nlme6QT.png", sub: "r/dankmemes" },
+  { title: "Distracted Boyfriend", url: "https://i.imgur.com/sq5NIpJ.jpg", sub: "r/memes" },
+  { title: "Surprised Pikachu", url: "https://i.imgur.com/0tWugmM.png", sub: "r/me_irl" },
+];
+const memeChannelCooldown = new Map(); // channelId → timestamp
 
 // ── 8-ball answer set (matches /8ball slash command — 20 answers) ──────────
 const ANSWERS = {
@@ -162,5 +249,190 @@ export default [
       const source = result.source ? ` [${result.source}]` : "";
       return reply(message, `${result.text}\n${result.metaLine}${source}`);
     }
-  }
+  },
+
+  // ── Cycle P3: Slash-mirrored prefix fun pack ──────────────────────────────
+
+  {
+    name: "meme",
+    aliases: ["m"],
+    description: "Get a random meme — !meme [sub]",
+    rateLimit: 5000,
+    async execute(message, args) {
+      const COOLDOWN_MS = 30_000;
+      const key = message.channelId || "dm";
+      const last = memeChannelCooldown.get(key) || 0;
+      if (Date.now() - last < COOLDOWN_MS) {
+        const rem = Math.ceil((COOLDOWN_MS - (Date.now() - last)) / 1000);
+        return message.reply(`⏳ Meme cooldown! Wait **${rem}s** in this channel.`);
+      }
+      memeChannelCooldown.set(key, Date.now());
+      const sub = args[0] || MEME_SUBS[Math.floor(Math.random() * MEME_SUBS.length)];
+      let title, imageUrl, subName;
+      try {
+        const data = await fetch(`https://meme-api.com/gimme/${encodeURIComponent(sub)}`, {
+          headers: { "User-Agent": "Chopsticks-Discord-Bot/1.5" },
+          signal: AbortSignal.timeout(8_000),
+        }).then(r => r.ok ? r.json() : null);
+        if (data && !data.nsfw && data.url && data.title) {
+          title = data.title; imageUrl = data.url;
+          subName = data.subreddit ? `r/${data.subreddit}` : `r/${sub}`;
+        }
+      } catch {}
+      if (!imageUrl) {
+        const fb = MEME_FALLBACK[Math.floor(Math.random() * MEME_FALLBACK.length)];
+        title = fb.title; imageUrl = fb.url; subName = fb.sub;
+      }
+      const embed = new EmbedBuilder()
+        .setTitle(title || "Random Meme")
+        .setImage(imageUrl)
+        .setColor(0xF0B232)
+        .setFooter({ text: `${subName} • Chopsticks !meme` });
+      await message.reply({ embeds: [embed] });
+    }
+  },
+
+  {
+    name: "wyr",
+    aliases: ["wouldyourather", "either"],
+    description: "Would you rather — !wyr",
+    rateLimit: 3000,
+    async execute(message) {
+      const pair = WYR_LIST[Math.floor(Math.random() * WYR_LIST.length)];
+      const embed = new EmbedBuilder()
+        .setTitle("🤔 Would You Rather…")
+        .setDescription(`**A)** ${pair[0]}\n\n**B)** ${pair[1]}`)
+        .setColor(0xFF73FA)
+        .setFooter({ text: "React with 🅰️ or 🅱️ to vote! • Chopsticks !wyr" });
+      const msg = await message.reply({ embeds: [embed] });
+      await msg.react("🅰️").catch(() => {});
+      await msg.react("🅱️").catch(() => {});
+    }
+  },
+
+  {
+    name: "tod",
+    aliases: ["truthordare", "td"],
+    description: "Truth or dare — !tod [truth|dare] [spicy]",
+    rateLimit: 3000,
+    async execute(message, args) {
+      const typeArg = (args[0] || "random").toLowerCase();
+      const intensity = args.includes("spicy") ? "spicy" : "mild";
+      const type = typeArg === "truth" || typeArg === "dare"
+        ? typeArg
+        : Math.random() < 0.5 ? "truth" : "dare";
+      const pool = TOD_PROMPTS[type][intensity];
+      const prompt = pool[Math.floor(Math.random() * pool.length)];
+      const isT = type === "truth";
+      const embed = new EmbedBuilder()
+        .setTitle(isT ? "🤔 Truth!" : "💪 Dare!")
+        .setDescription(prompt)
+        .setColor(isT ? 0x5865F2 : 0xED4245)
+        .setFooter({ text: `${intensity} • Chopsticks !tod` });
+      await message.reply({ embeds: [embed] });
+    }
+  },
+
+  {
+    name: "ship",
+    aliases: ["compatibility", "love"],
+    description: "Ship two users — !ship @user1 [@user2]",
+    rateLimit: 3000,
+    async execute(message, args) {
+      const mentioned = message.mentions.users;
+      const user1 = mentioned.first() || message.author;
+      const user2 = mentioned.size > 1 ? mentioned.at(1) : (mentioned.size === 1 ? message.author : null);
+      if (!user2 || user1.id === user2.id) {
+        return message.reply("💘 Usage: `!ship @user1 @user2` — ship two different users!");
+      }
+      const score = shipScore(user1.id, user2.id);
+      const [,, flavor] = SHIP_FLAVOR.find(([min, max]) => score >= min && score <= max);
+      const bar = `${shipHearts(score)} **${score}%**`;
+      const embed = new EmbedBuilder()
+        .setTitle("💘 Ship-O-Meter")
+        .setColor(score >= 70 ? Colors.Pink : score >= 40 ? Colors.Yellow : Colors.DarkRed)
+        .setDescription(`**${user1.username}** 💞 **${user2.username}**\n\n${bar}\n\n${flavor}`)
+        .setFooter({ text: "Science™ certified • Chopsticks !ship" });
+      await message.reply({ embeds: [embed] });
+    }
+  },
+
+  {
+    name: "quote",
+    aliases: ["q", "inspire"],
+    description: "Random quote — !quote [funny|programming]",
+    rateLimit: 4000,
+    async execute(message, args) {
+      const typeArg = (args[0] || "inspire").toLowerCase();
+      let quoteText = null, author = null;
+      if (typeArg === "inspire" || typeArg === "i") {
+        try {
+          const data = await httpRequest("quote", "https://zenquotes.io/api/random", {
+            method: "GET", headers: { "User-Agent": "Chopsticks-Discord-Bot/1.5" },
+          });
+          if (Array.isArray(data) && data[0]?.q) {
+            quoteText = data[0].q; author = data[0].a;
+          }
+        } catch {}
+      }
+      if (!quoteText) {
+        const fb = QUOTE_FALLBACK[Math.floor(Math.random() * QUOTE_FALLBACK.length)];
+        quoteText = fb.text; author = fb.author;
+      }
+      const embed = new EmbedBuilder()
+        .setTitle("💬 Quote")
+        .setDescription(`*"${quoteText}"*\n\n— **${author}**`)
+        .setColor(0xF0B232)
+        .setFooter({ text: "Chopsticks !quote" });
+      await message.reply({ embeds: [embed] });
+    }
+  },
+
+  {
+    name: "riddle",
+    aliases: ["brain", "puzzle"],
+    description: "Random riddle — !riddle [reveal]",
+    rateLimit: 3000,
+    async execute(message, args) {
+      const riddle = RIDDLES[Math.floor(Math.random() * RIDDLES.length)];
+      const reveal = args[0]?.toLowerCase() === "reveal";
+      const answerText = reveal ? `**Answer:** ${riddle.a}` : `**Answer:** ||${riddle.a}||`;
+      const embed = new EmbedBuilder()
+        .setTitle("🧩 Riddle Me This…")
+        .setColor(0x9B59B6)
+        .setDescription(`${riddle.q}\n\n${answerText}`)
+        .setFooter({ text: reveal ? "Answer revealed!" : "Click the spoiler to reveal • Chopsticks !riddle" });
+      await message.reply({ embeds: [embed] });
+    }
+  },
+
+  {
+    name: "trivia",
+    aliases: ["quiz", "q?"],
+    description: "Quick trivia question — !trivia [easy|normal|hard]",
+    rateLimit: 5000,
+    async execute(message, args) {
+      const { pickTriviaQuestion } = await import("../../game/trivia/bank.js");
+      const diff = ["easy", "normal", "hard"].includes(args[0]) ? args[0] : "normal";
+      let q;
+      try { q = await pickTriviaQuestion({ difficulty: diff }); } catch { q = null; }
+      if (!q) return message.reply("❌ Couldn't load a trivia question. Try again!");
+      const choices = [q.correct_answer, ...(q.incorrect_answers || [])].sort(() => Math.random() - 0.5);
+      const letters = ["A", "B", "C", "D"];
+      const lines = choices.slice(0, 4).map((c, i) => `**${letters[i]})** ${c}`);
+      const correctLetter = letters[choices.indexOf(q.correct_answer)];
+      const embed = new EmbedBuilder()
+        .setTitle("🧠 Trivia Question")
+        .setDescription([
+          `**${q.question}**`,
+          "",
+          ...lines,
+          "",
+          `||Answer: **${correctLetter}) ${q.correct_answer}**||`,
+        ].join("\n"))
+        .setColor(0x5865F2)
+        .setFooter({ text: `${diff} • ${q.category || "General"} • Chopsticks !trivia` });
+      await message.reply({ embeds: [embed] });
+    }
+  },
 ];

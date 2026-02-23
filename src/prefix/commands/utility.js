@@ -45,28 +45,80 @@ export default [
     rateLimit: 3000,
     async execute(message, args, ctx) {
       const query = args[0]?.toLowerCase();
+      const allCmds = Array.from(ctx.commands.values());
+
+      // Build category → commands map from tagged category field
+      const catMap = new Map();
+      for (const cmd of allCmds) {
+        const cat = cmd.category || "other";
+        if (!catMap.has(cat)) catMap.set(cat, []);
+        catMap.get(cat).push(cmd);
+      }
+
+      const CAT_EMOJI = {
+        meta: "⚙️", utility: "🔧", fun: "🎉", social: "💬",
+        info: "ℹ️", mod: "🔨", server: "🏰", media: "🎬",
+        economy: "💰", other: "📦",
+      };
+
       if (!query) {
-        const names = Array.from(ctx.commands.keys()).sort();
+        // Root help: category overview cards
+        const lines = [];
+        for (const [cat, cmds] of catMap) {
+          const emoji = CAT_EMOJI[cat] || "📦";
+          const sample = cmds.slice(0, 3).map(c => `\`${ctx.prefix}${c.name}\``).join(", ");
+          lines.push(`${emoji} **${cat}** (${cmds.length}) — ${sample}${cmds.length > 3 ? ` +${cmds.length - 3} more` : ""}`);
+        }
         const embed = new EmbedBuilder()
-          .setTitle("📖 Prefix Commands")
-          .setDescription(`Use \`${ctx.prefix}help <command>\` for details.\n\n\`\`\`${names.map(n => ctx.prefix + n).join("  ")}\`\`\``)
+          .setTitle("📖 Chopsticks — Prefix Commands")
+          .setDescription([
+            `Use \`${ctx.prefix}help <category>\` to list commands in a category.`,
+            `Use \`${ctx.prefix}help <command>\` for full command details.`,
+            "",
+            ...lines,
+          ].join("\n"))
           .setColor(0x5865F2)
-          .setFooter({ text: `${names.length} commands • Chopsticks` });
+          .setFooter({ text: `${allCmds.length} commands • Chopsticks` });
         return message.reply({ embeds: [embed] });
       }
-      const cmd = ctx.commands.get(query);
+
+      // Category lookup
+      if (catMap.has(query)) {
+        const cmds = catMap.get(query);
+        const emoji = CAT_EMOJI[query] || "📦";
+        const lines = cmds.map(c => {
+          const aliases = c.aliases?.length ? ` *(${c.aliases.map(a => `!${a}`).join(", ")})*` : "";
+          return `\`${ctx.prefix}${c.name}\`${aliases} — ${c.description || "No description"}`;
+        });
+        const embed = new EmbedBuilder()
+          .setTitle(`${emoji} ${query} commands`)
+          .setDescription(lines.join("\n").slice(0, 4000))
+          .setColor(0x5865F2)
+          .setFooter({ text: `${cmds.length} commands • Chopsticks` });
+        return message.reply({ embeds: [embed] });
+      }
+
+      // Command lookup (also check aliases)
+      let cmd = ctx.commands.get(query);
+      if (!cmd) {
+        cmd = allCmds.find(c => c.aliases?.includes(query));
+      }
       if (cmd) {
         const embed = new EmbedBuilder()
           .setTitle(`${ctx.prefix}${cmd.name}`)
           .setDescription(cmd.description || "No description.")
-          .setColor(0x5865F2)
-          .addFields(
-            cmd.aliases?.length ? { name: "Aliases", value: cmd.aliases.map(a => `\`${ctx.prefix}${a}\``).join(", "), inline: true } : null,
-            cmd.rateLimit ? { name: "Cooldown", value: `${cmd.rateLimit / 1000}s`, inline: true } : null,
-          ).filter(Boolean);
+          .setColor(0x5865F2);
+        if (cmd.aliases?.length)
+          embed.addFields({ name: "Aliases", value: cmd.aliases.map(a => `\`${ctx.prefix}${a}\``).join(", "), inline: true });
+        if (cmd.rateLimit)
+          embed.addFields({ name: "Cooldown", value: `${cmd.rateLimit / 1000}s`, inline: true });
+        if (cmd.guildOnly)
+          embed.addFields({ name: "Server Only", value: "Yes", inline: true });
+        embed.setFooter({ text: `Category: ${cmd.category || "other"} • Chopsticks` });
         return message.reply({ embeds: [embed] });
       }
-      return reply(message, `❌ No command named \`${query}\`.`);
+
+      return reply(message, `❌ No command or category named \`${query}\`. Try \`${ctx.prefix}help\` for the full list.`);
     }
   },
   {
@@ -124,5 +176,171 @@ export default [
         .setFooter({ text: "Chopsticks by WokSpec" });
       await message.reply({ embeds: [embed] });
     }
-  }
+  },
+
+  // ── Cycle P4: Prefix-exclusive text toys & quick games ────────────────────
+
+  {
+    name: "mock",
+    aliases: ["sponge", "spongebob"],
+    description: "mOcK tExT — !mock <text>",
+    rateLimit: 2000,
+    async execute(message, args) {
+      const text = args.join(" ").trim();
+      if (!text) return reply(message, "Usage: `!mock <text>`");
+      const mocked = text.split("").map((c, i) => i % 2 === 0 ? c.toLowerCase() : c.toUpperCase()).join("");
+      await message.reply(`🐸 ${mocked}`);
+    }
+  },
+
+  {
+    name: "reverse",
+    aliases: ["rev", "backwards"],
+    description: "Reverse text — !reverse <text>",
+    rateLimit: 2000,
+    async execute(message, args) {
+      const text = args.join(" ").trim();
+      if (!text) return reply(message, "Usage: `!reverse <text>`");
+      await message.reply(`🔄 ${[...text].reverse().join("")}`);
+    }
+  },
+
+  {
+    name: "clap",
+    aliases: ["👏"],
+    description: "Add 👏 between 👏 words — !clap <text>",
+    rateLimit: 2000,
+    async execute(message, args) {
+      if (!args.length) return reply(message, "Usage: `!clap <text>`");
+      await message.reply(args.join(" 👏 ") + " 👏");
+    }
+  },
+
+  {
+    name: "emojify",
+    aliases: ["emoji", "letters"],
+    description: "Turn text into letter emoji — !emojify <text>",
+    rateLimit: 2000,
+    async execute(message, args) {
+      const text = args.join(" ").trim().toLowerCase();
+      if (!text) return reply(message, "Usage: `!emojify <text>`");
+      const out = text.split("").map(c => {
+        if (c >= "a" && c <= "z") return `:regional_indicator_${c}:`;
+        if (c === " ") return "   ";
+        return c;
+      }).join(" ");
+      await message.reply(out.slice(0, 1990));
+    }
+  },
+
+  {
+    name: "rate",
+    aliases: ["rateit", "howgood"],
+    description: "Rate anything out of 10 — !rate <thing>",
+    rateLimit: 2000,
+    async execute(message, args) {
+      const thing = args.join(" ").trim();
+      if (!thing) return reply(message, "Usage: `!rate <thing>`");
+      // Deterministic-ish: hash the input for a consistent rating
+      let h = 0;
+      for (const c of thing.toLowerCase()) h = ((h << 5) + h + c.charCodeAt(0)) >>> 0;
+      const score = h % 11; // 0–10
+      const bar = "⭐".repeat(score) + "☆".repeat(10 - score);
+      const embed = new EmbedBuilder()
+        .setTitle("📊 Rating")
+        .setDescription(`**${thing}**\n\n${bar}\n\n**${score}/10**`)
+        .setColor(score >= 7 ? 0x57F287 : score >= 4 ? 0xFEE75C : 0xED4245)
+        .setFooter({ text: "Scientifically accurate™ • Chopsticks !rate" });
+      await message.reply({ embeds: [embed] });
+    }
+  },
+
+  {
+    name: "rps",
+    aliases: ["rockpaperscissors", "roshambo"],
+    description: "Rock paper scissors — !rps <rock|paper|scissors>",
+    rateLimit: 2000,
+    async execute(message, args) {
+      const MOVES = ["rock", "paper", "scissors"];
+      const EMOJI = { rock: "🪨", paper: "📄", scissors: "✂️" };
+      const player = args[0]?.toLowerCase();
+      if (!MOVES.includes(player)) return reply(message, "Usage: `!rps rock|paper|scissors`");
+      const bot = MOVES[Math.floor(Math.random() * 3)];
+      const result =
+        player === bot ? "🤝 **Tie!**"
+        : (player === "rock" && bot === "scissors") || (player === "paper" && bot === "rock") || (player === "scissors" && bot === "paper")
+          ? "🏆 **You win!**"
+          : "😈 **I win!**";
+      const embed = new EmbedBuilder()
+        .setTitle("✂️ Rock Paper Scissors")
+        .setDescription(`You: ${EMOJI[player]} **${player}**\nMe: ${EMOJI[bot]} **${bot}**\n\n${result}`)
+        .setColor(result.includes("You win") ? 0x57F287 : result.includes("Tie") ? 0xFEE75C : 0xED4245)
+        .setFooter({ text: "Chopsticks !rps" });
+      await message.reply({ embeds: [embed] });
+    }
+  },
+
+  {
+    name: "slots",
+    aliases: ["slot", "jackpot"],
+    description: "Spin the slots — !slots",
+    rateLimit: 4000,
+    async execute(message) {
+      const REELS = ["🍒", "🍋", "🍊", "🍇", "⭐", "💎", "7️⃣"];
+      const spin = () => REELS[Math.floor(Math.random() * REELS.length)];
+      const [a, b, c] = [spin(), spin(), spin()];
+      const jackpot = a === b && b === c;
+      const two = a === b || b === c || a === c;
+      const result = jackpot ? "🎉 **JACKPOT!**" : two ? "✨ **Almost!**" : "❌ **No match**";
+      const embed = new EmbedBuilder()
+        .setTitle("🎰 Slot Machine")
+        .setDescription(`[ ${a} | ${b} | ${c} ]\n\n${result}`)
+        .setColor(jackpot ? 0xF0B232 : two ? 0xFEE75C : 0x99AAB5)
+        .setFooter({ text: "Chopsticks !slots" });
+      await message.reply({ embeds: [embed] });
+    }
+  },
+
+  {
+    name: "pp",
+    aliases: ["size", "howbig"],
+    description: "Measure the pp — !pp [@user]",
+    rateLimit: 3000,
+    async execute(message) {
+      const target = message.mentions.users.first() || message.author;
+      let h = 0;
+      for (const c of target.id) h = ((h << 5) + h + c.charCodeAt(0)) >>> 0;
+      const size = h % 21; // 0–20
+      const bar = "8" + "=".repeat(size) + "D";
+      const embed = new EmbedBuilder()
+        .setTitle("📏 PP Meter")
+        .setDescription(`**${target.username}'s** pp:\n\`${bar}\` (${size}cm)`)
+        .setColor(0xFF73FA)
+        .setFooter({ text: "100% scientific • Chopsticks !pp" });
+      await message.reply({ embeds: [embed] });
+    }
+  },
+
+  {
+    name: "ascii",
+    aliases: ["figlet", "big"],
+    description: "Big ASCII banner — !ascii <text> (max 10 chars)",
+    rateLimit: 3000,
+    async execute(message, args) {
+      const text = args.join(" ").trim().slice(0, 10);
+      if (!text) return reply(message, "Usage: `!ascii <text>`");
+      // Simple block letter map (A–Z, 0–9)
+      const BLOCKS = {
+        A:"▲", B:"B", C:"C", D:"D", E:"E", F:"F", G:"G", H:"H", I:"I",
+        J:"J", K:"K", L:"L", M:"M", N:"N", O:"O", P:"P", Q:"Q", R:"R",
+        S:"S", T:"T", U:"U", V:"V", W:"W", X:"X", Y:"Y", Z:"Z",
+        " ":"  "
+      };
+      const big = text.toUpperCase().split("").map(c => {
+        const b = BLOCKS[c] || c;
+        return `**${b}**`;
+      }).join(" ");
+      await message.reply(`\`\`\`\n${text.toUpperCase()}\n\`\`\`\n${big}`);
+    }
+  },
 ];

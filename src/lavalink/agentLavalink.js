@@ -1,6 +1,7 @@
 // src/lavalink/agentLavalink.js
 import { LavalinkManager } from "lavalink-client";
 import { request } from "undici";
+import { logger } from "../utils/logger.js";
 
 export function createAgentLavalink(agentClient) {
   if (!agentClient?.user?.id) throw new Error("agent-client-not-ready");
@@ -236,7 +237,7 @@ export function createAgentLavalink(agentClient) {
     try {
       manager.on("error", err => {
         if (isTransientSocketError(err)) return;
-        console.error("[agent:lavalink:manager:error]", err?.message ?? err);
+        logger.error({ err }, "[agent:lavalink:manager:error]");
       });
     } catch {}
 
@@ -245,11 +246,7 @@ export function createAgentLavalink(agentClient) {
       manager.nodeManager?.on?.("reconnecting", () => {});
       manager.nodeManager?.on?.("error", (node, err) => {
         if (isTransientSocketError(err)) return;
-        console.error(
-          "[agent:lavalink:node:error]",
-          node?.options?.id ?? "node",
-          err?.message ?? err
-        );
+        logger.error({ err, node: node?.options?.id ?? "node" }, "[agent:lavalink:node:error]");
       });
     } catch {}
 
@@ -276,20 +273,20 @@ export function createAgentLavalink(agentClient) {
         : null;
       const providers = ctxProviders ?? providersRaw.split(",").map(s => s.trim()).filter(Boolean);
 
-      console.warn("[agent:lavalink:fallback] attempting", { reason, query, providers });
+      logger.warn("[agent:lavalink:fallback] attempting", { reason, query, providers });
 
       withCtxLock(ctx, async () => {
         try {
           const res = await search(ctx, query, track?.requester ?? null, providers);
           const fallback = res?.tracks?.[0];
           if (!fallback) {
-            console.warn("[agent:lavalink:fallback] no tracks found for:", query);
+            logger.warn("[agent:lavalink:fallback] no tracks found for:", query);
             return;
           }
           await softStopPlayback(ctx);
           await enqueueAndPlay(ctx, fallback);
         } catch (err) {
-          console.error("[agent:lavalink:fallback] failed:", err?.message ?? err, {
+          logger.error({ err }, "[agent:lavalink:fallback] failed:", err?.message ?? err, {
             query,
             providers,
             guildId,
@@ -297,7 +294,7 @@ export function createAgentLavalink(agentClient) {
           });
         }
       }).catch(err => {
-        console.error("[agent:lavalink:fallback] lock failed:", err?.message ?? err);
+        logger.error({ err }, "[agent:lavalink:fallback] lock failed:", err?.message ?? err);
       });
     };
 
@@ -309,6 +306,27 @@ export function createAgentLavalink(agentClient) {
         const reason = String(payload?.reason ?? "");
         if (reason === "LOAD_FAILED") {
           fallbackFromTrack(player, track, reason);
+        }
+      });
+      // Smart-queue autoplay — enqueue a similar track when queue empties
+      manager.on("queueEnd", async (player, track) => {
+        try {
+          const { isAutoplayEnabled, buildAutoNextSuggestion } = await import("../music/smartQueue.js");
+          if (!isAutoplayEnabled(player.guildId)) return;
+          if (!track?.info?.title) return;
+          const suggestion = await buildAutoNextSuggestion(
+            { title: track.info.title, author: track.info.author },
+            null
+          );
+          if (!suggestion) return;
+          const res = await player.search({ query: suggestion.searchQuery, source: "ytsearch" }, agentClient.user);
+          const next = res?.tracks?.[0];
+          if (!next) return;
+          await player.queue.add(next);
+          if (!player.playing && !player.paused) await player.play();
+          logger.debug({ guildId: player.guildId, track: suggestion.searchQuery }, "[smartQueue] auto-enqueued similar track");
+        } catch (err) {
+          logger.warn({ err }, "[smartQueue] queueEnd autoplay failed");
         }
       });
     } catch {}
@@ -409,7 +427,7 @@ export function createAgentLavalink(agentClient) {
     const next = prev
       .catch(err => {
         // Log lock chain errors to help debug issues
-        console.warn("[agent:lavalink:lock] previous promise failed:", key, err?.message);
+        logger.warn("[agent:lavalink:lock] previous promise failed:", key, err?.message);
       })
       .then(fn)
       .catch(err => {
@@ -423,7 +441,7 @@ export function createAgentLavalink(agentClient) {
             locks.delete(key);
           }
         } catch (err) {
-          console.error("[agent:lavalink:lock] cleanup failed:", key, err?.message);
+          logger.error({ err }, "[agent:lavalink:lock] cleanup failed:", key, err?.message);
         }
       });
 
@@ -587,7 +605,7 @@ export function createAgentLavalink(agentClient) {
         return true;
       }
     } catch (err) {
-      console.warn("[agent:lavalink:clearQueue] q.clear() failed:", err?.message);
+      logger.warn("[agent:lavalink:clearQueue] q.clear() failed:", err?.message);
     }
 
     try {
@@ -604,7 +622,7 @@ export function createAgentLavalink(agentClient) {
         return true;
       }
     } catch (err) {
-      console.warn("[agent:lavalink:clearQueue] fallback clear failed:", err?.message);
+      logger.warn("[agent:lavalink:clearQueue] fallback clear failed:", err?.message);
     }
     
     return false;
@@ -630,7 +648,7 @@ export function createAgentLavalink(agentClient) {
         }
         destroySession(ctx.guildId, ctx.voiceChannelId);
       } catch (err) {
-        console.error("[agent:lavalink:markStopping] destroy failed:", err?.message ?? err);
+        logger.error({ err }, "[agent:lavalink:markStopping] destroy failed:", err?.message ?? err);
       }
     }, Math.max(0, Math.trunc(ms)));
   }
@@ -772,23 +790,23 @@ export function createAgentLavalink(agentClient) {
   }
 
   async function ensureUnpaused(player, guildId) {
-    console.log(`[ensureUnpaused] Before: player.paused=${player.paused}`);
+    logger.debug(`[ensureUnpaused] Before: player.paused=${player.paused}`);
     await lavalinkPatch(player, guildId, { paused: false });
     // Force update player state
     if (player && typeof player.paused !== 'undefined') {
       player.paused = false;
     }
-    console.log(`[ensureUnpaused] After: player.paused=${player.paused}`);
+    logger.debug(`[ensureUnpaused] After: player.paused=${player.paused}`);
   }
 
   async function ensurePaused(player, guildId) {
-    console.log(`[ensurePaused] Before: player.paused=${player.paused}`);
+    logger.debug(`[ensurePaused] Before: player.paused=${player.paused}`);
     await lavalinkPatch(player, guildId, { paused: true });
     // Force update player state
     if (player && typeof player.paused !== 'undefined') {
       player.paused = true;
     }
-    console.log(`[ensurePaused] After: player.paused=${player.paused}`);
+    logger.debug(`[ensurePaused] After: player.paused=${player.paused}`);
   }
 
   async function restStopNow(player, guildId) {
@@ -999,7 +1017,7 @@ export function createAgentLavalink(agentClient) {
 
     if (first?.lastErr) {
       const msg = String(first.lastErr?.message ?? first.lastErr);
-      console.warn("[agent:lavalink:search] fallback exhausted:", msg);
+      logger.warn("[agent:lavalink:search] fallback exhausted:", msg);
     }
 
     return { tracks: [] };
@@ -1019,7 +1037,7 @@ export function createAgentLavalink(agentClient) {
 
   async function enqueueAndPlay(ctx, track) {
     return withCtxLock(ctx, async () => {
-      console.log(`[enqueueAndPlay] Starting for track: ${track.info?.title || track.title}`);
+      logger.debug(`[enqueueAndPlay] Starting for track: ${track.info?.title || track.title}`);
       ctx.lastActive = Date.now();
       clearStopping(ctx);
 
@@ -1039,30 +1057,30 @@ export function createAgentLavalink(agentClient) {
       const active = Boolean(player.playing || player.paused);
       const wasIdle = !active && upcomingCount === 0;
 
-      console.log(`[enqueueAndPlay] State: wasIdle=${wasIdle}, active=${active}, upcomingCount=${upcomingCount}, playing=${player.playing}, paused=${player.paused}`);
+      logger.debug(`[enqueueAndPlay] State: wasIdle=${wasIdle}, active=${active}, upcomingCount=${upcomingCount}, playing=${player.playing}, paused=${player.paused}`);
 
       if (wasIdle) {
-        console.log(`[enqueueAndPlay] Queue is idle, starting playback immediately`);
+        logger.debug(`[enqueueAndPlay] Queue is idle, starting playback immediately`);
         await waitForDiscordVoiceReady(ctx.guildId, ctx.voiceChannelId);
         await ensureUnpaused(player, ctx.guildId);
         const playResult = await player.play({ clientTrack: track });
-        console.log(`[enqueueAndPlay] player.play() result:`, playResult);
+        logger.debug(`[enqueueAndPlay] player.play() result:`, playResult);
         return { action: "playing" };
       }
 
       await player.queue.add(track);
-      console.log(`[enqueueAndPlay] Added track to queue`);
+      logger.debug(`[enqueueAndPlay] Added track to queue`);
 
       const cur = getCurrent(player);
       const nowActive = Boolean(player.playing || player.paused);
-      console.log(`[enqueueAndPlay] After add: cur=${!!cur}, nowActive=${nowActive}`);
+      logger.debug(`[enqueueAndPlay] After add: cur=${!!cur}, nowActive=${nowActive}`);
       if (!nowActive && !cur) {
-        console.log(`[enqueueAndPlay] Not active and no current track, forcing start`);
+        logger.debug(`[enqueueAndPlay] Not active and no current track, forcing start`);
         await forceStart(ctx);
         return { action: "playing" };
       }
 
-      console.log(`[enqueueAndPlay] Track queued, playback already active`);
+      logger.debug(`[enqueueAndPlay] Track queued, playback already active`);
       return { action: "queued" };
     });
   }
@@ -1111,18 +1129,18 @@ export function createAgentLavalink(agentClient) {
       const current = getCurrent(player);
       const queued = getQueueTracks(player).length;
 
-      console.log(`[pause] state=${state}, current=${!!current}, player.playing=${player.playing}, player.paused=${player.paused}, queued=${queued}`);
+      logger.debug(`[pause] state=${state}, current=${!!current}, player.playing=${player.playing}, player.paused=${player.paused}, queued=${queued}`);
 
       if (state === true) {
         if (!current && !player.playing) {
-          console.log(`[pause] Nothing playing, returning`);
+          logger.debug(`[pause] Nothing playing, returning`);
           return { ok: true, action: "nothing-playing" };
         }
         if (player.paused) {
-          console.log(`[pause] Already paused, returning`);
+          logger.debug(`[pause] Already paused, returning`);
           return { ok: true, action: "already-paused" };
         }
-        console.log(`[pause] Calling ensurePaused`);
+        logger.debug(`[pause] Calling ensurePaused`);
         await ensurePaused(player, ctx.guildId);
         return { ok: true, action: "paused" };
       }
@@ -1130,25 +1148,25 @@ export function createAgentLavalink(agentClient) {
       // Resume logic (state === false)
       if (current) {
         if (player.paused) {
-          console.log(`[pause/resume] Track is paused, calling ensureUnpaused`);
+          logger.debug(`[pause/resume] Track is paused, calling ensureUnpaused`);
           await ensureUnpaused(player, ctx.guildId);
           return { ok: true, action: "resumed" };
         }
-        console.log(`[pause/resume] Already playing`);
+        logger.debug(`[pause/resume] Already playing`);
         return { ok: true, action: "already-playing" };
       }
 
       if (!player.playing) {
         if (queued > 0) {
-          console.log(`[pause/resume] Nothing playing but has queue, forcing start`);
+          logger.debug(`[pause/resume] Nothing playing but has queue, forcing start`);
           await forceStart(ctx);
           return { ok: true, action: "resumed" };
         }
-        console.log(`[pause/resume] Nothing playing and no queue`);
+        logger.debug(`[pause/resume] Nothing playing and no queue`);
         return { ok: true, action: "nothing-playing" };
       }
 
-      console.log(`[pause/resume] Fallback: already playing`);
+      logger.debug(`[pause/resume] Fallback: already playing`);
       return { ok: true, action: "already-playing" };
     });
   }

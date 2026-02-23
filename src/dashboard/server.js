@@ -38,6 +38,9 @@ import { embedToCardSvg, renderEmbedCardPng } from "../render/svgCard.js";
 import Joi from "joi";
 import { generateCorrelationId } from "../utils/logger.js";
 import { installProcessSafety } from "../utils/processSafety.js";
+import { createRequire as _cjsRequire } from "node:module";
+const _require = _cjsRequire(import.meta.url);
+const jwt = _require("jsonwebtoken");
 
 const app = express();
 installProcessSafety("dashboard", dashboardLogger);
@@ -46,6 +49,9 @@ installProcessSafety("dashboard", dashboardLogger);
 applySecurityMiddleware(app);
 
 app.use(express.json({ limit: "200kb" }));
+// Serve static assets for the guild console SPA
+const __dashboardDir = path.dirname(new URL(import.meta.url).pathname);
+app.use("/console-assets", express.static(path.join(__dashboardDir, "public")));
 app.use((req, res, next) => {
   const requestId = String(req.headers["x-correlation-id"] || generateCorrelationId());
   const startedAt = Date.now();
@@ -303,6 +309,22 @@ function requireAdmin(req, res, next) {
     return;
   }
   next();
+}
+
+// Allows bot owners OR guild admins who authenticated via /console token.
+function requireGuildAdminOrOwner(guildId) {
+  return (req, res, next) => {
+    const id = guildId || req.params?.id;
+    if (isDashboardAdmin(req)) return next();
+    if (req.session?.guildAdmin && String(req.session.guildId) === String(id)) return next();
+    res.status(403).json({ ok: false, error: "not-authorized-for-guild" });
+  };
+}
+
+function getJwtSecret() {
+  return String(
+    process.env.DASHBOARD_SECRET || process.env.DASHBOARD_SESSION_SECRET || ""
+  ).trim();
 }
 
 function parsePeers() {
@@ -1560,6 +1582,79 @@ app.get("/login", (req, res) => {
   res.redirect(url);
 });
 
+// One-click console auth from /console Discord command
+app.get("/console-auth", async (req, res) => {
+  const token = String(req.query.token || "").trim();
+  if (!token) return res.status(400).send("Missing token.");
+
+  const secret = getJwtSecret();
+  if (!secret) return res.status(500).send("Dashboard secret not configured.");
+
+  let payload;
+  try {
+    payload = jwt.verify(token, secret);
+  } catch (err) {
+    return res.status(401).send(
+      `<html><body style="font-family:sans-serif;background:#0b0f1a;color:#e6e6e6;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
+        <div style="text-align:center"><h2>🔒 Link Expired or Invalid</h2><p>Run <code>/console</code> in Discord again to get a new link.</p>
+        <a href="/" style="color:#7c3aed">Return to dashboard</a></div></body></html>`
+    );
+  }
+
+  const { jti, userId, guildId, username, avatarHash } = payload;
+
+  // One-time use: try to atomically mark token as consumed
+  let ok = true;
+  const redisUrl = process.env.REDIS_URL;
+  if (redisUrl) {
+    try {
+      const rc = createClient({ url: redisUrl });
+      await rc.connect();
+      const result = await rc.set(`console_token_used:${jti}`, "1", { EX: 600, NX: true });
+      await rc.quit();
+      ok = result !== null; // null = already set = already used
+    } catch { /* Redis unavailable — allow */ }
+  }
+
+  if (!ok) {
+    return res.status(401).send(
+      `<html><body style="font-family:sans-serif;background:#0b0f1a;color:#e6e6e6;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
+        <div style="text-align:center"><h2>🔒 Link Already Used</h2><p>Each console link can only be used once.<br>Run <code>/console</code> again for a fresh link.</p>
+        <a href="/" style="color:#7c3aed">Return to dashboard</a></div></body></html>`
+    );
+  }
+
+  // Create guild-scoped session
+  req.session.userId = String(userId);
+  req.session.username = String(username || "");
+  req.session.avatar = String(avatarHash || "");
+  req.session.guildAdmin = true;
+  req.session.guildId = String(guildId);
+  req.session.consoleAuth = true;
+  await new Promise(r => req.session.save(r));
+
+  res.redirect(`/guild/${guildId}`);
+});
+
+// Guild console SPA
+app.get("/guild/:id", requireAuth, (req, res) => {
+  const guildId = req.params.id;
+  // Auth check: must be bot admin OR the guild admin who console-authed for this guild
+  const isOwner = isDashboardAdmin(req);
+  const isGuildAdmin = req.session?.guildAdmin && String(req.session.guildId) === String(guildId);
+  if (!isOwner && !isGuildAdmin) {
+    return res.redirect(`/?error=unauthorized&guild=${guildId}`);
+  }
+
+  const __dirname2 = path.dirname(new URL(import.meta.url).pathname);
+  const spaPath = path.join(__dirname2, "public", "guild.html");
+  if (fs.existsSync(spaPath)) {
+    return res.sendFile(spaPath);
+  }
+  // Fallback: inline SPA shell
+  res.redirect(`/?guild=${guildId}`);
+});
+
 app.get("/oauth/callback", async (req, res) => {
   const code = String(req.query.code || "");
   if (!code) {
@@ -1609,24 +1704,33 @@ app.get("/api/guilds", requireAuth, rateLimitDashboard, requireAdmin, async (req
   res.json({ ok: true, guilds: out });
 });
 
-app.get("/api/guild/:id", requireAuth, rateLimitDashboard, requireAdmin, async (req, res) => {
+app.get("/api/guild/:id", requireAuth, rateLimitDashboard, requireGuildAdminOrOwner(), async (req, res) => {
   const guildId = String(req.params.id || "");
   if (!guildId || !isSnowflake(guildId)) {
     res.status(400).json({ ok: false, error: "bad-guild" });
     return;
   }
 
-  const guilds = (await apiGet("https://discord.com/api/users/@me/guilds", req.session.accessToken)) || [];
-  const guild = guilds.find(g => g.id === guildId);
-  if (!guild) {
-    res.status(403).json({ ok: false, error: "no-permission" });
-    return;
-  }
-  const canManage = manageGuildPerms(guild);
-  const access = await hasDashboardAccess(guildId, req.session?.userId, canManage);
-  if (!access.ok) {
-    res.status(403).json({ ok: false, error: "no-permission" });
-    return;
+  // Console-auth sessions (guild admins via /console) don't have a Discord OAuth token —
+  // they are already validated by requireGuildAdminOrOwner; fetch guild info via bot.
+  let guild, canManage;
+  if (req.session?.guildAdmin && req.session?.consoleAuth) {
+    const botGuild = await botGet(`https://discord.com/api/guilds/${guildId}?with_counts=true`);
+    guild = botGuild ? { id: guildId, name: botGuild.name, icon: botGuild.icon } : { id: guildId };
+    canManage = true;
+  } else {
+    const guilds = (await apiGet("https://discord.com/api/users/@me/guilds", req.session.accessToken)) || [];
+    guild = guilds.find(g => g.id === guildId);
+    if (!guild) {
+      res.status(403).json({ ok: false, error: "no-permission" });
+      return;
+    }
+    canManage = manageGuildPerms(guild);
+    const access = await hasDashboardAccess(guildId, req.session?.userId, canManage);
+    if (!access.ok) {
+      res.status(403).json({ ok: false, error: "no-permission" });
+      return;
+    }
   }
 
   const music = await getMusicConfig(guildId);
@@ -1671,7 +1775,7 @@ app.get("/api/guild/:id", requireAuth, rateLimitDashboard, requireAdmin, async (
   });
 });
 
-app.get("/api/guild/:id/sessions", requireAuth, rateLimitDashboard, requireAdmin, async (req, res) => {
+app.get("/api/guild/:id/sessions", requireAuth, rateLimitDashboard, requireGuildAdminOrOwner(), async (req, res) => {
   const guildId = String(req.params.id || "");
   if (!guildId || !isSnowflake(guildId)) {
     res.status(400).json({ ok: false, error: "bad-guild" });
@@ -1699,7 +1803,7 @@ app.get("/api/instances", requireAuth, rateLimitDashboard, requireAdmin, async (
   res.json({ ok: true, instances });
 });
 
-app.get("/api/guild/:id/analytics", requireAuth, rateLimitDashboard, requireAdmin, async (req, res) => {
+app.get("/api/guild/:id/analytics", requireAuth, rateLimitDashboard, requireGuildAdminOrOwner(), async (req, res) => {
   const guildId = String(req.params.id || "");
   const days = Number(req.query.days || 7);
   if (!guildId || !isSnowflake(guildId)) {
@@ -1745,7 +1849,7 @@ app.get("/api/internal/status", async (req, res) => {
   });
 });
 
-app.get("/api/guild/:id/audit", requireAuth, rateLimitDashboard, requireAdmin, async (req, res) => {
+app.get("/api/guild/:id/audit", requireAuth, rateLimitDashboard, requireGuildAdminOrOwner(), async (req, res) => {
   const guildId = String(req.params.id || "");
   const before = req.query.before ? Number(req.query.before) : null;
   const limit = req.query.limit ? Number(req.query.limit) : 50;
@@ -1783,14 +1887,18 @@ app.get("/api/me", requireAuth, rateLimitDashboard, async (req, res) => {
   const pets = await getUserPets(userId);
   const myPools = await fetchPoolsByOwner(userId);
   const publicPools = await listPools();
+  const csrf = ensureCsrf(req);
   
   res.json({ 
     ok: true, 
+    csrfToken: csrf,
     user: { 
       id: userId, 
       username: req.session.username,
       avatar: req.session.avatar
     },
+    guildAdmin: req.session?.guildAdmin ?? false,
+    scopedGuildId: req.session?.guildId ?? null,
     pets,
     myPools,
     publicPools
@@ -2152,7 +2260,7 @@ app.post("/api/guild/:id/music/default", requireAuth, rateLimitDashboard, requir
   res.json({ ok: true, ...out });
 });
 
-app.post("/api/guild/:id/music/control", requireAuth, rateLimitDashboard, requireCsrf, requireAdmin, async (req, res) => {
+app.post("/api/guild/:id/music/control", requireAuth, rateLimitDashboard, requireCsrf, requireGuildAdminOrOwner(), async (req, res) => {
   const guildId = String(req.params.id || "");
   const { voiceChannelId, action, query } = req.body ?? {};
   if (!guildId || !isSnowflake(guildId) || !isSnowflake(String(voiceChannelId || "")) || !action) {
@@ -2239,7 +2347,7 @@ app.post("/api/guild/:id/music/control", requireAuth, rateLimitDashboard, requir
   res.json({ ok: true, result: agentRes ?? null });
 });
 
-app.get("/api/guild/:id/music/queue", requireAuth, rateLimitDashboard, requireAdmin, async (req, res) => {
+app.get("/api/guild/:id/music/queue", requireAuth, rateLimitDashboard, requireGuildAdminOrOwner(), async (req, res) => {
   const guildId = String(req.params.id || "");
   const voiceChannelId = String(req.query.voiceChannelId || "");
   if (!guildId || !isSnowflake(guildId) || !isSnowflake(voiceChannelId)) {
@@ -2277,7 +2385,7 @@ app.get("/api/guild/:id/music/queue", requireAuth, rateLimitDashboard, requireAd
   res.json({ ok: true, ...data });
 });
 
-app.post("/api/guild/:id/music/remove", requireAuth, rateLimitDashboard, requireCsrf, requireAdmin, async (req, res) => {
+app.post("/api/guild/:id/music/remove", requireAuth, rateLimitDashboard, requireCsrf, requireGuildAdminOrOwner(), async (req, res) => {
   const guildId = String(req.params.id || "");
   const { voiceChannelId, index } = req.body ?? {};
   if (!guildId || !isSnowflake(guildId) || !isSnowflake(String(voiceChannelId || "")) || index === undefined) {
@@ -2316,7 +2424,7 @@ app.post("/api/guild/:id/music/remove", requireAuth, rateLimitDashboard, require
   res.json({ ok: true });
 });
 
-app.post("/api/guild/:id/music/preset", requireAuth, rateLimitDashboard, requireCsrf, requireAdmin, async (req, res) => {
+app.post("/api/guild/:id/music/preset", requireAuth, rateLimitDashboard, requireCsrf, requireGuildAdminOrOwner(), async (req, res) => {
   const guildId = String(req.params.id || "");
   const { voiceChannelId, preset } = req.body ?? {};
   if (!guildId || !isSnowflake(guildId) || !isSnowflake(String(voiceChannelId || "")) || !preset) {
@@ -2412,7 +2520,7 @@ app.post("/api/guild/:id/assistant/config", requireAuth, rateLimitDashboard, req
   res.json({ ok: true, assistant: out.assistant });
 });
 
-app.post("/api/guild/:id/assistant/control", requireAuth, rateLimitDashboard, requireCsrf, requireAdmin, async (req, res) => {
+app.post("/api/guild/:id/assistant/control", requireAuth, rateLimitDashboard, requireCsrf, requireGuildAdminOrOwner(), async (req, res) => {
   const guildId = String(req.params.id || "");
   const { voiceChannelId, action, seconds, text } = req.body ?? {};
   if (!guildId || !isSnowflake(guildId) || !isSnowflake(String(voiceChannelId || "")) || !action) {
@@ -2532,7 +2640,7 @@ app.post("/api/guild/:id/assistant/control", requireAuth, rateLimitDashboard, re
   res.json({ ok: true, result });
 });
 
-app.post("/api/guild/:id/assistant/install-voice", requireAuth, rateLimitDashboard, requireCsrf, requireAdmin, async (req, res) => {
+app.post("/api/guild/:id/assistant/install-voice", requireAuth, rateLimitDashboard, requireCsrf, requireGuildAdminOrOwner(), async (req, res) => {
   const preset = String(req.body?.preset || "").trim();
   if (!preset) {
     res.status(400).json({ ok: false, error: "missing-preset" });

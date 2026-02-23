@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chopsticks Console</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/console-assets/css/dashboard.css" />
+</head>
+<body>
+  <div id="app">
+    <div class="splash">
+      <div class="splash-inner">
+        <div class="splash-logo">🥢</div>
+        <div class="splash-title">Chopsticks Console</div>
+        <div class="splash-subtitle">Loading your server control panel…</div>
+        <div class="splash-loader"><div class="loader-bar"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <template id="tpl-shell">
+    <div class="shell">
+      <!-- Sidebar -->
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+          <div class="sidebar-logo">🥢</div>
+          <div class="sidebar-guild">
+            <div class="sidebar-guild-name" id="guild-name">Loading…</div>
+            <div class="sidebar-guild-id" id="guild-id-display"></div>
+          </div>
+        </div>
+
+        <nav class="sidebar-nav">
+          <button class="nav-item active" data-page="overview">
+            <span class="nav-icon">⚡</span><span class="nav-label">Overview</span>
+          </button>
+          <button class="nav-item" data-page="music">
+            <span class="nav-icon">🎵</span><span class="nav-label">Music</span>
+          </button>
+          <button class="nav-item" data-page="pools">
+            <span class="nav-icon">🤖</span><span class="nav-label">Agent Pools</span>
+          </button>
+          <button class="nav-item" data-page="voice">
+            <span class="nav-icon">🔊</span><span class="nav-label">Voice Rooms</span>
+          </button>
+          <button class="nav-item" data-page="audiobook">
+            <span class="nav-icon">📖</span><span class="nav-label">Audiobooks</span>
+          </button>
+          <button class="nav-item" data-page="logs">
+            <span class="nav-icon">📋</span><span class="nav-label">Logs</span>
+          </button>
+          <button class="nav-item" data-page="settings">
+            <span class="nav-icon">⚙️</span><span class="nav-label">Settings</span>
+          </button>
+        </nav>
+
+        <div class="sidebar-footer">
+          <div class="user-info">
+            <img class="user-avatar" id="user-avatar" src="" alt="" />
+            <div>
+              <div class="user-name" id="user-name">…</div>
+              <div class="user-role admin-badge" id="user-role">Admin</div>
+            </div>
+          </div>
+          <a href="/logout" class="btn-logout" title="Sign out">↩</a>
+        </div>
+      </aside>
+
+      <!-- Main content -->
+      <main class="main-content" id="main-content">
+        <div class="page-header">
+          <button class="sidebar-toggle" id="sidebar-toggle">☰</button>
+          <div>
+            <h1 class="page-title" id="page-title">Overview</h1>
+            <p class="page-sub" id="page-sub">Server dashboard</p>
+          </div>
+          <div class="header-actions">
+            <button class="btn btn-ghost" id="refresh-btn" title="Refresh data">↻</button>
+          </div>
+        </div>
+
+        <div class="page-body" id="page-body">
+          <!-- Dynamic content renders here -->
+        </div>
+      </main>
+    </div>
+  </template>
+
+  <script type="module" src="/console-assets/js/dashboard.js"></script>
+</body>
+</html>

@@ -5,6 +5,10 @@ import { SlashCommandBuilder, EmbedBuilder, Colors } from 'discord.js';
 import { generateText } from '../utils/textLlm.js';
 import { checkRateLimit } from '../utils/ratelimit.js';
 import { withTimeout } from "../utils/interactionTimeout.js";
+import { createRequire } from "module";
+
+const require = createRequire(import.meta.url);
+const FALLBACK_ROASTS = require('../fun/roasts.json');
 
 export const meta = {
   name: 'roast',
@@ -33,6 +37,12 @@ export const data = new SlashCommandBuilder()
 const RATE_LIMIT_KEY = 'roast';
 const RATE_LIMIT_WINDOW = 60; // seconds
 
+// Track recently roasted targets per invoker to prevent spam-targeting the same user
+// Map<invokerId, { targetId, count, firstAt }>
+const TARGET_SPAM_MAP = new Map();
+const TARGET_SPAM_WINDOW = 5 * 60 * 1000; // 5 minutes
+const TARGET_SPAM_LIMIT = 3;
+
 const SYSTEM_PROMPTS = {
   playful: 'You are a witty comedian. Write a short, funny, PLAYFUL roast (2-3 sentences). Keep it light and fun, not genuinely mean. No slurs, no profanity.',
   hard: 'You are a savage comedian. Write a sharp, clever roast (2-3 sentences). Keep it creative and punchy. No slurs, no profanity.',
@@ -40,19 +50,18 @@ const SYSTEM_PROMPTS = {
   rap: 'You are a battle rapper. Write a short rap verse roasting the target (4 lines, rhyming). Keep it clever and fun, no slurs.',
 };
 
-// Fallback roasts when LLM is unavailable
-const FALLBACK_ROASTS = [
-  "Their WiFi password is 'password123' — and they're proud of it.",
-  "They use Internet Explorer... unironically.",
-  "Their GitHub is just a long list of 'initial commit' entries.",
-  "The only thing they've ever committed to is a 60-day free trial that auto-renewed.",
-  "They once opened a terminal and immediately googled 'how to close a terminal'.",
-  "Their README just says 'TODO: write readme'.",
-  "They reply to DMs with 'k' and think that's a full conversation.",
-  "They muted the server notifications but still complain about missing announcements.",
-  "Their code is so spaghetti that even Italian grandmothers are confused.",
-  "They joined 47 servers and haven't talked in any of them.",
-];
+/** Picks a random fallback roast, avoiding the last N seen (no-repeat window). */
+const _lastPicked = new Map(); // userId → Set of recently used indices
+function pickFallbackRoast(userId) {
+  const seen = _lastPicked.get(userId) || new Set();
+  const available = FALLBACK_ROASTS.map((_, i) => i).filter(i => !seen.has(i));
+  const pool = available.length > 0 ? available : Array.from({ length: FALLBACK_ROASTS.length }, (_, i) => i);
+  const idx = pool[Math.floor(Math.random() * pool.length)];
+  if (seen.size >= 20) seen.clear(); // Reset after 20 uses
+  seen.add(idx);
+  _lastPicked.set(userId, seen);
+  return FALLBACK_ROASTS[idx];
+}
 
 export async function execute(interaction) {
   const target = interaction.options.getUser('target') || interaction.user;
@@ -67,6 +76,22 @@ export async function execute(interaction) {
     return;
   }
 
+  // Anti-spam: block spamming the same target repeatedly
+  if (!isSelf) {
+    const spamKey = interaction.user.id;
+    const spamEntry = TARGET_SPAM_MAP.get(spamKey);
+    const now = Date.now();
+    if (spamEntry && spamEntry.targetId === target.id && (now - spamEntry.firstAt) < TARGET_SPAM_WINDOW) {
+      if (spamEntry.count >= TARGET_SPAM_LIMIT) {
+        await interaction.reply({ content: `⚠️ Give them a break! You've roasted **${target.username}** too many times recently. Try a different target.`, ephemeral: true });
+        return;
+      }
+      spamEntry.count++;
+    } else {
+      TARGET_SPAM_MAP.set(spamKey, { targetId: target.id, count: 1, firstAt: now });
+    }
+  }
+
   await interaction.deferReply();
   await withTimeout(interaction, async () => {
     const targetName = target.displayName || target.username;
@@ -79,8 +104,7 @@ export async function execute(interaction) {
     } catch {}
 
     if (!roastText || roastText.trim().length < 10) {
-      // Fallback roast
-      roastText = FALLBACK_ROASTS[Math.floor(Math.random() * FALLBACK_ROASTS.length)];
+      roastText = pickFallbackRoast(interaction.user.id);
     }
 
     const embed = new EmbedBuilder()

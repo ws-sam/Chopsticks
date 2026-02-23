@@ -4,6 +4,8 @@
 import { SlashCommandBuilder, AttachmentBuilder, EmbedBuilder, Colors } from 'discord.js';
 import { withTimeout } from '../utils/interactionTimeout.js';
 import { sanitizeString } from '../utils/validation.js';
+import { checkRateLimit } from '../utils/ratelimit.js';
+import { loadGuildData } from '../utils/storage.js';
 
 export const meta = {
   name: 'imagine',
@@ -59,13 +61,22 @@ export async function execute(interaction) {
   const prompt = sanitizeString(interaction.options.getString('prompt'));
   const style = interaction.options.getString('style') || 'default';
 
+  // Guild opt-in check (imagegen defaults to enabled; admins can disable via /config)
+  if (interaction.guildId) {
+    const guildData = await loadGuildData(interaction.guildId).catch(() => ({}));
+    if (guildData.imagegen === false) {
+      await interaction.reply({ content: '❌ Image generation has been disabled in this server.', ephemeral: true });
+      return;
+    }
+  }
+
   // Safety filter
   if (BANNED.test(prompt)) {
     await interaction.reply({ content: '❌ Your prompt contains disallowed content.', ephemeral: true });
     return;
   }
 
-  // Rate limit per user per guild
+  // Per-user rate limit (30s cooldown)
   const rlKey = `${interaction.guildId || 'dm'}:${interaction.user.id}`;
   const lastUsed = rateLimits.get(rlKey) || 0;
   if (Date.now() - lastUsed < RATE_LIMIT_MS) {
@@ -73,9 +84,21 @@ export async function execute(interaction) {
     await interaction.reply({ content: `⏳ Please wait **${remaining}s** before generating another image.`, ephemeral: true });
     return;
   }
+
+  // Per-guild rate limit (5 per hour)
+  if (interaction.guildId) {
+    const guildRl = await checkRateLimit(`imagine:guild:${interaction.guildId}`, 5, 3600).catch(() => ({ ok: true }));
+    if (!guildRl.ok) {
+      const remaining = Math.ceil(guildRl.retryAfter || 60);
+      await interaction.reply({ content: `⏳ This server has hit the image generation limit (5/hr). Try again in **${remaining}s**.`, ephemeral: true });
+      return;
+    }
+  }
+
   rateLimits.set(rlKey, Date.now());
 
   await interaction.deferReply();
+  await interaction.editReply({ content: '🖼️ Generating your image… this may take up to 30 seconds.' });
 
   await withTimeout(interaction, async () => {
     const fullPrompt = prompt + (STYLE_SUFFIXES[style] || '');
@@ -122,11 +145,18 @@ export async function execute(interaction) {
         if (!res.ok) {
           const errorText = await res.text().catch(() => '');
           if (res.status === 503) {
-            // Model loading — try next
-            lastError = `Model ${model} is loading, please try again in a moment.`;
+            lastError = `model_loading`;
             continue;
           }
-          lastError = `Model ${model} returned ${res.status}: ${errorText.slice(0, 100)}`;
+          if (res.status === 401 || res.status === 403) {
+            lastError = `api_key_invalid`;
+            break; // No point retrying other models with a bad key
+          }
+          if (errorText.toLowerCase().includes('safety') || errorText.toLowerCase().includes('filter')) {
+            lastError = `safety_filter`;
+            break; // Prompt blocked — no point retrying
+          }
+          lastError = `http_${res.status}`;
           continue;
         }
 
@@ -152,11 +182,18 @@ export async function execute(interaction) {
     }
 
     if (!imageBuffer) {
+      const errorMessages = {
+        model_loading: '🕐 All models are warming up. HuggingFace free tier models spin down between uses — **try again in 30 seconds**.',
+        api_key_invalid: '🔑 The HuggingFace API key is invalid or expired. Contact the bot owner.',
+        safety_filter: '🛡️ Your prompt was blocked by the model\'s safety filter. Try rephrasing it.',
+      };
+      const desc = errorMessages[lastError] || `Generation failed (${lastError || 'unknown error'}). Try again in a moment.`;
       await interaction.editReply({
+        content: null,
         embeds: [new EmbedBuilder()
           .setTitle('❌ Image Generation Failed')
           .setColor(Colors.Red)
-          .setDescription(`Could not generate image. ${lastError || 'Please try again in a moment.'}\n\nTip: HuggingFace free tier models sometimes need a warm-up — try again in 30 seconds.`)
+          .setDescription(desc)
         ]
       });
       return;
@@ -171,6 +208,6 @@ export async function execute(interaction) {
       .setColor(Colors.Blurple)
       .setFooter({ text: `Model: ${usedModel?.split('/')[1] || usedModel} • Powered by HuggingFace` });
 
-    await interaction.editReply({ embeds: [embed], files: [att] });
+    await interaction.editReply({ content: null, embeds: [embed], files: [att] });
   }, { label: "imagine" });
 }

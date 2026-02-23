@@ -202,7 +202,8 @@ app.use(
     cookie: {
       httpOnly: true,
       sameSite: "lax",
-      secure: cookieSecure
+      secure: cookieSecure,
+      maxAge: 24 * 60 * 60 * 1000, // 24-hour session lifetime
     }
   })
 );

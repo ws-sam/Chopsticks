@@ -21,6 +21,11 @@ async function getClient() {
   return connecting;
 }
 
+/**
+ * Get a value from Redis cache. Returns `null` on miss or error.
+ * @param {string} key
+ * @returns {Promise<any>}
+ */
 export async function cacheGet(key) {
   try {
     const c = await getClient();
@@ -32,6 +37,12 @@ export async function cacheGet(key) {
   }
 }
 
+/**
+ * Set a value in Redis. Silently swallows errors (non-critical cache layer).
+ * @param {string} key
+ * @param {any} value  — will be JSON-serialised
+ * @param {number} [ttlSec]  — positive integer seconds; omit for no expiry
+ */
 export async function cacheSet(key, value, ttlSec) {
   try {
     const c = await getClient();
@@ -44,6 +55,12 @@ export async function cacheSet(key, value, ttlSec) {
   } catch {}
 }
 
+/**
+ * Atomically increment an integer counter. Sets TTL on first write.
+ * @param {string} key
+ * @param {number} [ttlSec]  — applied only when the key is first created
+ * @returns {Promise<number|null>}  new counter value, or null on error
+ */
 export async function cacheIncr(key, ttlSec) {
   try {
     const c = await getClient();
@@ -57,6 +74,13 @@ export async function cacheIncr(key, ttlSec) {
   }
 }
 
+/**
+ * Set a value only if the key does not already exist (NX semantics).
+ * @param {string} key
+ * @param {any} value
+ * @param {number} [ttlSec]
+ * @returns {Promise<boolean|null>}  `true` if set, `false` if key existed, `null` on error
+ */
 export async function cacheSetNx(key, value, ttlSec) {
   try {
     const c = await getClient();
@@ -72,10 +96,19 @@ export async function cacheSetNx(key, value, ttlSec) {
   }
 }
 
+/**
+ * Return the raw Redis client instance (may be `null` before first connection).
+ * Use for operations not covered by the helper functions above (e.g. `del`).
+ * @returns {import('redis').RedisClientType|null}
+ */
 export function getRedis() {
   return client;
 }
 
+/**
+ * Ping Redis to verify connectivity.
+ * @returns {Promise<boolean>}
+ */
 export async function checkRedisHealth() {
   try {
     const c = await getClient();

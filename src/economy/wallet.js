@@ -159,7 +159,7 @@ export async function depositToBank(userId, amount) {
     await client.query("BEGIN");
 
     const walletRes = await client.query(
-      `SELECT balance, bank, bank_capacity FROM user_wallets WHERE user_id = $1`,
+      `SELECT balance, bank, bank_capacity FROM user_wallets WHERE user_id = $1 FOR UPDATE`,
       [userId]
     );
     const wallet = walletRes.rows[0];
@@ -232,13 +232,16 @@ export async function upgradeBankCapacity(userId, levels = 1) {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-    // Ensure wallet exists
-    const wRes = await client.query(
+    // Ensure wallet exists, then lock for update
+    await client.query(
       `INSERT INTO user_wallets (user_id, balance, bank, bank_capacity, total_earned, total_spent, created_at, updated_at)
        VALUES ($1, 0, 0, 10000, 0, 0, $2, $2)
-       ON CONFLICT (user_id) DO UPDATE SET updated_at = $2
-       RETURNING *`,
+       ON CONFLICT (user_id) DO UPDATE SET updated_at = $2`,
       [userId, now]
+    );
+    const wRes = await client.query(
+      `SELECT * FROM user_wallets WHERE user_id = $1 FOR UPDATE`,
+      [userId]
     );
     let wallet = wRes.rows[0];
 

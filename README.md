@@ -11,7 +11,7 @@
 <br/>
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
-[![Node.js](https://img.shields.io/badge/Node.js-20%2B-339933?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org)
+[![Node.js](https://img.shields.io/badge/Node.js-22%2B-339933?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org)
 [![Discord.js](https://img.shields.io/badge/discord.js-v14-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.js.org)
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?style=for-the-badge&logo=docker&logoColor=white)](docker-compose.laptop.yml)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen?style=for-the-badge&logo=github)](CONTRIBUTING.md)
@@ -123,6 +123,8 @@
 - `/apod [date]` — NASA Astronomy Picture of the Day
 - `/book <query>` — Open Library book search (cover, author, subjects)
 - `/afk [reason]` — Set AFK status; bot notifies others who mention you
+- `/color <hex>` — Preview a hex color with RGB, HSL breakdown and a rendered swatch
+- `/steam <profile>` — Look up a Steam community profile (no API key)
 - `/convert <amount> <from> <to>` — Currency conversion via Frankfurter (ECB data, free)
 - `/botinfo` `/ping` `/serverinfo` `/userinfo` — rich stat embeds
 
@@ -191,7 +193,7 @@ Your Server ──► Guild Pool Config ──► Primary Pool + up to 2 Seconda
 
 | Requirement | Version |
 |-------------|---------|
-| [Node.js](https://nodejs.org) | 20+ |
+| [Node.js](https://nodejs.org) | 22+ |
 | [PostgreSQL](https://postgresql.org) | 14+ |
 | [Redis](https://redis.io) | 7+ |
 | [Lavalink](https://github.com/lavalink-devs/Lavalink) | 4+ |

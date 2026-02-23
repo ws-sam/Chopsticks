@@ -74,7 +74,7 @@ export function applySecurityMiddleware(app) {
       directives: {
         defaultSrc: ["'self'"],
         styleSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
-        scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
+        scriptSrc: ["'self'", "https://cdn.jsdelivr.net"],
         imgSrc: ["'self'", "data:", "https://cdn.discordapp.com"],
         connectSrc: ["'self'"],
         fontSrc: ["'self'", "https://cdn.jsdelivr.net"],

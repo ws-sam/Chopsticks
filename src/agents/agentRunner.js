@@ -1198,6 +1198,7 @@ async function startAgent(agentConfig) {
 
   return {
     agentId,
+    isConnected: () => wsReady,
     stop: async () => {
       try {
         await stopAssistant("shutdown");
@@ -1287,8 +1288,8 @@ async function pollForAgentChanges() {
       }
       logger.info(`[Runner:${RUNNER_ID}] Starting agent ${agentConfig.agent_id}...`);
       try {
-        const { stop: stopFn } = await startAgent({ ...agentConfig, token: plainToken });
-        activeAgents.set(agentConfig.agent_id, { stopFn, agentConfig, startedAt: Date.now() });
+        const { stop: stopFn, isConnected } = await startAgent({ ...agentConfig, token: plainToken });
+        activeAgents.set(agentConfig.agent_id, { stopFn, isConnected, agentConfig, startedAt: Date.now() });
       } catch (err) {
         logger.error({ err, agentId: agentConfig.agent_id, tag: agentConfig.tag, poolId: agentConfig.pool_id }, `[Runner:${RUNNER_ID}] Error starting agent ${agentConfig.agent_id} (tag=${agentConfig.tag}): ${err?.message}`);
         updateAgentBotStatus(agentConfig.agent_id, 'failed').catch(e => logger.error({ err: e }, "Failed to update agent status to failed"));
@@ -1302,7 +1303,7 @@ async function pollForAgentChanges() {
   for (const [agentId, entry] of activeAgents) {
     if (!entry.startedAt) continue;
     const elapsed = Date.now() - entry.startedAt;
-    const live = await mgr.listAgents().then(arr => arr.find(a => a.agentId === agentId)).catch(() => null);
+    const live = entry.isConnected?.() ?? false;
     if (!live && elapsed > HELLO_TIMEOUT_MS) {
       // Agent never connected — mark failed so it won't thrash; retry logic will pick it up after RETRY_AFTER_MS
       logger.warn(`[Runner:${RUNNER_ID}] Agent ${agentId} never sent hello after ${Math.round(elapsed / 1000)}s — marking failed`);

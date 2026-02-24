@@ -115,13 +115,16 @@ const state = {
 // ─── Router / Page Engine ────────────────────────
 
 const PAGES = {
-  overview:  { title: 'Overview',      sub: 'Server health at a glance',    icon: '⚡', render: renderOverview },
-  music:     { title: 'Music',         sub: 'Playback & queue management',  icon: '🎵', render: renderMusic },
-  pools:     { title: 'Agent Pools',   sub: 'Manage your agent fleet',      icon: '🤖', render: renderPools },
-  voice:     { title: 'Voice Rooms',   sub: 'Lobby & VC configuration',     icon: '🔊', render: renderVoice },
-  audiobook: { title: 'Audiobooks',    sub: 'Reading sessions & library',   icon: '📖', render: renderAudiobook },
-  logs:      { title: 'Logs',          sub: 'Audit trail & command usage',  icon: '📋', render: renderLogs },
-  settings:  { title: 'Settings',      sub: 'Bot settings & permissions',   icon: '⚙️', render: renderSettings },
+  overview:  { title: 'Overview',        sub: 'Server health at a glance',     icon: '⚡', render: renderOverview },
+  music:     { title: 'Music',           sub: 'Playback & queue management',   icon: '🎵', render: renderMusic },
+  pools:     { title: 'Agent Pools',     sub: 'Manage your agent fleet',       icon: '🤖', render: renderPools },
+  voice:     { title: 'Voice Rooms',     sub: 'Lobby & VC configuration',      icon: '🔊', render: renderVoice },
+  audiobook: { title: 'Audiobooks',      sub: 'Reading sessions & library',    icon: '📖', render: renderAudiobook },
+  stats:     { title: 'Stats',           sub: 'Server leaderboards & activity',icon: '📊', render: renderStats },
+  leveling:  { title: 'Leveling',        sub: 'XP rates & guild progression',  icon: '⚡', render: renderLeveling },
+  actions:   { title: 'Agent Actions',   sub: 'Economy actions & cost config', icon: '🎭', render: renderActions },
+  logs:      { title: 'Logs',            sub: 'Audit trail & command usage',   icon: '📋', render: renderLogs },
+  settings:  { title: 'Settings',        sub: 'Bot settings & permissions',    icon: '⚙️', render: renderSettings },
 };
 
 function navigate(page) {
@@ -685,6 +688,279 @@ function initSettingsHandlers() {
 // ─── Helpers ─────────────────────────────────────
 
 function renderEmpty(icon, title, sub = '') {
+  return `<div class="empty-state">
+    <div class="empty-state-icon">${icon}</div>
+    <div class="empty-state-title">${title}</div>
+    ${sub ? `<div class="empty-state-sub">${sub}</div>` : ''}
+  </div>`;
+}
+
+// ─── Stats Panel ─────────────────────────────────
+
+const METRIC_LABELS = {
+  messages_sent:     '💬 Messages',
+  vc_minutes:        '🎙️ VC Time (min)',
+  credits_earned:    '💰 Credits Earned',
+  credits_spent:     '🛒 Credits Spent',
+  work_runs:         '💼 Work Runs',
+  gather_runs:       '⛏️ Gather Runs',
+  fight_wins:        '⚔️ Fight Wins',
+  trivia_wins:       '🧠 Trivia Wins',
+  heist_runs:        '🏴‍☠️ Heist Runs',
+  casino_wins:       '🎰 Casino Wins',
+  commands_used:     '🤖 Commands Used',
+  agent_actions_used:'🎭 Agent Actions',
+};
+
+async function renderStats(d) {
+  let metric = 'messages_sent';
+  async function loadBoard(m) {
+    metric = m;
+    const res = await get(`/api/guild/${guildId}/stats/leaderboard?metric=${m}&limit=15`);
+    return res?.ok ? res.rows : [];
+  }
+
+  const rows = await loadBoard('messages_sent');
+
+  function boardHtml(rows, m) {
+    if (!rows.length) return '<div class="empty-state-sub">No data yet — activity will appear here as users engage.</div>';
+    return `<div class="table-wrap"><table>
+      <thead><tr><th>#</th><th>User</th><th>${METRIC_LABELS[m] || m}</th></tr></thead>
+      <tbody>${rows.map((r, i) => `
+        <tr>
+          <td><b>${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}</b></td>
+          <td><span class="tag">${esc(r.user_id)}</span></td>
+          <td><b>${Number(r.value || 0).toLocaleString()}</b></td>
+        </tr>`).join('')}
+      </tbody>
+    </table></div>`;
+  }
+
+  const metricSelector = `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
+    ${Object.entries(METRIC_LABELS).map(([k, v]) =>
+      `<button class="btn ${k === 'messages_sent' ? 'btn-primary' : ''}" id="metric-${k}" onclick="window.__statsLoadBoard('${k}')" style="font-size:12px;padding:4px 10px">${v}</button>`
+    ).join('')}
+  </div>`;
+
+  const html = `
+    <div class="section-title">📊 Server Leaderboards</div>
+    ${metricSelector}
+    <div id="stats-board">${boardHtml(rows, 'messages_sent')}</div>
+  `;
+
+  setTimeout(() => {
+    window.__statsLoadBoard = async (m) => {
+      const el = document.getElementById('stats-board');
+      if (el) el.innerHTML = '<div class="splash-loader" style="width:80px;margin:0 auto"><div class="loader-bar"></div></div>';
+      $$('[id^="metric-"]').forEach(b => b.classList.remove('btn-primary'));
+      const btn = document.getElementById(`metric-${m}`);
+      if (btn) btn.classList.add('btn-primary');
+      const res = await get(`/api/guild/${guildId}/stats/leaderboard?metric=${m}&limit=15`);
+      if (el) el.innerHTML = boardHtml(res?.ok ? res.rows : [], m);
+    };
+  }, 50);
+
+  return html;
+}
+
+// ─── Leveling Panel ───────────────────────────────
+
+async function renderLeveling(d) {
+  const cfgRes = await get(`/api/guild/${guildId}/xp/config`);
+  const cfg = cfgRes?.ok ? cfgRes.config : {};
+
+  const sources = [
+    ['xp_per_message', '💬 Per Message', 'xp_per_message'],
+    ['xp_per_vc_minute', '🎙️ Per VC Minute', 'xp_per_vc_minute'],
+    ['xp_per_work', '💼 Work', 'xp_per_work'],
+    ['xp_per_gather', '⛏️ Gather', 'xp_per_gather'],
+    ['xp_per_fight_win', '⚔️ Fight Win', 'xp_per_fight_win'],
+    ['xp_per_trivia_win', '🧠 Trivia Win', 'xp_per_trivia_win'],
+    ['xp_per_daily', '📅 Daily Streak', 'xp_per_daily'],
+    ['xp_per_command', '🤖 Per Command', 'xp_per_command'],
+    ['xp_per_agent_action', '🎭 Agent Action', 'xp_per_agent_action'],
+  ];
+
+  const enabled = cfg.enabled !== false;
+  const multiplier = Number(cfg.xp_multiplier || 1).toFixed(1);
+  const cooldown = cfg.message_xp_cooldown_s ?? 60;
+  const lvlupCh = cfg.levelup_channel_id ? `<#${cfg.levelup_channel_id}>` : '—';
+
+  const html = `
+    <div class="section-title">⚡ XP & Leveling Configuration</div>
+    <div class="card" style="margin-bottom:16px;padding:16px">
+      <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+          <input type="checkbox" id="xp-enabled" ${enabled ? 'checked' : ''} onchange="window.__xpToggle(this.checked)" style="width:18px;height:18px">
+          <span><b>Leveling System</b> — ${enabled ? '✅ Enabled' : '❌ Disabled'}</span>
+        </label>
+        <span style="color:var(--text-muted)">|</span>
+        <label style="display:flex;align-items:center;gap:8px">
+          <span>Multiplier:</span>
+          <input type="number" id="xp-multiplier" value="${multiplier}" min="0.1" max="5" step="0.1" style="width:70px;background:var(--bg-input,#1e2124);color:var(--text-primary,#fff);border:1px solid var(--border,#444);border-radius:4px;padding:4px 8px">
+          <button class="btn btn-sm" onclick="window.__xpSaveMultiplier()">Set</button>
+        </label>
+        <span style="color:var(--text-muted)">|</span>
+        <label style="display:flex;align-items:center;gap:8px">
+          <span>Msg Cooldown:</span>
+          <input type="number" id="xp-cooldown" value="${cooldown}" min="10" max="3600" style="width:70px;background:var(--bg-input,#1e2124);color:var(--text-primary,#fff);border:1px solid var(--border,#444);border-radius:4px;padding:4px 8px">
+          <span>sec</span>
+          <button class="btn btn-sm" onclick="window.__xpSaveCooldown()">Set</button>
+        </label>
+      </div>
+      <div style="margin-top:12px;color:var(--text-muted)">Level-up channel: <b>${lvlupCh}</b> — use <code>/xp config levelup_channel</code> to change</div>
+    </div>
+
+    <div class="section-title">XP Per Activity</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:16px">
+      ${sources.map(([id, label, field]) => `
+        <div class="card" style="padding:12px">
+          <div style="font-size:13px;color:var(--text-muted);margin-bottom:6px">${label}</div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input type="number" id="xp-${id}" value="${cfg[field] ?? ''}" min="0" max="500" placeholder="default"
+              style="width:70px;background:var(--bg-input,#1e2124);color:var(--text-primary,#fff);border:1px solid var(--border,#444);border-radius:4px;padding:4px 8px">
+            <span style="font-size:12px;color:var(--text-muted)">XP</span>
+            <button class="btn btn-sm" onclick="window.__xpSaveField('${field}', document.getElementById('xp-${id}').value)">✔</button>
+          </div>
+        </div>`).join('')}
+    </div>
+
+    <div class="section-title">Quick Presets</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      ${[['relaxed','🌿 Relaxed'],['balanced','⚖️ Balanced'],['grind','🔥 Grind']].map(([p, l]) =>
+        `<button class="btn" onclick="window.__xpPreset('${p}')">${l}</button>`).join('')}
+    </div>
+    <div id="xp-feedback" style="margin-top:12px;height:24px;color:var(--text-accent,#5865F2)"></div>
+  `;
+
+  setTimeout(() => {
+    const feedback = (msg, ok = true) => {
+      const el = document.getElementById('xp-feedback');
+      if (el) { el.textContent = msg; el.style.color = ok ? 'var(--color-success,#2ecc71)' : 'var(--color-danger,#ed4245)'; }
+    };
+    window.__xpToggle = async (v) => {
+      const r = await post(`/api/guild/${guildId}/xp/config`, { enabled: v });
+      feedback(r?.ok ? `✅ Leveling ${v ? 'enabled' : 'disabled'}` : '❌ Error', r?.ok);
+    };
+    window.__xpSaveMultiplier = async () => {
+      const v = parseFloat(document.getElementById('xp-multiplier')?.value || 1);
+      const r = await post(`/api/guild/${guildId}/xp/config`, { xp_multiplier: v });
+      feedback(r?.ok ? `✅ Multiplier set to ${v}x` : '❌ Error', r?.ok);
+    };
+    window.__xpSaveCooldown = async () => {
+      const v = parseInt(document.getElementById('xp-cooldown')?.value || 60);
+      const r = await post(`/api/guild/${guildId}/xp/config`, { message_xp_cooldown_s: v });
+      feedback(r?.ok ? `✅ Cooldown set to ${v}s` : '❌ Error', r?.ok);
+    };
+    window.__xpSaveField = async (field, val) => {
+      const v = parseInt(val);
+      if (isNaN(v) || v < 0) { feedback('❌ Invalid value', false); return; }
+      const r = await post(`/api/guild/${guildId}/xp/config`, { [field]: v });
+      feedback(r?.ok ? `✅ Saved` : '❌ Error', r?.ok);
+    };
+    const PRESET_RATES = {
+      relaxed:  { xp_per_message:3,xp_per_vc_minute:1,xp_per_work:20,xp_per_gather:15,xp_per_fight_win:25,xp_per_trivia_win:30,xp_per_daily:50,xp_multiplier:1.0,message_xp_cooldown_s:120 },
+      balanced: { xp_per_message:5,xp_per_vc_minute:2,xp_per_work:40,xp_per_gather:30,xp_per_fight_win:50,xp_per_trivia_win:60,xp_per_daily:80,xp_multiplier:1.0,message_xp_cooldown_s:60 },
+      grind:    { xp_per_message:10,xp_per_vc_minute:5,xp_per_work:80,xp_per_gather:60,xp_per_fight_win:100,xp_per_trivia_win:120,xp_per_daily:160,xp_multiplier:1.5,message_xp_cooldown_s:30 },
+    };
+    window.__xpPreset = async (preset) => {
+      const r = await post(`/api/guild/${guildId}/xp/config`, PRESET_RATES[preset]);
+      feedback(r?.ok ? `✅ Preset "${preset}" applied` : '❌ Error', r?.ok);
+      if (r?.ok) setTimeout(() => navigate('leveling'), 800);
+    };
+  }, 50);
+
+  return html;
+}
+
+// ─── Agent Actions Panel ──────────────────────────
+
+async function renderActions(d) {
+  const [actRes, usageRes] = await Promise.all([
+    get(`/api/guild/${guildId}/actions`),
+    get(`/api/guild/${guildId}/actions/usage`),
+  ]);
+  const actions = actRes.ok ? actRes.actions : [];
+  const usage   = usageRes.ok ? usageRes.usage : [];
+  const usageMap = Object.fromEntries(usage.map(u => [u.action_type, u]));
+
+  const ACTION_EMOJI = { play_sound:'🔊', say_message:'🗣️', summon_dj:'🎵', air_horn:'📯', rickroll:'🎵', announce:'📢' };
+
+  function actionRow(a) {
+    const u = usageMap[a.action_type] || {};
+    return `
+      <tr>
+        <td>${ACTION_EMOJI[a.action_type] || '🤖'} <b>${esc(a.name)}</b></td>
+        <td><span class="tag">${esc(a.action_type)}</span></td>
+        <td>
+          <input type="number" id="cost-${a.id}" value="${a.cost}" min="0" style="width:70px;background:var(--bg-input,#1e2124);color:var(--text-primary,#fff);border:1px solid var(--border,#444);border-radius:4px;padding:2px 6px">
+          <button class="btn btn-sm" onclick="window.__actionSetCost('${a.action_type}', document.getElementById('cost-${a.id}').value)" style="margin-left:4px">Set</button>
+        </td>
+        <td>${u.uses ? Number(u.uses).toLocaleString() + ' uses' : '—'}</td>
+        <td>${u.total_spent ? Number(u.total_spent).toLocaleString() + ' credits' : '—'}</td>
+        <td>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+            <input type="checkbox" ${a.enabled ? 'checked' : ''} onchange="window.__actionToggle('${a.action_type}', this.checked)" style="width:16px;height:16px">
+            <span style="font-size:12px">${a.enabled ? 'On' : 'Off'}</span>
+          </label>
+        </td>
+      </tr>`;
+  }
+
+  const html = `
+    <div class="section-title">🎭 Agent Economy Actions</div>
+    <div style="color:var(--text-muted);margin-bottom:16px;font-size:13px">
+      Users can spend credits to trigger agents. Use <code>/actions admin enable</code> to add actions, then configure costs here.
+    </div>
+    ${actions.length ? `
+      <div class="table-wrap"><table>
+        <thead><tr><th>Action</th><th>Type</th><th>Cost (credits)</th><th>Uses</th><th>Credits Spent</th><th>Enabled</th></tr></thead>
+        <tbody>${actions.map(actionRow).join('')}</tbody>
+      </table></div>` :
+      `<div class="card" style="padding:20px;text-align:center;color:var(--text-muted)">
+        <div style="font-size:32px;margin-bottom:8px">🎭</div>
+        <b>No actions configured yet</b><br>
+        <span style="font-size:13px">Use <code>/actions admin enable</code> in Discord to add economy actions for your server.</span>
+      </div>`
+    }
+
+    ${usage.length ? `
+      <div class="section-title" style="margin-top:24px">📈 Usage Summary</div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Action</th><th>Total Uses</th><th>Credits Spent</th><th>Last Used</th></tr></thead>
+        <tbody>${usage.map(u => `
+          <tr>
+            <td>${ACTION_EMOJI[u.action_type] || '🤖'} ${esc(u.action_type)}</td>
+            <td>${Number(u.uses).toLocaleString()}</td>
+            <td>${Number(u.total_spent || 0).toLocaleString()}</td>
+            <td>${u.last_used ? new Date(Number(u.last_used)).toLocaleString() : '—'}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table></div>` : ''}
+
+    <div id="action-feedback" style="margin-top:12px;height:24px;color:var(--text-accent,#5865F2)"></div>
+  `;
+
+  setTimeout(() => {
+    const feedback = (msg, ok = true) => {
+      const el = document.getElementById('action-feedback');
+      if (el) { el.textContent = msg; el.style.color = ok ? 'var(--color-success,#2ecc71)' : 'var(--color-danger,#ed4245)'; }
+    };
+    window.__actionSetCost = async (type, val) => {
+      const cost = parseInt(val);
+      if (isNaN(cost) || cost < 0) { feedback('❌ Invalid cost', false); return; }
+      const r = await post(`/api/guild/${guildId}/actions/${type}/cost`, { cost });
+      feedback(r?.ok ? `✅ Cost updated for ${type}` : '❌ ' + (r?.error || 'Error'), r?.ok);
+    };
+    window.__actionToggle = async (type, enabled) => {
+      const r = await post(`/api/guild/${guildId}/actions/${type}/toggle`, { enabled });
+      feedback(r?.ok ? `✅ ${type} ${enabled ? 'enabled' : 'disabled'}` : '❌ Error', r?.ok);
+    };
+  }, 50);
+
+  return html;
+}
+
   return `<div class="empty-state">
     <div class="empty-state-icon">${icon}</div>
     <div class="empty-state-title">${title}</div>

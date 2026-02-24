@@ -28,7 +28,18 @@ import {
   fetchPoolsByOwner,
   createPool,
   loadGuildData,
-  saveGuildData
+  saveGuildData,
+  fetchAgentBots,
+  fetchAgentToken,
+  updateAgentBotStatus,
+  deletePool,
+  fetchPool,
+  deletePoolWithReassignment,
+  fetchPoolContributions,
+  approveContribution,
+  rejectContribution,
+  approveAllContributions,
+  fetchPoolEvents,
 } from "../utils/storage.js";
 import { applySecurityMiddleware, requireAdmin as modernRequireAdmin, auditLog as modernAudit } from "./securityMiddleware.js";
 import { dashboardLogger } from "../utils/modernLogger.js";
@@ -1950,6 +1961,145 @@ app.get("/api/guild/:id/audit", requireAuth, rateLimitDashboard, requireGuildAdm
 app.get("/api/agents", requireAuth, rateLimitDashboard, requireAdmin, async (req, res) => {
   const data = agentManagerStatus();
   res.json(data);
+});
+
+// ── I1: Agent Diagnose ────────────────────────────────────────────────────
+app.get("/api/agents/diagnose", requireAuth, rateLimitDashboard, requireAdmin, async (req, res) => {
+  try {
+    const mgr = global.agentManager;
+    const liveAgents = mgr ? Object.fromEntries(mgr.liveAgents || new Map()) : {};
+    const dbAgents = await fetchAgentBots();
+    const results = await Promise.all(dbAgents.map(async (a) => {
+      const isLive = !!liveAgents[a.agent_id];
+      const live = liveAgents[a.agent_id] || {};
+      let decryptOk = false;
+      let decryptError = null;
+      try {
+        const tok = await fetchAgentToken(a.agent_id);
+        decryptOk = !!tok;
+      } catch (err) {
+        decryptError = err?.message || String(err);
+      }
+      let reason = 'unknown';
+      if (a.status === 'corrupt')    reason = 'token_decrypt_failed';
+      else if (a.status === 'failed') reason = 'runner_start_error';
+      else if (a.status === 'pending') reason = 'pending_review';
+      else if (a.status === 'inactive' || a.status === 'suspended') reason = `status_${a.status}`;
+      else if (a.status === 'active' && !isLive) reason = 'ws_not_connected';
+      else if (isLive) reason = 'online';
+      return {
+        agent_id:       a.agent_id,
+        tag:            a.tag,
+        status:         a.status,
+        pool_id:        a.pool_id,
+        isLive,
+        health:         live.health ?? null,
+        lastHeartbeat:  live.lastHeartbeat ?? null,
+        decryptOk,
+        decryptError,
+        reason,
+      };
+    }));
+    res.json({ ok: true, agents: results });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: String(err?.message || err) });
+  }
+});
+
+app.get("/api/agents/runner-status", requireAuth, rateLimitDashboard, requireAdmin, async (req, res) => {
+  try {
+    const mgr = global.agentManager;
+    const runnerMeta = mgr?._runnerMeta ?? null;
+    res.json({ ok: true, runnerMeta, agentCount: mgr?.liveAgents?.size ?? 0 });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: String(err?.message || err) });
+  }
+});
+
+// ── I2: Admin Pool Delete ─────────────────────────────────────────────────
+app.delete("/api/admin/pools/:poolId", requireAuth, rateLimitDashboard, requireCsrf, requireAdmin, async (req, res) => {
+  const { poolId } = req.params;
+  if (poolId === 'pool_goot27') {
+    return res.status(400).json({ ok: false, error: 'Cannot delete the default pool.' });
+  }
+  try {
+    const result = await deletePoolWithReassignment(poolId, 'pool_goot27', req.session.userId);
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: String(err?.message || err) });
+  }
+});
+
+// ── I3: Pool Contribution Review Routes ──────────────────────────────────
+app.get("/api/pools/:id/contributions", requireAuth, rateLimitDashboard, requireAdmin, async (req, res) => {
+  try {
+    const { status, q } = req.query;
+    let contribs = await fetchPoolContributions(req.params.id, status || null);
+    if (q) contribs = contribs.filter(c => c.contributed_by?.toLowerCase().includes(q.toLowerCase()));
+    res.json({ ok: true, contributions: contribs });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: String(err?.message || err) });
+  }
+});
+
+app.post("/api/pools/:id/contributions/:cid/approve", requireAuth, rateLimitDashboard, requireCsrf, requireAdmin, async (req, res) => {
+  try {
+    const result = await approveContribution(req.params.cid, req.session.userId);
+    res.json({ ok: true, contribution: result });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: String(err?.message || err) });
+  }
+});
+
+app.post("/api/pools/:id/contributions/:cid/reject", requireAuth, rateLimitDashboard, requireCsrf, requireAdmin, async (req, res) => {
+  try {
+    const { notes } = req.body || {};
+    const result = await rejectContribution(req.params.cid, req.session.userId, notes || '');
+    res.json({ ok: true, contribution: result });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: String(err?.message || err) });
+  }
+});
+
+app.post("/api/pools/:id/contributions/approve-all", requireAuth, rateLimitDashboard, requireCsrf, requireAdmin, async (req, res) => {
+  try {
+    const results = await approveAllContributions(req.params.id, req.session.userId);
+    res.json({ ok: true, approved: results.length, contributions: results });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: String(err?.message || err) });
+  }
+});
+
+// ── I4: Pool Audit ────────────────────────────────────────────────────────
+app.get("/api/pools/:id/audit", requireAuth, rateLimitDashboard, requireAdmin, async (req, res) => {
+  try {
+    const limit = Math.min(Number(req.query.limit) || 50, 200);
+    const events = await fetchPoolEvents(req.params.id, limit);
+    res.json({ ok: true, events });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: String(err?.message || err) });
+  }
+});
+
+// ── I5: Fix Pending Agents ────────────────────────────────────────────────
+app.post("/api/admin/agents/fix-pending", requireAuth, rateLimitDashboard, requireCsrf, requireAdmin, async (req, res) => {
+  try {
+    const dbAgents = await fetchAgentBots();
+    const userId = req.session.userId;
+    const isBotOwner = userId === process.env.BOT_OWNER_ID;
+    const toFix = dbAgents.filter(a => a.status === 'pending');
+    let fixed = 0;
+    for (const a of toFix) {
+      const pool = await fetchPool(a.pool_id).catch(() => null);
+      if (!pool) continue;
+      if (!isBotOwner && pool.owner_user_id !== userId) continue;
+      await updateAgentBotStatus(a.agent_id, 'active', userId);
+      fixed++;
+    }
+    res.json({ ok: true, fixed });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: String(err?.message || err) });
+  }
 });
 
 // ── U3: Operator Monitoring Panel endpoints ───────────────────────────────

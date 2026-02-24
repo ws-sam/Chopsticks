@@ -627,6 +627,28 @@ export async function deletePool(poolId, actorUserId) {
   return pg.deletePool(poolId, actorUserId);
 }
 
+export async function deletePoolWithReassignment(poolId, targetPoolId, actorUserId) {
+  const pg = await getPg();
+  return pg.deletePoolWithReassignment(poolId, targetPoolId, actorUserId);
+}
+
+export async function fetchPoolContributions(poolId, status) {
+  const pg = await getPg();
+  return pg.fetchPoolContributions(poolId, status);
+}
+export async function approveContribution(contributionId, reviewerUserId) {
+  const pg = await getPg();
+  return pg.approveContribution(contributionId, reviewerUserId);
+}
+export async function rejectContribution(contributionId, reviewerUserId, notes) {
+  const pg = await getPg();
+  return pg.rejectContribution(contributionId, reviewerUserId, notes);
+}
+export async function approveAllContributions(poolId, reviewerUserId) {
+  const pg = await getPg();
+  return pg.approveAllContributions(poolId, reviewerUserId);
+}
+
 export async function transferPool(poolId, newOwnerUserId, actorUserId) {
   const pg = await getPg();
   return pg.transferPool(poolId, newOwnerUserId, actorUserId);

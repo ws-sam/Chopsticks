@@ -1276,12 +1276,12 @@ async function pollForAgentChanges() {
       try {
         plainToken = await fetchAgentToken(agentConfig.agent_id);
       } catch (err) {
-        logger.error({ err }, `[Runner:${RUNNER_ID}] Could not decrypt token for ${agentConfig.agent_id}`);
+        logger.error({ err, agentId: agentConfig.agent_id, poolId: agentConfig.pool_id, encVersion: agentConfig.enc_version }, `[Runner:${RUNNER_ID}] Could not decrypt token for ${agentConfig.agent_id} — enc_version=${agentConfig.enc_version} pool=${agentConfig.pool_id}`);
         updateAgentBotStatus(agentConfig.agent_id, 'corrupt').catch(() => {});
         continue;
       }
       if (!plainToken) {
-        logger.warn(`[Runner:${RUNNER_ID}] Agent ${agentConfig.agent_id} has no usable token (likely key rotated). Marking as corrupt.`);
+        logger.warn({ agentId: agentConfig.agent_id, poolId: agentConfig.pool_id, encVersion: agentConfig.enc_version }, `[Runner:${RUNNER_ID}] Agent ${agentConfig.agent_id} has no usable token (likely key rotated). enc_version=${agentConfig.enc_version}. Marking as corrupt.`);
         updateAgentBotStatus(agentConfig.agent_id, 'corrupt').catch(() => {});
         continue;
       }
@@ -1290,7 +1290,7 @@ async function pollForAgentChanges() {
         const { stop: stopFn } = await startAgent({ ...agentConfig, token: plainToken });
         activeAgents.set(agentConfig.agent_id, { stopFn, agentConfig });
       } catch (err) {
-        logger.error({ err }, `[Runner:${RUNNER_ID}] Error starting agent ${agentConfig.agent_id}`);
+        logger.error({ err, agentId: agentConfig.agent_id, tag: agentConfig.tag, poolId: agentConfig.pool_id }, `[Runner:${RUNNER_ID}] Error starting agent ${agentConfig.agent_id} (tag=${agentConfig.tag}): ${err?.message}`);
         updateAgentBotStatus(agentConfig.agent_id, 'failed').catch(e => logger.error({ err: e }, "Failed to update agent status to failed"));
       }
     }

@@ -183,6 +183,7 @@ export class AgentManager {
     ws.__remoteAddress = req?.socket?.remoteAddress || null;
     ws.__helloTimer = setTimeout(() => {
       if (!ws.__agentId) {
+        logger.warn({ remoteAddress: ws._socket?.remoteAddress }, "Agent WS connected but no hello received within timeout — closing connection");
         try { ws.close(1008, "hello-required"); } catch {}
       }
     }, handshakeMs);

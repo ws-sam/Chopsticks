@@ -1,5 +1,6 @@
 import { EmbedBuilder, PermissionsBitField } from "discord.js";
 import { reply } from "../helpers.js";
+import COLORS from "../../utils/colors.js";
 
 export default [
   {
@@ -33,7 +34,7 @@ export default [
       const embed = new EmbedBuilder()
         .setTitle("⏱️ Uptime")
         .setDescription(`**${parts.join(" ")}**`)
-        .setColor(0x5865F2)
+        .setColor(COLORS.INFO)
         .setFooter({ text: "Chopsticks • !uptime" });
       await message.reply({ embeds: [embed] });
     }
@@ -77,7 +78,7 @@ export default [
             "",
             ...lines,
           ].join("\n"))
-          .setColor(0x5865F2)
+          .setColor(COLORS.INFO)
           .setFooter({ text: `${allCmds.length} commands • Chopsticks` });
         return message.reply({ embeds: [embed] });
       }
@@ -93,7 +94,7 @@ export default [
         const embed = new EmbedBuilder()
           .setTitle(`${emoji} ${query} commands`)
           .setDescription(lines.join("\n").slice(0, 4000))
-          .setColor(0x5865F2)
+          .setColor(COLORS.INFO)
           .setFooter({ text: `${cmds.length} commands • Chopsticks` });
         return message.reply({ embeds: [embed] });
       }
@@ -107,7 +108,7 @@ export default [
         const embed = new EmbedBuilder()
           .setTitle(`${ctx.prefix}${cmd.name}`)
           .setDescription(cmd.description || "No description.")
-          .setColor(0x5865F2);
+          .setColor(COLORS.INFO);
         if (cmd.aliases?.length)
           embed.addFields({ name: "Aliases", value: cmd.aliases.map(a => `\`${ctx.prefix}${a}\``).join(", "), inline: true });
         if (cmd.rateLimit)
@@ -146,7 +147,7 @@ export default [
       const embed = new EmbedBuilder()
         .setTitle("🎯 I choose...")
         .setDescription(`**${pick}**`)
-        .setColor(0xF0B232)
+        .setColor(COLORS.ECONOMY)
         .setFooter({ text: `From ${items.length} options • Chopsticks` });
       await message.reply({ embeds: [embed] });
     }
@@ -172,7 +173,7 @@ export default [
       const embed = new EmbedBuilder()
         .setTitle("🔗 Invite Chopsticks")
         .setDescription(`[**Click here to add Chopsticks to your server**](${url})`)
-        .setColor(0x5865F2)
+        .setColor(COLORS.INFO)
         .setFooter({ text: "Chopsticks by WokSpec" });
       await message.reply({ embeds: [embed] });
     }
@@ -368,7 +369,7 @@ export default [
             { name: "Expression", value: `\`${expr}\``, inline: true },
             { name: "Result", value: `\`${result}\``, inline: true },
           )
-          .setColor(0x5865F2)
+          .setColor(COLORS.INFO)
           .setFooter({ text: "Chopsticks !calc" });
         await message.reply({ embeds: [embed] });
       } catch {
@@ -396,7 +397,7 @@ export default [
           { name: "Long Date/Time",  value: `<t:${unix}:F>  →  \`<t:${unix}:F>\``,  inline: false },
           { name: "Relative",        value: `<t:${unix}:R>  →  \`<t:${unix}:R>\``,  inline: false },
         )
-        .setColor(0x5865F2)
+        .setColor(COLORS.INFO)
         .setFooter({ text: "Copy the code into any Discord message • Chopsticks !timestamp" });
       await message.reply({ embeds: [embed] });
     }
@@ -448,7 +449,7 @@ export default [
           { name: "Input", value: `\`${text.slice(0, 200)}\`` },
           { name: "Hash", value: `\`${h}\`` },
         )
-        .setColor(0x5865F2)
+        .setColor(COLORS.INFO)
         .setFooter({ text: "Chopsticks !hash" });
       await message.reply({ embeds: [embed] });
     }

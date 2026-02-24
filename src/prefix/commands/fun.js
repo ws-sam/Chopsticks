@@ -9,6 +9,7 @@ import {
 } from "../../fun/runtime.js";
 import { createRequire } from "module";
 import { httpRequest } from "../../utils/httpFetch.js";
+import COLORS from "../../utils/colors.js";
 
 const require = createRequire(import.meta.url);
 const RIDDLES = require("../../fun/riddles.json");
@@ -286,7 +287,7 @@ export default [
       const embed = new EmbedBuilder()
         .setTitle(title || "Random Meme")
         .setImage(imageUrl)
-        .setColor(0xF0B232)
+        .setColor(COLORS.ECONOMY)
         .setFooter({ text: `${subName} • Chopsticks !meme` });
       await message.reply({ embeds: [embed] });
     }
@@ -302,7 +303,7 @@ export default [
       const embed = new EmbedBuilder()
         .setTitle("🤔 Would You Rather…")
         .setDescription(`**A)** ${pair[0]}\n\n**B)** ${pair[1]}`)
-        .setColor(0xFF73FA)
+        .setColor(COLORS.FUN)
         .setFooter({ text: "React with 🅰️ or 🅱️ to vote! • Chopsticks !wyr" });
       const msg = await message.reply({ embeds: [embed] });
       await msg.react("🅰️").catch(() => {});
@@ -382,7 +383,7 @@ export default [
       const embed = new EmbedBuilder()
         .setTitle("💬 Quote")
         .setDescription(`*"${quoteText}"*\n\n— **${author}**`)
-        .setColor(0xF0B232)
+        .setColor(COLORS.ECONOMY)
         .setFooter({ text: "Chopsticks !quote" });
       await message.reply({ embeds: [embed] });
     }
@@ -399,7 +400,7 @@ export default [
       const answerText = reveal ? `**Answer:** ${riddle.a}` : `**Answer:** ||${riddle.a}||`;
       const embed = new EmbedBuilder()
         .setTitle("🧩 Riddle Me This…")
-        .setColor(0x9B59B6)
+        .setColor(COLORS.KNOWLEDGE)
         .setDescription(`${riddle.q}\n\n${answerText}`)
         .setFooter({ text: reveal ? "Answer revealed!" : "Click the spoiler to reveal • Chopsticks !riddle" });
       await message.reply({ embeds: [embed] });
@@ -430,7 +431,7 @@ export default [
           "",
           `||Answer: **${correctLetter}) ${q.correct_answer}**||`,
         ].join("\n"))
-        .setColor(0x5865F2)
+        .setColor(COLORS.INFO)
         .setFooter({ text: `${diff} • ${q.category || "General"} • Chopsticks !trivia` });
       await message.reply({ embeds: [embed] });
     }

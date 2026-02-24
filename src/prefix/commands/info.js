@@ -1,5 +1,6 @@
 import { EmbedBuilder } from "discord.js";
 import { reply } from "../helpers.js";
+import COLORS from "../../utils/colors.js";
 
 export default [
   {
@@ -13,7 +14,7 @@ export default [
       const embed = new EmbedBuilder()
         .setTitle(`📋 ${g.name}`)
         .setThumbnail(g.iconURL({ size: 128 }) || null)
-        .setColor(0x5865F2)
+        .setColor(COLORS.INFO)
         .addFields(
           { name: "👑 Owner", value: owner?.user.tag ?? "Unknown", inline: true },
           { name: "👥 Members", value: String(g.memberCount), inline: true },
@@ -38,7 +39,7 @@ export default [
       const embed = new EmbedBuilder()
         .setTitle(user.tag)
         .setThumbnail(user.displayAvatarURL({ size: 128 }))
-        .setColor(0x5865F2)
+        .setColor(COLORS.INFO)
         .addFields(
           { name: "🆔 ID", value: user.id, inline: true },
           { name: "🤖 Bot", value: user.bot ? "Yes" : "No", inline: true },
@@ -64,7 +65,7 @@ export default [
       const embed = new EmbedBuilder()
         .setTitle(`🖼️ ${user.username}'s Avatar`)
         .setImage(url)
-        .setColor(0x5865F2)
+        .setColor(COLORS.INFO)
         .setFooter({ text: "Chopsticks • !avatar" });
       await message.reply({ embeds: [embed] });
     }
@@ -106,7 +107,7 @@ export default [
       const embed = new EmbedBuilder()
         .setTitle(`🤖 ${message.client.user.username}`)
         .setThumbnail(message.client.user.displayAvatarURL({ size: 128 }))
-        .setColor(0x5865F2)
+        .setColor(COLORS.INFO)
         .addFields(
           { name: "🌐 Guilds", value: String(message.client.guilds.cache.size), inline: true },
           { name: "👥 Users", value: String(message.client.users.cache.size), inline: true },

@@ -16,6 +16,7 @@ import { sanitizeString } from "../../utils/validation.js";
 import { botLogger } from "../../utils/modernLogger.js";
 import { generateText } from "../../utils/textLlm.js";
 import { httpRequest } from "../../utils/httpFetch.js";
+import COLORS from "../../utils/colors.js";
 
 // G5: Prestige title helper
 function getPrestigeTitle(prestige) {
@@ -51,7 +52,7 @@ const balanceCmd = {
       const wallet = await getWallet(targetUser.id);
       const embed = new EmbedBuilder()
         .setTitle("💰 Balance")
-        .setColor(0xffd700)
+        .setColor(0xFFD700)
         .setAuthor({ name: targetUser.username })
         .addFields(
           { name: "Wallet", value: String(wallet?.balance ?? 0), inline: true },
@@ -81,7 +82,7 @@ const dailyCmd = {
         const remaining = (claim.nextClaim ?? Date.now()) - Date.now();
         const embed = new EmbedBuilder()
           .setTitle("⏰ Already Claimed!")
-          .setColor(0xff6b6b)
+          .setColor(0xFF6B6B)
           .setDescription(`Come back in **${formatCooldown(remaining)}**`);
         return await message.reply({ embeds: [embed] }).catch(() => {});
       }
@@ -89,7 +90,7 @@ const dailyCmd = {
       await addGameXp(message.author.id, 50, { reason: "daily" }).catch(() => {});
       const embed = new EmbedBuilder()
         .setTitle("🎁 Daily Reward")
-        .setColor(0x57f287)
+        .setColor(COLORS.SUCCESS)
         .setDescription(
           `You claimed **${claim.totalReward}** credits!\nStreak: **${claim.streak}** day${claim.streak === 1 ? "" : "s"}`
         );
@@ -133,7 +134,7 @@ const workCmd = {
       const job = JOB_TITLES[Math.floor(Math.random() * JOB_TITLES.length)];
       const embed = new EmbedBuilder()
         .setTitle("💼 Work Complete")
-        .setColor(0x57f287)
+        .setColor(COLORS.SUCCESS)
         .setDescription(`You worked as a **${job}** and earned **${amount}** credits!`);
       await message.reply({ embeds: [embed] }).catch(() => {});
     } catch (err) {
@@ -173,7 +174,7 @@ const shopCmd = {
         }).join("\n");
         const embed = new EmbedBuilder()
           .setTitle("🏪 Chopsticks Shop")
-          .setColor(0x5865F2)
+          .setColor(COLORS.INFO)
           .setDescription(lines + "\n\n💡 Use `!buy <item name>` to purchase an item.")
           .setFooter({ text: "!shop <category> [page] to browse" });
         return await message.reply({ embeds: [embed] }).catch(() => {});
@@ -188,7 +189,7 @@ const shopCmd = {
 
       const embed = new EmbedBuilder()
         .setTitle(`${em} Shop — ${category.charAt(0).toUpperCase() + category.slice(1)}`)
-        .setColor(0x5865F2)
+        .setColor(COLORS.INFO)
         .setDescription(
           slice.map(i => {
             const price = i.price > 0 ? `💰 ${i.price.toLocaleString()} cr` : "🎁 Non-purchasable";
@@ -253,7 +254,7 @@ const inventoryCmd = {
       const totalItems = rows.reduce((s, r) => s + (r.quantity ?? 1), 0);
       const embed = new EmbedBuilder()
         .setTitle(`📦 ${targetUser.username}'s Inventory`)
-        .setColor(0x9B59B6)
+        .setColor(COLORS.KNOWLEDGE)
         .setDescription(sections.slice(0, 3900) || "Empty")
         .setFooter({ text: `${totalItems} total item${totalItems !== 1 ? "s" : ""} • !use <item> to use` })
         .setThumbnail(targetUser.displayAvatarURL?.() ?? null);
@@ -296,7 +297,7 @@ const profileCmd = {
       ]);
       const embed = new EmbedBuilder()
         .setTitle(`${targetUser.username}'s Profile`)
-        .setColor(0x5865f2)
+        .setColor(COLORS.INFO)
         .setThumbnail(targetUser.displayAvatarURL({ size: 64 }))
         .addFields(
           { name: "Level", value: String(profile?.level ?? 1), inline: true },
@@ -332,7 +333,7 @@ const xpCmd = {
       const progress = "█".repeat(filled) + "░".repeat(10 - filled);
       const embed = new EmbedBuilder()
         .setTitle("⭐ XP Progress")
-        .setColor(0xf39c12)
+        .setColor(0xF39C12)
         .setAuthor({ name: targetUser.username })
         .addFields(
           { name: "Level", value: String(profile.level ?? 1), inline: true },
@@ -365,7 +366,7 @@ const questsCmd = {
       }
       const embed = new EmbedBuilder()
         .setTitle("📋 Active Quests")
-        .setColor(0xe74c3c)
+        .setColor(0xE74C3C)
         .addFields(
           quests.slice(0, 10).map(q => ({
             name: q.name ?? q.quest_id ?? "Quest",
@@ -412,7 +413,7 @@ const complimentCmd = {
       }
       const embed = new EmbedBuilder()
         .setTitle("✨ Compliment")
-        .setColor(0x57f287)
+        .setColor(COLORS.SUCCESS)
         .setAuthor({ name: `${message.author.username} compliments ${targetUser.username}` })
         .setDescription(complimentText)
         .setThumbnail(targetUser.displayAvatarURL({ size: 64 }));
@@ -422,7 +423,7 @@ const complimentCmd = {
       const fallback =
         FALLBACK_COMPLIMENTS[Math.floor(Math.random() * FALLBACK_COMPLIMENTS.length)];
       await message
-        .reply({ embeds: [new EmbedBuilder().setTitle("✨ Compliment").setColor(0x57f287).setDescription(fallback)] })
+        .reply({ embeds: [new EmbedBuilder().setTitle("✨ Compliment").setColor(COLORS.SUCCESS).setDescription(fallback)] })
         .catch(() => {});
     }
   },
@@ -464,7 +465,7 @@ const triviaCmd = {
 
       const embed = new EmbedBuilder()
         .setTitle("🎯 Trivia")
-        .setColor(0x9b59b6)
+        .setColor(COLORS.KNOWLEDGE)
         .setDescription(question)
         .addFields(fields)
         .setFooter({ text: "Type A, B, C, or D to answer" });
@@ -498,7 +499,7 @@ const riddleCmd = {
       const riddle = RIDDLES[Math.floor(Math.random() * RIDDLES.length)];
       const embed = new EmbedBuilder()
         .setTitle("🧩 Riddle")
-        .setColor(0xe67e22)
+        .setColor(0xE67E22)
         .setDescription(riddle.q)
         .addFields({ name: "Answer (click to reveal)", value: `||${riddle.a}||`, inline: false });
       await message.reply({ embeds: [embed] }).catch(() => {});
@@ -693,7 +694,7 @@ export default [
             "",
             `Keep grinding! ${PRESTIGE_LEVEL_REQ - level} more levels to go.`,
           ].join("\n"))
-          .setColor(0xF0B232)
+          .setColor(COLORS.ECONOMY)
           .setFooter({ text: "Chopsticks !prestige" });
         return message.reply({ embeds: [embed] });
       }
@@ -732,7 +733,7 @@ export default [
           "",
           `Your XP and level have been reset. Time to grind again! 💪`,
         ].join("\n"))
-        .setColor(0xF0B232)
+        .setColor(COLORS.ECONOMY)
         .setThumbnail(message.author.displayAvatarURL())
         .setFooter({ text: `Prestige ${newPrestige} • Chopsticks !prestige` });
       await message.reply({ embeds: [embed] }).catch(() => {});

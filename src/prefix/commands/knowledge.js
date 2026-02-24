@@ -3,6 +3,7 @@
 
 import { EmbedBuilder } from "discord.js";
 import { httpFetch } from "../../utils/httpFetch.js";
+import COLORS from "../../utils/colors.js";
 
 const USER_AGENT = "Chopsticks-Discord-Bot/2.0";
 
@@ -34,7 +35,7 @@ export default [
         const meanings = entry.meanings?.slice(0, 2) || [];
         const embed = new EmbedBuilder()
           .setTitle(`📖 ${entry.word}${phonetic ? `  *${phonetic}*` : ""}`)
-          .setColor(0x5865F2);
+          .setColor(COLORS.INFO);
         for (const m of meanings) {
           const defs = m.definitions.slice(0, 2).map((d, i) => {
             let line = `${i + 1}. ${d.definition}`;
@@ -62,7 +63,7 @@ export default [
         const embed = new EmbedBuilder()
           .setTitle("💡 Advice")
           .setDescription(`*"${d.slip.advice}"*`)
-          .setColor(0xF0B232)
+          .setColor(COLORS.ECONOMY)
           .setFooter({ text: "adviceslip.com • Chopsticks !advice" });
         await message.reply({ embeds: [embed] });
       } catch {
@@ -83,7 +84,7 @@ export default [
         const embed = new EmbedBuilder()
           .setTitle(`🔢 Number ${n}`)
           .setDescription(text)
-          .setColor(0x5865F2)
+          .setColor(COLORS.INFO)
           .setFooter({ text: "numbersapi.com • Chopsticks !number" });
         await message.reply({ embeds: [embed] });
       } catch {
@@ -110,7 +111,7 @@ export default [
         const pop = c.population?.toLocaleString() || "N/A";
         const embed = new EmbedBuilder()
           .setTitle(`${c.name.common} — ${c.name.official}`)
-          .setColor(0x57F287)
+          .setColor(COLORS.SUCCESS)
           .addFields(
             { name: "Capital", value: capital, inline: true },
             { name: "Region", value: `${c.region} / ${c.subregion || "N/A"}`, inline: true },
@@ -139,7 +140,7 @@ export default [
         const embed = new EmbedBuilder()
           .setTitle("🛸 ISS Current Location")
           .setDescription(`The International Space Station is currently over:\n**Lat:** ${parseFloat(latitude).toFixed(4)}° | **Lon:** ${parseFloat(longitude).toFixed(4)}°`)
-          .setColor(0x5865F2)
+          .setColor(COLORS.INFO)
           .setURL(`https://www.google.com/maps?q=${latitude},${longitude}`)
           .addFields(
             { name: "Altitude", value: "~408 km above Earth", inline: true },
@@ -195,7 +196,7 @@ export default [
         const embed = new EmbedBuilder()
           .setTitle(`📖 ${d.reference}`)
           .setDescription(d.text?.trim().slice(0, 2000) || "No text found.")
-          .setColor(0xF0B232)
+          .setColor(COLORS.ECONOMY)
           .setFooter({ text: `${d.translation_name || "WEB"} • Chopsticks !bible` });
         await message.reply({ embeds: [embed] });
       } catch {
@@ -217,7 +218,7 @@ export default [
         .setTitle("📱 QR Code")
         .setDescription(`\`${text.slice(0, 100)}\``)
         .setImage(url)
-        .setColor(0x5865F2)
+        .setColor(COLORS.INFO)
         .setFooter({ text: "qrserver.com • Chopsticks !qr" });
       await message.reply({ embeds: [embed] });
     }
@@ -237,7 +238,7 @@ export default [
         const embed = new EmbedBuilder()
           .setTitle("🔗 Shortened URL")
           .setDescription(`[${d.shorturl}](${d.shorturl})`)
-          .setColor(0x5865F2)
+          .setColor(COLORS.INFO)
           .addFields({ name: "Original", value: url.slice(0, 200) })
           .setFooter({ text: "is.gd • Chopsticks !shorten" });
         await message.reply({ embeds: [embed] });

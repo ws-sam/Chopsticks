@@ -3,6 +3,7 @@
 
 import { EmbedBuilder } from "discord.js";
 import { httpFetch } from "../../utils/httpFetch.js";
+import COLORS from "../../utils/colors.js";
 
 const USER_AGENT = "Chopsticks-Discord-Bot/2.0";
 const RATE_MS = 3000;
@@ -40,7 +41,7 @@ function animalEmbed(title, imageUrl, source) {
   return new EmbedBuilder()
     .setTitle(title)
     .setImage(imageUrl)
-    .setColor(0x57F287)
+    .setColor(COLORS.SUCCESS)
     .setFooter({ text: `via ${source} • Chopsticks` });
 }
 
@@ -49,7 +50,7 @@ function reactionEmbed(title, desc, imageUrl, source) {
     .setTitle(title)
     .setDescription(desc)
     .setImage(imageUrl)
-    .setColor(0xFF73FA)
+    .setColor(COLORS.FUN)
     .setFooter({ text: `via ${source} • Chopsticks` });
 }
 

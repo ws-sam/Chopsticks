@@ -7,6 +7,7 @@ import { addCredits } from "../../economy/wallet.js";
 import { addGameXp } from "../../game/profile.js";
 import { recordQuestEvent } from "../../game/quests.js";
 import { eventBus, Events } from "../../utils/eventBus.js";
+import COLORS from "../../utils/colors.js";
 
 const FISH_COOLDOWN_MS = 45_000;  // 45 seconds
 const MINE_COOLDOWN_MS = 60_000;  // 60 seconds

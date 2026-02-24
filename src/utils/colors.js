@@ -35,3 +35,11 @@ const COLORS = Object.freeze({
 });
 
 export default COLORS;
+
+/**
+ * Stamp an embed with the current timestamp and a consistent footer.
+ * Call as: stamp(embed) — returns the embed for chaining.
+ */
+export function stamp(embed, footerText = "Chopsticks") {
+  return embed.setTimestamp().setFooter({ text: footerText });
+}

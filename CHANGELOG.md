@@ -4,6 +4,28 @@ All notable changes to Chopsticks will be documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] — 2026-02-24
+
+### Added
+- Phase I: Agent pool hardening — `/api/agents/diagnose` endpoint surfaces offline root cause per agent
+- Phase I: Public pool contribution review workflow (`pool_contributions` table, approve/reject/approve-all)
+- Phase I: Pool rename migration — default pool now "goot27's pool"
+- Phase I: Admin pool delete with agent reassignment (`DELETE /api/admin/pools/:poolId`)
+- Phase I: Per-user contribution limits (`max_contributions_per_user`) on pools
+- Phase I: Pool audit log route (`GET /api/pools/:id/audit`)
+- Phase I: Fix-pending admin endpoint for promoting agents to active
+
+### Changed
+- H2: All prefix command external API calls now route through circuit-breaker (`httpFetch`)
+- H3: Global prefix burst rate limit (5 req/3s per user, `!help` exempt)
+- H4: Crate `!open` is now atomic — loot is granted before crate is deducted
+- H4: All `message.reply()` calls in economy commands now have `.catch(() => {})` guards
+- H5: Prefix command embed colors standardized to COLORS palette
+
+### Fixed
+- H4: Minigame cooldown Maps now purge stale entries every 24 hours
+- H4: Fixed mealdb guard (`const meal`) in entertainment.js that was accidentally removed
+
 ---
 
 ## [Unreleased]

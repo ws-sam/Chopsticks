@@ -4,7 +4,7 @@
 export const meta = {
   category: "voice",
   guildOnly: true,
-  deployGlobal: false,
+  deployGlobal: true,
 };
 
 export { data, execute, handleButton, handleSelect, handleModal } from "../tools/voice/commands.js";

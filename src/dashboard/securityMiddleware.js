@@ -73,11 +73,11 @@ export function applySecurityMiddleware(app) {
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        styleSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
+        styleSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://fonts.googleapis.com"],
         scriptSrc: ["'self'", "https://cdn.jsdelivr.net"],
         imgSrc: ["'self'", "data:", "https://cdn.discordapp.com"],
-        connectSrc: ["'self'"],
-        fontSrc: ["'self'", "https://cdn.jsdelivr.net"],
+        connectSrc: ["'self'", "https://fonts.googleapis.com"],
+        fontSrc: ["'self'", "https://cdn.jsdelivr.net", "https://fonts.gstatic.com"],
         objectSrc: ["'none'"],
         mediaSrc: ["'self'"],
         frameSrc: ["'none'"],

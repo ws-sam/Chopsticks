@@ -146,8 +146,9 @@ async function startAgent(agentConfig) {
     try {
       // Inject agentId into outgoing messages
       const out = { ...payload, agentId, runnerId: RUNNER_ID };
-      // DEBUG: log outgoing WS frames for troubleshooting handshake
-      try { logger.debug("[agent-runner] OUTGOING_WS", JSON.stringify(out)); } catch {}
+      if (process.env.AGENT_DEBUG === "true") {
+        try { logger.debug("[agent-runner] OUTGOING_WS", JSON.stringify(out)); } catch {}
+      }
       ws.send(JSON.stringify(out));
       return true;
     } catch {

@@ -686,10 +686,7 @@ export class AgentManager {
         agentId: a.agentId,
         tag: a.tag ?? null,
         botUserId: a.botUserId,
-        inviteUrl: (() => {
-          logger.info(`[DEBUG] Building invite for agent: ${a.agentId}, botUserId: ${a.botUserId}`);
-          return this.buildInviteForAgent(a);
-        })()
+        inviteUrl: this.buildInviteForAgent(a),
       }))
       .filter(x => x.inviteUrl);
 

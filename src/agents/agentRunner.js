@@ -18,7 +18,7 @@ import { request } from "undici";
 import WebSocket from "ws";
 import { createAgentLavalink } from "../lavalink/agentLavalink.js";
 import { fetchAgentBots, fetchAgentToken, resetCorruptAgents, updateAgentBotStatus, upsertAgentRunner, deleteAgentRunner } from "../utils/storage.js";
-import { randomUUID } from "node:crypto";
+import { randomUUID, timingSafeEqual } from "node:crypto";
 import { handleSafeError, handleCriticalError, handleVoiceError, ErrorCategory, ErrorSeverity } from "../utils/errorHandler.js";
 import { logger } from "../utils/logger.js";
 import { installProcessSafety } from "../utils/processSafety.js";
@@ -397,7 +397,10 @@ async function startAgent(agentConfig) {
   function isAdminOverride(payload) {
     const token = String(process.env.DASHBOARD_ADMIN_TOKEN || "").trim();
     if (!token) return false;
-    return String(payload?.adminToken || "") === token;
+    const presented = String(payload?.adminToken || "");
+    const bPresented = Buffer.from(presented, "utf8");
+    const bToken     = Buffer.from(token, "utf8");
+    return bPresented.length === bToken.length && timingSafeEqual(bPresented, bToken);
   }
 
   function getVoiceGuild(guildId) {

@@ -4,6 +4,7 @@
 // If threshold is exceeded, the engine "punishes" the executor automatically.
 
 import { loadGuildData, saveGuildData } from "../../utils/storage.js";
+import { PermissionFlagsBits } from "discord.js";
 
 // In-memory action counters: Map<"guildId:userId:action", { count, firstAt }>
 const actionCounters = new Map();
@@ -77,6 +78,9 @@ export async function punishExecutor(guild, userId, action, config) {
 
     // Don't punish server owner
     if (guild.ownerId === userId) return;
+
+    // Auto-exempt members with Administrator permission (they should manage their own admins)
+    if (member.permissions?.has(PermissionFlagsBits.Administrator)) return;
 
     // Check whitelist
     if (config.whitelistUserIds?.includes(userId)) return;

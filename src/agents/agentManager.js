@@ -1,6 +1,6 @@
 // src/agents/agentManager.js
 import { WebSocketServer } from "ws";
-import { randomUUID } from "node:crypto";
+import { randomUUID, timingSafeEqual } from "node:crypto";
 import { fetchAgentBots, fetchAgentToken, fetchAgentRunners, fetchPool, loadGuildData, updateAgentBotStatus } from "../utils/storage.js";
 import { logger, createAgentScopedLogger, generateCorrelationId } from "../utils/logger.js";
 import {
@@ -234,6 +234,7 @@ export class AgentManager {
       msg = JSON.parse(String(data));
     } catch {
       logger.warn('[AgentManager] Invalid JSON received from agent');
+      try { ws.send(JSON.stringify({ type: "error", error: "Invalid JSON" })); } catch {}
       return;
     }
     
@@ -287,7 +288,13 @@ export class AgentManager {
     // If AGENT_RUNNER_SECRET is set on the controller, the agent MUST present it in hello.
     if (this.runnerSecret) {
       const presented = String(msg?.runnerSecret || "").trim();
-      if (!presented || presented !== this.runnerSecret) {
+      const expected  = this.runnerSecret;
+      const bPresented = Buffer.from(presented, "utf8");
+      const bExpected  = Buffer.from(expected,  "utf8");
+      const valid = presented.length > 0
+        && bPresented.length === bExpected.length
+        && timingSafeEqual(bPresented, bExpected);
+      if (!valid) {
         agentLogger.warn("Agent presented invalid runner secret, rejecting", {
           remoteAddress: ws.__remoteAddress || undefined
         });

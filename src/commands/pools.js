@@ -19,6 +19,7 @@ import { canManagePool, getUserPoolRole, logPoolEvent, maskToken, SPECIALTIES, B
          addGuildSecondaryPool, removeGuildSecondaryPool, getGuildAllPoolIds,
          rankPoolsBySpecialty, evaluatePoolBadges } from '../utils/storage.js';
 import { botLogger } from "../utils/modernLogger.js";
+import { sanitizeString } from "../utils/validation.js";
 
 const _poolWriteRateLimit = new Map();
 function checkPoolWriteRateLimit(userId, cooldownMs = 5000) {
@@ -1173,7 +1174,7 @@ async function handleCreate(interaction) {
   await interaction.deferReply({ ephemeral: true });
 
   const userId = interaction.user.id;
-  const poolName = interaction.options.getString('name');
+  const poolName = sanitizeString(interaction.options.getString('name') ?? '').slice(0, 50) || 'My Pool';
   const visibility = interaction.options.getString('visibility');
 
   // Generate pool ID
@@ -1215,7 +1216,7 @@ async function handleCreate(interaction) {
     // Apply optional description and specialty immediately if provided
     if (initDescription || initSpecialty) {
       const initMeta = {
-        ...(initDescription ? { description: initDescription.slice(0, 300) } : {}),
+        ...(initDescription ? { description: sanitizeString(initDescription).slice(0, 300) } : {}),
         ...(initSpecialty ? { specialty: initSpecialty } : {}),
       };
       await storageLayer.updatePool(poolId, { meta: initMeta }, userId).catch(() => {});

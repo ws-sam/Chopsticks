@@ -24,6 +24,7 @@ import {
 import { validateProviderKey } from "../utils/voiceValidation.js";
 import { sanitizeString } from "../utils/validation.js";
 import { getRedisClient } from "../utils/redis.js";
+import { withTimeout } from "../utils/interactionTimeout.js";
 
 export const meta = {
   guildOnly: true,
@@ -239,6 +240,7 @@ export async function execute(interaction) {
     return interaction.reply({ content: "This command must be used in a server.", ephemeral: true });
   }
 
+  await withTimeout(interaction, async () => {
   const group = interaction.options.getSubcommandGroup(false);
   const sub   = interaction.options.getSubcommand();
 
@@ -262,6 +264,7 @@ export async function execute(interaction) {
   if (sub === "moderate")     return handleModerate(interaction);
   if (sub === "help")         return handleHelp(interaction);
   if (sub === "stats")        return handleStats(interaction);
+  }, { label: "ai" });
 }
 
 // ── /ai chat ─────────────────────────────────────────────────────────────────

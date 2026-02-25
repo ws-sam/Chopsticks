@@ -1,5 +1,6 @@
 import { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } from "discord.js";
 import { replyError } from "../utils/discordOutput.js";
+import { sanitizeString } from "../utils/validation.js";
 
 export const meta = {
   guildOnly: true,
@@ -50,11 +51,13 @@ export async function execute(interaction) {
   if (sub !== "create") return;
 
   const channel = interaction.options.getChannel("channel", true);
-  const title = interaction.options.getString("title", true);
-  const description = interaction.options.getString("description", true);
+  const title = sanitizeString(interaction.options.getString("title", true)).slice(0, 250);
+  const description = sanitizeString(interaction.options.getString("description", true)).slice(0, 4000);
   const colorInput = interaction.options.getString("color");
   const imageUrl = interaction.options.getString("image_url");
-  const footerText = interaction.options.getString("footer");
+  const footerText = interaction.options.getString("footer")
+    ? sanitizeString(interaction.options.getString("footer")).slice(0, 250)
+    : undefined;
 
   const color = parseColor(colorInput);
   if (color === null) {

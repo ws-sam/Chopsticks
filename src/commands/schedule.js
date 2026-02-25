@@ -3,6 +3,7 @@ import { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits, MessageFlags, C
 import { loadGuildData, saveGuildData } from "../utils/storage.js";
 import { schedule, cancel } from "../utils/scheduler.js";
 import { makeEmbed } from "../utils/discordOutput.js";
+import { sanitizeString } from "../utils/validation.js";
 
 export const meta = {
   category: "tools",
@@ -74,7 +75,7 @@ export async function execute(interaction) {
 
   if (sub === "message") {
     const channel = interaction.options.getChannel("channel", true);
-    const message = interaction.options.getString("message", true);
+    const message = sanitizeString(interaction.options.getString("message", true)).slice(0, 1900);
     const timeRaw = interaction.options.getString("time", true);
 
     const parsed = parseTime(timeRaw);

@@ -11,6 +11,7 @@ import {
   EmbedBuilder,
 } from "discord.js";
 import { loadGuildData, saveGuildData } from "../utils/storage.js";
+import { sanitizeString } from "../utils/validation.js";
 
 export const meta = {
   name: "autoresponder",
@@ -67,8 +68,8 @@ export async function execute(interaction) {
   const ars = ensureAr(gd);
 
   if (sub === "add") {
-    const trigger = interaction.options.getString("trigger", true);
-    const response = interaction.options.getString("response", true);
+    const trigger = sanitizeString(interaction.options.getString("trigger", true)).slice(0, 200);
+    const response = sanitizeString(interaction.options.getString("response", true)).slice(0, 1900);
     const matchType = interaction.options.getString("match_type") ?? "contains";
     const caseSensitive = interaction.options.getBoolean("case_sensitive") ?? false;
     const deleteTrigger = interaction.options.getBoolean("delete_trigger") ?? false;

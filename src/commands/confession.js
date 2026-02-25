@@ -15,6 +15,7 @@ import {
   EmbedBuilder,
 } from "discord.js";
 import { loadGuildData, saveGuildData } from "../utils/storage.js";
+import { sanitizeString } from "../utils/validation.js";
 import crypto from "node:crypto";
 
 export const meta = {
@@ -105,7 +106,7 @@ export async function execute(interaction) {
     if (!gd.confessions.enabled || !gd.confessions.channelId) {
       return interaction.reply({ content: "> Confessions are not enabled in this server.", flags: MessageFlags.Ephemeral });
     }
-    const text = interaction.options.getString("text", true);
+    const text = sanitizeString(interaction.options.getString("text", true)).slice(0, 1500);
     const ch = interaction.guild.channels.cache.get(gd.confessions.channelId);
     if (!ch?.isTextBased()) return interaction.reply({ content: "> Confession channel not found.", flags: MessageFlags.Ephemeral });
 

@@ -7,6 +7,7 @@ import { replyError, Colors } from "../utils/discordOutput.js";
 import { sanitizeString } from "../utils/validation.js";
 import { createCase } from "../tools/modcases/store.js";
 import { checkEscalation } from "../tools/modcases/escalation.js";
+import { withTimeout } from "../utils/interactionTimeout.js";
 
 export const meta = {
   guildOnly: true,
@@ -139,6 +140,7 @@ function checkPerm(interaction, sub) {
 
 // ─── Main execute ─────────────────────────────────────────────────────────────
 export async function execute(interaction) {
+  await withTimeout(interaction, async () => {
   const sub = interaction.options.getSubcommand();
 
   const permError = checkPerm(interaction, sub);
@@ -606,4 +608,5 @@ export async function execute(interaction) {
     });
     return;
   }
+  }, { label: "mod" });
 }

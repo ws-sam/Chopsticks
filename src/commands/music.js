@@ -31,6 +31,7 @@ import { checkRateLimit } from "../utils/ratelimit.js";
 import { makeEmbed } from "../utils/discordOutput.js";
 import { openAdvisorUiHandoff } from "./agents.js";
 import { botLogger } from "../utils/modernLogger.js";
+import { withTimeout } from "../utils/interactionTimeout.js";
 
 export const meta = {
   guildOnly: true,
@@ -1836,6 +1837,7 @@ async function playPlaylistItem(interaction, agent, guildId, voiceChannelId, ite
 }
 
 export async function execute(interaction) {
+  await withTimeout(interaction, async () => {
   const guildId = interaction.guildId;
   const userId = interaction.user.id;
   const group = interaction.options.getSubcommandGroup(false);
@@ -2931,6 +2933,7 @@ export async function execute(interaction) {
 
     throw err;
   }
+  }, { label: "music" });
 }
 
 export async function handleButton(interaction) {

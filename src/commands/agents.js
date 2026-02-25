@@ -47,6 +47,7 @@ import { getBotOwnerIds, isBotOwner } from "../utils/owners.js";
 import { replyInteraction } from "../utils/interactionReply.js";
 import { trackAgentDeployment } from "../utils/metrics.js";
 import { botLogger } from "../utils/modernLogger.js";
+import { withTimeout } from "../utils/interactionTimeout.js";
 
 export const meta = {
   guildOnly: true,
@@ -1074,6 +1075,7 @@ export async function execute(interaction) {
     return;
   }
 
+  await withTimeout(interaction, async () => {
   const sub = interaction.options.getSubcommand();
   const guildId = interaction.guildId;
 
@@ -2552,6 +2554,7 @@ export async function execute(interaction) {
     }
     return;
   }
+  }, { label: "agents" });
 }
 
 export async function handleSelect(interaction) {

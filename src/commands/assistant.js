@@ -37,6 +37,7 @@ import { countAssistantSessionsInGuild } from "../assistant/service.js";
 import { auditLog } from "../utils/audit.js";
 import { replyEmbedWithJson, buildEmbed } from "../utils/discordOutput.js";
 import { replyInteraction } from "../utils/interactionReply.js";
+import { withTimeout } from "../utils/interactionTimeout.js";
 
 export const data = new SlashCommandBuilder()
   .setName("assistant")
@@ -467,6 +468,7 @@ async function runListen(interaction, mode) {
 }
 
 export async function execute(interaction) {
+  await withTimeout(interaction, async () => {
   const sub = interaction.options.getSubcommand();
   const guildId = interaction.guildId;
   const userId = interaction.user.id;
@@ -951,6 +953,7 @@ export async function execute(interaction) {
     }
     await replyInteraction(interaction, makeMsg("Assistant", "Speaking."));
   }
+  }, { label: "assistant" });
 }
 
 export async function handleButton(interaction) {

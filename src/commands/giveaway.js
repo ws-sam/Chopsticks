@@ -2,6 +2,7 @@ import { SlashCommandBuilder, PermissionFlagsBits, MessageFlags, EmbedBuilder } 
 import { schedule } from "../utils/scheduler.js";
 import { maybeBuildGuildFunLine } from "../fun/integrations.js";
 import { loadGuildData, saveGuildData } from "../utils/storage.js";
+import { withTimeout } from "../utils/interactionTimeout.js";
 
 export const meta = {
   category: "admin",
@@ -66,6 +67,7 @@ async function pickWinners(msg, count, requiredRoleId) {
 }
 
 export async function execute(interaction) {
+  await withTimeout(interaction, async () => {
   const sub = interaction.options.getSubcommand();
   const guildId = interaction.guildId;
 
@@ -153,5 +155,6 @@ export async function execute(interaction) {
     );
     return interaction.reply({ embeds: [new EmbedBuilder().setTitle("Active Giveaways").setDescription(lines.join("\n")).setColor(0xF1C40F)], flags: MessageFlags.Ephemeral });
   }
+  }, { label: "giveaway" });
 }
 

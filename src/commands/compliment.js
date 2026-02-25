@@ -56,6 +56,11 @@ export async function execute(interaction) {
   const style = interaction.options.getString('style') || 'genuine';
   const isSelf = target.id === interaction.user.id;
 
+  if (target.bot && target.id !== interaction.user.id) {
+    await interaction.reply({ content: "⚠️ You can't compliment bots.", ephemeral: true });
+    return;
+  }
+
   const rl = await checkRateLimit(`compliment:${interaction.user.id}`, 1, 30).catch(() => ({ ok: true }));
   if (!rl.ok) {
     const remaining = Math.ceil(rl.retryAfter || 30);

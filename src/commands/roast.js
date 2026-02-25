@@ -69,6 +69,11 @@ export async function execute(interaction) {
   const vibe = interaction.options.getString('vibe') || 'playful';
   const isSelf = target.id === interaction.user.id;
 
+  if (target.bot && target.id !== interaction.user.id) {
+    await interaction.reply({ content: "⚠️ You can't roast bots.", ephemeral: true });
+    return;
+  }
+
   // Rate limit per user
   const rl = await checkRateLimit(`${RATE_LIMIT_KEY}:${interaction.user.id}`, 1, RATE_LIMIT_WINDOW).catch(() => ({ ok: true }));
   if (!rl.ok) {

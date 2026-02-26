@@ -160,4 +160,248 @@ export default [
       await message.reply({ embeds: [embed] });
     }
   },
+,
+// ── marry ───────────────────────────────────────────────────────────────────
+  {
+    name: "marry",
+    aliases: ["propose", "wed"],
+    description: "Propose marriage to a user — !marry @user",
+    guildOnly: true,
+    rateLimit: 5000,
+    async execute(message) {
+      const { loadGuildData, saveGuildData } = await import("../../utils/storage.js");
+      const target = message.mentions.users.first();
+      if (!target) return message.reply("💍 Mention someone to propose to: `!marry @user`");
+      if (target.id === message.author.id) return message.reply("💍 You can't marry yourself!");
+      if (target.bot) return message.reply("🤖 Bots don't accept proposals.");
+
+      const data = await loadGuildData(message.guildId);
+      data.marriages ??= {};
+      const existing = data.marriages[message.author.id];
+      if (existing) {
+        const spouse = await message.client.users.fetch(existing).catch(() => null);
+        return message.reply(`💍 You're already married to **${spouse?.username ?? "someone"}**! Use \`!divorce\` first.`);
+      }
+      if (data.marriages[target.id]) {
+        return message.reply(`💍 **${target.username}** is already married!`);
+      }
+
+      const embed = new EmbedBuilder()
+        .setTitle("💍 Marriage Proposal!")
+        .setDescription(
+          `**${message.author.username}** is proposing to **${target.username}**!\n\n` +
+          `${target}, will you accept? React with 💍 to accept or ❌ to decline.`
+        )
+        .setColor(0xFF73FA)
+        .setThumbnail(target.displayAvatarURL())
+        .setFooter({ text: "You have 60 seconds to respond." });
+
+      const msg = await message.reply({ embeds: [embed] });
+      await msg.react("💍");
+      await msg.react("❌");
+
+      const filter = (r, u) => u.id === target.id && ["💍", "❌"].includes(r.emoji.name);
+      try {
+        const collected = await msg.awaitReactions({ filter, max: 1, time: 60_000, errors: ["time"] });
+        const reaction = collected.first();
+        if (reaction.emoji.name === "💍") {
+          data.marriages[message.author.id] = target.id;
+          data.marriages[target.id] = message.author.id;
+          await saveGuildData(message.guildId, data);
+          const embed2 = new EmbedBuilder()
+            .setTitle("💒 Married!")
+            .setDescription(`🎉 **${message.author.username}** and **${target.username}** are now married!\n\n💕 Congratulations!`)
+            .setColor(0xFF73FA)
+            .setFooter({ text: "Chopsticks !marry" });
+          return msg.edit({ embeds: [embed2], components: [] });
+        } else {
+          const embed2 = new EmbedBuilder()
+            .setTitle("💔 Proposal Declined")
+            .setDescription(`**${target.username}** declined the proposal. Better luck next time!`)
+            .setColor(0xED4245);
+          return msg.edit({ embeds: [embed2], components: [] });
+        }
+      } catch {
+        return msg.edit({ content: "💍 Proposal timed out.", embeds: [], components: [] });
+      }
+    },
+  },
+
+  // ── divorce ─────────────────────────────────────────────────────────────────
+  {
+    name: "divorce",
+    aliases: ["unmarry", "splitup"],
+    description: "End your marriage — !divorce",
+    guildOnly: true,
+    rateLimit: 10000,
+    async execute(message) {
+      const { loadGuildData, saveGuildData } = await import("../../utils/storage.js");
+      const data = await loadGuildData(message.guildId);
+      data.marriages ??= {};
+      const spouseId = data.marriages[message.author.id];
+      if (!spouseId) return message.reply("💔 You're not married.");
+      const spouse = await message.client.users.fetch(spouseId).catch(() => null);
+      delete data.marriages[message.author.id];
+      delete data.marriages[spouseId];
+      await saveGuildData(message.guildId, data);
+      const embed = new EmbedBuilder()
+        .setTitle("💔 Divorced")
+        .setDescription(`**${message.author.username}** and **${spouse?.username ?? "their spouse"}** are now divorced.`)
+        .setColor(0xED4245)
+        .setFooter({ text: "Chopsticks !divorce" });
+      return message.reply({ embeds: [embed] });
+    },
+  },
+
+  // ── spouse ──────────────────────────────────────────────────────────────────
+  {
+    name: "spouse",
+    aliases: ["married", "partner"],
+    description: "See who you're married to — !spouse",
+    guildOnly: true,
+    rateLimit: 3000,
+    async execute(message) {
+      const { loadGuildData } = await import("../../utils/storage.js");
+      const target = message.mentions.users.first() || message.author;
+      const data = await loadGuildData(message.guildId);
+      data.marriages ??= {};
+      const spouseId = data.marriages[target.id];
+      if (!spouseId) return message.reply(`💔 **${target.username}** is not married.`);
+      const spouse = await message.client.users.fetch(spouseId).catch(() => null);
+      const embed = new EmbedBuilder()
+        .setTitle("💍 Married")
+        .setDescription(`**${target.username}** is married to **${spouse?.username ?? "unknown"}**!`)
+        .setColor(0xFF73FA)
+        .setFooter({ text: "Chopsticks !spouse" });
+      return message.reply({ embeds: [embed] });
+    },
+  },
+
+  // ── rep ─────────────────────────────────────────────────────────────────────
+  {
+    name: "rep",
+    aliases: ["reputation", "+rep"],
+    description: "Give reputation to someone — !rep @user",
+    guildOnly: true,
+    rateLimit: 3000,
+    async execute(message) {
+      const { loadGuildData, saveGuildData } = await import("../../utils/storage.js");
+      const target = message.mentions.users.first();
+      if (!target) return message.reply("⭐ Mention someone to give rep: `!rep @user`");
+      if (target.id === message.author.id) return message.reply("⭐ You can't rep yourself!");
+      if (target.bot) return message.reply("🤖 Bots don't need rep.");
+
+      const data = await loadGuildData(message.guildId);
+      data.rep ??= {};
+      data.repGiven ??= {};
+
+      const lastGiven = data.repGiven[message.author.id] ?? 0;
+      const hoursSince = (Date.now() - lastGiven) / 3_600_000;
+      if (hoursSince < 24) {
+        const hoursLeft = Math.ceil(24 - hoursSince);
+        return message.reply(`⭐ You've already given rep today. Try again in **${hoursLeft}h**.`);
+      }
+
+      data.rep[target.id] = (data.rep[target.id] ?? 0) + 1;
+      data.repGiven[message.author.id] = Date.now();
+      await saveGuildData(message.guildId, data);
+
+      const embed = new EmbedBuilder()
+        .setTitle("⭐ Rep Given!")
+        .setDescription(`**${message.author.username}** gave **+1 rep** to **${target.username}**!\n⭐ They now have **${data.rep[target.id]}** rep.`)
+        .setThumbnail(target.displayAvatarURL())
+        .setColor(0xF0B232)
+        .setFooter({ text: "Rep resets every 24h • Chopsticks !rep" });
+      return message.reply({ embeds: [embed] });
+    },
+  },
+
+  // ── checkrep ────────────────────────────────────────────────────────────────
+  {
+    name: "checkrep",
+    aliases: ["getrep", "myreq"],
+    description: "Check someone's rep score — !checkrep [@user]",
+    guildOnly: true,
+    rateLimit: 3000,
+    async execute(message) {
+      const { loadGuildData } = await import("../../utils/storage.js");
+      const target = message.mentions.users.first() || message.author;
+      const data = await loadGuildData(message.guildId);
+      data.rep ??= {};
+      const rep = data.rep[target.id] ?? 0;
+      const embed = new EmbedBuilder()
+        .setTitle("⭐ Reputation")
+        .setDescription(`**${target.username}** has **${rep}** rep.`)
+        .setThumbnail(target.displayAvatarURL())
+        .setColor(0xF0B232)
+        .setFooter({ text: "Chopsticks !rep @user to give rep" });
+      return message.reply({ embeds: [embed] });
+    },
+  },
+
+  // ── bio ──────────────────────────────────────────────────────────────────────
+  {
+    name: "bio",
+    aliases: ["setbio", "about"],
+    description: "Set or view your bio — !bio [text] or !bio @user",
+    guildOnly: true,
+    rateLimit: 3000,
+    async execute(message, args) {
+      const { loadGuildData, saveGuildData } = await import("../../utils/storage.js");
+      const mentionTarget = message.mentions.users.first();
+      // View mode: !bio @user or !bio with no args
+      if (mentionTarget || args.length === 0) {
+        const target = mentionTarget || message.author;
+        const data = await loadGuildData(message.guildId);
+        data.bios ??= {};
+        const bio = data.bios[target.id] || "_No bio set. Use `!bio <text>` to set yours._";
+        const embed = new EmbedBuilder()
+          .setTitle(`📝 ${target.username}'s Bio`)
+          .setDescription(bio)
+          .setThumbnail(target.displayAvatarURL())
+          .setColor(0x5865F2)
+          .setFooter({ text: "Chopsticks !bio <text> to set yours" });
+        return message.reply({ embeds: [embed] });
+      }
+      // Set mode
+      const bio = args.join(" ").slice(0, 300);
+      const data = await loadGuildData(message.guildId);
+      data.bios ??= {};
+      data.bios[message.author.id] = bio;
+      await saveGuildData(message.guildId, data);
+      return message.reply(`✅ Bio updated! (${bio.length}/300 chars)`);
+    },
+  },
+
+  // ── socialprofile ────────────────────────────────────────────────────────────
+  {
+    name: "socialprofile",
+    aliases: ["sp", "card"],
+    description: "View your social profile card — !socialprofile [@user]",
+    guildOnly: true,
+    rateLimit: 4000,
+    async execute(message) {
+      const { loadGuildData } = await import("../../utils/storage.js");
+      const target = message.mentions.users.first() || message.author;
+      const data = await loadGuildData(message.guildId);
+      data.rep ??= {};
+      data.bios ??= {};
+      data.marriages ??= {};
+      const rep = data.rep[target.id] ?? 0;
+      const bio = data.bios[target.id] || "No bio set.";
+      const spouseId = data.marriages[target.id];
+      const spouse = spouseId ? await message.client.users.fetch(spouseId).catch(() => null) : null;
+      const embed = new EmbedBuilder()
+        .setTitle(`👤 ${target.username}`)
+        .setThumbnail(target.displayAvatarURL())
+        .addFields(
+          { name: "📝 Bio",        value: bio.slice(0, 300),                  inline: false },
+          { name: "⭐ Rep",         value: String(rep),                        inline: true  },
+          { name: "💍 Married To", value: spouse?.username ?? "Single",       inline: true  },
+        )
+        .setColor(0x5865F2)
+        .setFooter({ text: "Chopsticks !bio | !rep | !marry" });
+      return message.reply({ embeds: [embed] });
+    },
+  },
 ];

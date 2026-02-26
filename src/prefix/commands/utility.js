@@ -1,6 +1,23 @@
-import { EmbedBuilder, PermissionsBitField } from "discord.js";
+import { EmbedBuilder, PermissionsBitField, ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
 import { reply } from "../helpers.js";
 import COLORS from "../../utils/colors.js";
+
+// ── Shared helper for category embeds (used by help command + button handler) ─
+async function sendCategoryEmbed(target, cat, catMap, CAT_EMOJI, prefix, isEdit = false) {
+  const cmds = catMap.get(cat) ?? [];
+  const emoji = CAT_EMOJI[cat] || "📦";
+  const lines = cmds.map(c => {
+    const al = c.aliases?.length ? ` *(${c.aliases.slice(0, 3).map(a => `!${a}`).join(", ")})*` : "";
+    return `\`${prefix}${c.name}\`${al} — ${c.description || "No description"}`;
+  });
+  const embed = new EmbedBuilder()
+    .setTitle(`${emoji} ${cat} (${cmds.length} commands)`)
+    .setDescription(lines.join("\n").slice(0, 4000) || "No commands yet.")
+    .setColor(COLORS.INFO)
+    .setFooter({ text: `${prefix}help for overview • Chopsticks` });
+  if (isEdit) return target.edit({ embeds: [embed] }).catch(() => {});
+  return target.reply({ embeds: [embed] });
+}
 
 export default [
   {
@@ -48,7 +65,6 @@ export default [
       const query = args[0]?.toLowerCase();
       const allCmds = Array.from(ctx.commands.values());
 
-      // Build category → commands map from tagged category field
       const catMap = new Map();
       for (const cmd of allCmds) {
         const cat = cmd.category || "other";
@@ -57,70 +73,91 @@ export default [
       }
 
       const CAT_EMOJI = {
-        meta: "⚙️", utility: "🔧", fun: "🎉", social: "💬",
-        info: "ℹ️", mod: "🔨", server: "🏰", media: "🎬",
-        economy: "💰", other: "📦",
+        meta: "⚙️", music: "🎵", ai: "🤖", utility: "🔧", fun: "🎉",
+        social: "💬", info: "ℹ️", mod: "🔨", server: "🏰", media: "🎬",
+        economy: "💰", animals: "🐾", entertainment: "🎭", knowledge: "📚",
+        minigames: "🎮", voice: "🔊", other: "📦",
       };
 
-      if (!query) {
-        // Root help: category overview cards
-        const lines = [];
-        for (const [cat, cmds] of catMap) {
-          const emoji = CAT_EMOJI[cat] || "📦";
-          const sample = cmds.slice(0, 3).map(c => `\`${ctx.prefix}${c.name}\``).join(", ");
-          lines.push(`${emoji} **${cat}** (${cmds.length}) — ${sample}${cmds.length > 3 ? ` +${cmds.length - 3} more` : ""}`);
+      // ── Command detail lookup ──────────────────────────────────────────────
+      if (query) {
+        let cmd = ctx.commands.get(query) ?? allCmds.find(c => c.aliases?.includes(query));
+        if (cmd) {
+          const embed = new EmbedBuilder()
+            .setTitle(`${ctx.prefix}${cmd.name}`)
+            .setDescription(cmd.description || "No description.")
+            .setColor(COLORS.INFO);
+          if (cmd.aliases?.length)
+            embed.addFields({ name: "Aliases", value: cmd.aliases.map(a => `\`${ctx.prefix}${a}\``).join(", "), inline: true });
+          if (cmd.rateLimit)
+            embed.addFields({ name: "Cooldown", value: `${cmd.rateLimit / 1000}s`, inline: true });
+          if (cmd.guildOnly)
+            embed.addFields({ name: "Server Only", value: "Yes", inline: true });
+          embed.setFooter({ text: `Category: ${cmd.category || "other"} • Chopsticks` });
+          return message.reply({ embeds: [embed] });
         }
-        const embed = new EmbedBuilder()
-          .setTitle("📖 Chopsticks — Prefix Commands")
-          .setDescription([
-            `Use \`${ctx.prefix}help <category>\` to list commands in a category.`,
-            `Use \`${ctx.prefix}help <command>\` for full command details.`,
-            "",
-            ...lines,
-          ].join("\n"))
-          .setColor(COLORS.INFO)
-          .setFooter({ text: `${allCmds.length} commands • Chopsticks` });
-        return message.reply({ embeds: [embed] });
+
+        // Category lookup with button nav
+        if (catMap.has(query)) {
+          return sendCategoryEmbed(message, query, catMap, CAT_EMOJI, ctx.prefix);
+        }
+
+        return reply(message, `❌ No command or category \`${query}\`. Try \`${ctx.prefix}help\`.`);
       }
 
-      // Category lookup
-      if (catMap.has(query)) {
-        const cmds = catMap.get(query);
-        const emoji = CAT_EMOJI[query] || "📦";
-        const lines = cmds.map(c => {
-          const aliases = c.aliases?.length ? ` *(${c.aliases.map(a => `!${a}`).join(", ")})*` : "";
-          return `\`${ctx.prefix}${c.name}\`${aliases} — ${c.description || "No description"}`;
-        });
-        const embed = new EmbedBuilder()
-          .setTitle(`${emoji} ${query} commands`)
-          .setDescription(lines.join("\n").slice(0, 4000))
-          .setColor(COLORS.INFO)
-          .setFooter({ text: `${cmds.length} commands • Chopsticks` });
-        return message.reply({ embeds: [embed] });
+      // ── Root help: overview with category buttons ──────────────────────────
+      const cats = [...catMap.keys()];
+      const lines = cats.map(cat => {
+        const cmds = catMap.get(cat);
+        const emoji = CAT_EMOJI[cat] || "📦";
+        const sample = cmds.slice(0, 3).map(c => `\`${ctx.prefix}${c.name}\``).join(", ");
+        return `${emoji} **${cat}** (${cmds.length}) — ${sample}${cmds.length > 3 ? ` +${cmds.length - 3} more` : ""}`;
+      });
+
+      const embed = new EmbedBuilder()
+        .setTitle("📖 Chopsticks — Command Help")
+        .setDescription([
+          `**${allCmds.length} prefix commands** across **${cats.length} categories**`,
+          `Use \`${ctx.prefix}help <category>\` or click a button below.`,
+          `Use \`${ctx.prefix}help <command>\` for command details.`,
+          "",
+          ...lines,
+        ].join("\n"))
+        .setColor(COLORS.INFO)
+        .setFooter({ text: "Chopsticks • Slash commands: /help" });
+
+      // Build up to 5 buttons per row (max 25 total = 5 rows)
+      const PRIORITY_CATS = ["music", "ai", "fun", "economy", "social", "minigames", "mod", "utility", "info", "animals", "entertainment", "knowledge", "voice", "server", "meta"];
+      const orderedCats = [...new Set([...PRIORITY_CATS, ...cats])].filter(c => catMap.has(c));
+      const rows = [];
+      for (let i = 0; i < Math.min(orderedCats.length, 25); i += 5) {
+        const row = new ActionRowBuilder();
+        const slice = orderedCats.slice(i, i + 5);
+        for (const cat of slice) {
+          row.addComponents(
+            new ButtonBuilder()
+              .setCustomId(`help:cat:${cat}`)
+              .setLabel(`${CAT_EMOJI[cat] ?? "📦"} ${cat}`)
+              .setStyle(ButtonStyle.Secondary)
+          );
+        }
+        rows.push(row);
       }
 
-      // Command lookup (also check aliases)
-      let cmd = ctx.commands.get(query);
-      if (!cmd) {
-        cmd = allCmds.find(c => c.aliases?.includes(query));
-      }
-      if (cmd) {
-        const embed = new EmbedBuilder()
-          .setTitle(`${ctx.prefix}${cmd.name}`)
-          .setDescription(cmd.description || "No description.")
-          .setColor(COLORS.INFO);
-        if (cmd.aliases?.length)
-          embed.addFields({ name: "Aliases", value: cmd.aliases.map(a => `\`${ctx.prefix}${a}\``).join(", "), inline: true });
-        if (cmd.rateLimit)
-          embed.addFields({ name: "Cooldown", value: `${cmd.rateLimit / 1000}s`, inline: true });
-        if (cmd.guildOnly)
-          embed.addFields({ name: "Server Only", value: "Yes", inline: true });
-        embed.setFooter({ text: `Category: ${cmd.category || "other"} • Chopsticks` });
-        return message.reply({ embeds: [embed] });
-      }
+      const msg = await message.reply({ embeds: [embed], components: rows.slice(0, 5) });
 
-      return reply(message, `❌ No command or category named \`${query}\`. Try \`${ctx.prefix}help\` for the full list.`);
-    }
+      // Handle button clicks for 2 minutes
+      const coll = msg.createMessageComponentCollector({
+        filter: i => i.user.id === message.author.id,
+        time: 120_000,
+      });
+      coll.on("collect", async interaction => {
+        const cat = interaction.customId.replace("help:cat:", "");
+        await interaction.deferUpdate().catch(() => {});
+        await sendCategoryEmbed(msg, cat, catMap, CAT_EMOJI, ctx.prefix, true);
+      });
+      coll.on("end", () => msg.edit({ components: [] }).catch(() => {}));
+    },
   },
   {
     name: "echo",

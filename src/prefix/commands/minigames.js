@@ -235,4 +235,112 @@ export default [
       await message.reply({ embeds: [embed] });
     }
   },
+,
+
+  // ── guess (higher/lower) ──────────────────────────────────────────────────
+  {
+    name: "guess",
+    aliases: ["highlow", "number"],
+    description: "Guess a number 1–100 — !guess",
+    rateLimit: 3000,
+    async execute(message) {
+      const secret = Math.floor(Math.random() * 100) + 1;
+      let attempts = 0;
+      const MAX_ATTEMPTS = 7;
+      const { EmbedBuilder } = await import("discord.js");
+      const mkEmbed = (desc, color = 0x5865F2) => new EmbedBuilder().setTitle("🎲 Guess the Number").setDescription(desc).setColor(color).setFooter({ text: "Type a number between 1-100!" });
+      const msg = await message.reply({ embeds: [mkEmbed(`I'm thinking of a number between **1 and 100**.\nYou have **${MAX_ATTEMPTS}** guesses!`)] });
+      const filter = m => m.author.id === message.author.id && /^\d+$/.test(m.content.trim());
+      const coll = message.channel.createMessageCollector({ filter, time: 60_000, max: MAX_ATTEMPTS });
+      coll.on("collect", async m => {
+        attempts++;
+        const guess = parseInt(m.content.trim());
+        if (guess === secret) { coll.stop("win"); return msg.edit({ embeds: [mkEmbed(`🎉 Correct! The number was **${secret}** — guessed in **${attempts}** attempt${attempts !== 1 ? "s" : ""}!`, 0x57F287)] }); }
+        if (attempts >= MAX_ATTEMPTS) { coll.stop(); return msg.edit({ embeds: [mkEmbed(`😢 Out of guesses! The number was **${secret}**.`, 0xED4245)] }); }
+        const hint = guess < secret ? "📈 Too low!" : "📉 Too high!";
+        await msg.edit({ embeds: [mkEmbed(`${hint} Guesses left: **${MAX_ATTEMPTS - attempts}**`, 0xFEE75C)] });
+      });
+      coll.on("end", (_, r) => { if (r !== "win" && r !== "max") msg.edit({ embeds: [new EmbedBuilder().setTitle("😢 Time's up!").setDescription(`The number was **${secret}**.`).setColor(0xED4245)] }).catch(() => {}); });
+    },
+  },
+
+  // ── blackjack ─────────────────────────────────────────────────────────────
+  {
+    name: "blackjack",
+    aliases: ["bj", "21"],
+    description: "Blackjack for credits — !blackjack [bet]",
+    guildOnly: true,
+    rateLimit: 5000,
+    async execute(message, args) {
+      const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = await import("discord.js");
+      const { getWallet, removeCredits, addCredits } = await import("../../economy/wallet.js");
+      const bet = Math.max(10, Math.min(1000, parseInt(args[0]) || 50));
+      const wallet = await getWallet(message.author.id).catch(() => ({ balance: 0 }));
+      if ((wallet.balance ?? 0) < bet) return message.reply(`💸 You need **${bet}** credits (have **${wallet.balance ?? 0}**).`);
+      await removeCredits(message.author.id, bet, "blackjack_bet").catch(() => {});
+      const suits = ["♠","♥","♦","♣"], vals = ["A","2","3","4","5","6","7","8","9","10","J","Q","K"];
+      const deck = suits.flatMap(s => vals.map(v => `${v}${s}`)).sort(() => Math.random() - 0.5);
+      let i = 0; const draw = () => deck[i++];
+      function hv(hand) { let v = 0, a = 0; for (const c of hand) { const f = c.slice(0,-1); if (f==="A"){v+=11;a++;}else if(["J","Q","K"].includes(f))v+=10;else v+=+f; } while(v>21&&a>0){v-=10;a--;} return v; }
+      let player = [draw(),draw()], dealer = [draw(),draw()];
+      const emb = (showD=false, res=null) => new EmbedBuilder().setTitle("🃏 Blackjack").setColor(res==="win"?0x57F287:res==="lose"?0xED4245:res==="push"?0xFEE75C:0x5865F2)
+        .addFields({name:`Your Hand (${hv(player)})`,value:player.join(" "),inline:true},{name:`Dealer (${showD?hv(dealer):"?"})`,value:showD?dealer.join(" "):`${dealer[0]} ??`,inline:true})
+        .setDescription(res==="win"?`🎉 You win **${bet*2}** credits!`:res==="lose"?`😢 Lost **${bet}** credits.`:res==="push"?`🤝 Push! Bet returned.`:res==="bj"?`🃏 **BLACKJACK!** +**${Math.floor(bet*2.5)}** credits!`:`Bet: **${bet}** credits`)
+        .setFooter({text:"Chopsticks !blackjack"});
+      const btns = () => new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId("bj:hit").setLabel("Hit").setStyle(ButtonStyle.Success),new ButtonBuilder().setCustomId("bj:stand").setLabel("Stand").setStyle(ButtonStyle.Danger));
+      if (hv(player)===21) { await addCredits(message.author.id,Math.floor(bet*2.5),"blackjack_bj").catch(()=>{}); return message.reply({embeds:[emb(true,"bj")]}); }
+      const msg = await message.reply({embeds:[emb()],components:[btns()]});
+      const coll = msg.createMessageComponentCollector({filter:x=>x.user.id===message.author.id,time:60_000});
+      coll.on("collect", async x => {
+        await x.deferUpdate().catch(()=>{});
+        if (x.customId==="bj:hit") { player.push(draw()); const v=hv(player); if(v>21){coll.stop();return msg.edit({embeds:[emb(true,"lose")],components:[]});} if(v===21)coll.stop("stand"); else msg.edit({embeds:[emb()],components:[btns()]}); }
+        if (x.customId==="bj:stand") coll.stop("stand");
+      });
+      coll.on("end", async(_,r) => {
+        if(r!=="stand")return;
+        let dv=hv(dealer); while(dv<17){dealer.push(draw());dv=hv(dealer);}
+        const pv=hv(player); let res,pay=0;
+        if(dv>21||pv>dv){res="win";pay=bet*2;}else if(pv===dv){res="push";pay=bet;}else res="lose";
+        if(pay>0)await addCredits(message.author.id,pay,`bj_${res}`).catch(()=>{});
+        await msg.edit({embeds:[emb(true,res)],components:[]});
+      });
+    },
+  },
+
+  // ── hangman ───────────────────────────────────────────────────────────────
+  {
+    name: "hangman",
+    aliases: ["hm"],
+    description: "Play hangman — !hangman",
+    rateLimit: 5000,
+    async execute(message) {
+      const { EmbedBuilder } = await import("discord.js");
+      const WORDS = ["javascript","discord","chopsticks","gaming","music","developer","server","channel","economy","community","minecraft","streaming","playlist","leaderboard","tournament"];
+      const word = WORDS[Math.floor(Math.random()*WORDS.length)];
+      const MAX_WRONG = 7;
+      let guessed = new Set(), wrong = 0;
+      const STAGE = ["  ___\n |   |\n |\n |\n |\n |_____","  ___\n |   |\n |   O\n |\n |\n |_____","  ___\n |   |\n |   O\n |   |\n |\n |_____","  ___\n |   |\n |   O\n |  /|\n |\n |_____","  ___\n |   |\n |   O\n |  /|\\\n |\n |_____","  ___\n |   |\n |   O\n |  /|\\\n |  /\n |_____","  ___\n |   |\n |   O\n |  /|\\\n |  / \\\n |_____"];
+      const disp = () => {
+        const letters = word.split("").map(l=>guessed.has(l)?l:"_").join(" ");
+        const wr = [...guessed].filter(l=>!word.includes(l));
+        return new EmbedBuilder().setTitle("🎮 Hangman")
+          .setDescription(`\`\`\`\n${STAGE[Math.min(wrong,6)]}\n\`\`\`\n**Word:** \`${letters}\`\n**Wrong:** ${wr.length?wr.join(", "):"none"}\n**Lives:** ${"❤️".repeat(MAX_WRONG-wrong)}${"🖤".repeat(wrong)}`)
+          .setColor(wrong>=MAX_WRONG?0xED4245:wrong>=4?0xFEE75C:0x57F287).setFooter({text:"Type a letter or the whole word!"});
+      };
+      const msg = await message.reply({embeds:[disp()]});
+      const coll = message.channel.createMessageCollector({filter:m=>m.author.id===message.author.id&&/^[a-zA-Z]+$/.test(m.content.trim()),time:120_000});
+      coll.on("collect", async m => {
+        const g = m.content.trim().toLowerCase();
+        if(g.length>1){if(g===word)return coll.stop("win");wrong++;if(wrong>=MAX_WRONG)return coll.stop("lose");}
+        else{if(guessed.has(g))return;guessed.add(g);if(!word.includes(g))wrong++;}
+        if(word.split("").every(l=>guessed.has(l)))return coll.stop("win");
+        if(wrong>=MAX_WRONG)return coll.stop("lose");
+        await msg.edit({embeds:[disp()]});
+      });
+      coll.on("end", async(_,r) => {
+        if(r==="win") await msg.edit({embeds:[new EmbedBuilder().setTitle("🎉 You Win!").setDescription(`The word was **${word}**!`).setColor(0x57F287)]});
+        else await msg.edit({embeds:[new EmbedBuilder().setTitle("💀 Game Over").setDescription(`The word was **${word}**.`).setColor(0xED4245)]});
+      });
+    },
+  },
 ];

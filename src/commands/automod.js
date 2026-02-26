@@ -20,7 +20,7 @@ const RULE_LABELS = {
 };
 
 export const meta = {
-  deployGlobal: false,
+  deployGlobal: true,
   name: "automod",
   category: "safety",
 };

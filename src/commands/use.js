@@ -12,7 +12,7 @@ import { withTimeout } from "../utils/interactionTimeout.js";
 import { sanitizeString } from "../utils/validation.js";
 
 export const meta = {
-  deployGlobal: true,
+  deployGlobal: false,
   category: "game",
   guildOnly: true,
 };

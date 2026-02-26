@@ -10,7 +10,7 @@ import { checkEscalation } from "../tools/modcases/escalation.js";
 import { withTimeout } from "../utils/interactionTimeout.js";
 
 export const meta = {
-  deployGlobal: false,
+  deployGlobal: true,
   guildOnly: true,
   category: "mod"
 };

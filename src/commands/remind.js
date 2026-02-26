@@ -3,7 +3,7 @@ import { schedule } from "../utils/scheduler.js";
 import { sanitizeString } from "../utils/validation.js";
 
 export const meta = {
-  deployGlobal: false,
+  deployGlobal: true,
   category: "utility",
   guildOnly: true,
 };

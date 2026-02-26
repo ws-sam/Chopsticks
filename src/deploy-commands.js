@@ -58,6 +58,10 @@ for (const file of files) {
 
   if (!cmd?.data?.toJSON) continue;
 
+  // Global deploy: only include commands explicitly opted in via meta.deployGlobal.
+  // Discord enforces a hard 100-command limit; keeping the global set small and intentional.
+  if (MODE === "global" && !cmd.meta?.deployGlobal) continue;
+
   try {
     if (cmd.meta?.userPerms && Array.isArray(cmd.meta.userPerms) && cmd.meta.userPerms.length > 0) {
       const combinedPerms = cmd.meta.userPerms.reduce((acc, perm) => acc | resolvePermFlag(perm), 0n);

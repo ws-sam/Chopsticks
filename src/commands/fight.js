@@ -29,7 +29,7 @@ function pick(arr) {
 }
 
 export const meta = {
-  deployGlobal: true,
+  deployGlobal: false,
   category: "game",
   guildOnly: true,
 };

@@ -36,7 +36,7 @@ import {
 const TYPE_KEYS = new Set(TICKET_TYPES.map(t => t.key));
 
 export const meta = {
-  deployGlobal: false,
+  deployGlobal: true,
   guildOnly: true,
   category: "tools"
 };

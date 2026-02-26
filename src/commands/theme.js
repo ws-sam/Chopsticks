@@ -21,7 +21,7 @@ import { Branding } from "../config/branding.js";
 export const meta = {
   name: "theme",
   category: "utility",
-  deployGlobal: true,
+  deployGlobal: false,
 };
 
 const COLOR_SLOTS = ["primary", "success", "error", "warning", "info", "neutral"];

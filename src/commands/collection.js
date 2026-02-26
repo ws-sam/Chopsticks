@@ -9,7 +9,7 @@ import { withTimeout } from "../utils/interactionTimeout.js";
 const ITEMS_PER_PAGE = 12;
 
 export const meta = {
-  deployGlobal: true,
+  deployGlobal: false,
   category: "game",
   guildOnly: true,
 };

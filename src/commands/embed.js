@@ -3,7 +3,7 @@ import { replyError } from "../utils/discordOutput.js";
 import { sanitizeString } from "../utils/validation.js";
 
 export const meta = {
-  deployGlobal: false,
+  deployGlobal: true,
   guildOnly: true,
   userPerms: [PermissionFlagsBits.ManageMessages],
   category: "tools"

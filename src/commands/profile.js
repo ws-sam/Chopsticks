@@ -46,7 +46,7 @@ function boolWord(v) {
 }
 
 export const meta = {
-  deployGlobal: true,
+  deployGlobal: false,
   category: "social",
   guildOnly: true,
 };

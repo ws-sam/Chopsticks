@@ -16,7 +16,7 @@ import { withTimeout } from '../utils/interactionTimeout.js';
 import { progressBar } from '../utils/embedComponents.js';
 
 export const meta = {
-  deployGlobal: true,
+  deployGlobal: false,
   name: 'stats',
   description: 'Per-guild activity stats, leaderboards, and achievements',
   category: "info",

@@ -14,7 +14,7 @@ import { replyEmbed, replyEmbedWithJson, replySuccess, replyError } from "../uti
 import { getPool } from "../utils/storage_pg.js";
 
 export const meta = {
-  deployGlobal: false,
+  deployGlobal: true,
   guildOnly: true,
   userPerms: [PermissionFlagsBits.ManageGuild],
   category: "admin"

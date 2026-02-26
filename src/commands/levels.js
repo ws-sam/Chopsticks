@@ -16,7 +16,7 @@ import { getGameProfile } from "../game/profile.js";
 import { withTimeout } from "../utils/interactionTimeout.js";
 
 export const meta = {
-  deployGlobal: false,
+  deployGlobal: true,
   guildOnly: true,
   userPerms: [PermissionFlagsBits.ManageRoles],
   category: "social"

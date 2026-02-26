@@ -50,7 +50,7 @@ import { botLogger } from "../utils/modernLogger.js";
 import { withTimeout } from "../utils/interactionTimeout.js";
 
 export const meta = {
-  deployGlobal: false,
+  deployGlobal: true,
   guildOnly: true,
   userPerms: [PermissionFlagsBits.ManageGuild],
   category: "agents"
@@ -1130,63 +1130,100 @@ export async function execute(interaction) {
 
       // Status emoji legend
       const statusLine = [
-        `🟢 Online: **${liveAgents.length}**`,
-        `🔵 In this guild: **${inGuild.length}**`,
-        `⚪ Registered (active): **${registeredActive.length}**`,
-        `🔴 Offline (starting up): **${offlineAgents.length}**`,
+        `🟢 **Online:** ${liveAgents.length}`,
+        `🔵 **In server:** ${inGuild.length}`,
+        `⚪ **Registered:** ${registeredActive.length}`,
+        `🔴 **Offline / starting:** ${offlineAgents.length}`,
       ].join("\n");
+
+      const guildHealth = inGuild.length > 0
+        ? `🎵 Idle **${idleInGuild.length}**  ·  ⚡ Busy **${busyInGuild.length}**`
+        : onlineNotInGuild.length > 0
+          ? `${onlineNotInGuild.length} agent(s) online but not yet in this server — use **Deploy** to invite them.`
+          : registeredActive.length > 0
+            ? `Agents are registered but not in this server yet — use **Deploy** to invite them.`
+            : "No agents configured. Use **Add Token** then **Deploy**.";
 
       const embed = new EmbedBuilder()
         .setTitle("🤖 Agent Status")
-        .setColor(inGuild.length > 0 ? Colors.SUCCESS : offlineAgents.length > 0 ? Colors.WARNING : Colors.INFO)
+        .setColor(inGuild.length > 0 ? Colors.SUCCESS : offlineAgents.length > 0 || onlineNotInGuild.length > 0 ? Colors.WARNING : Colors.INFO)
         .setTimestamp()
         .addFields(
-          { name: "Overview", value: statusLine },
-          {
-            name: `This Guild · ${inGuild.length} agent${inGuild.length !== 1 ? 's' : ''}`,
-            value: inGuild.length
-              ? `🎵 Idle: **${idleInGuild.length}**  |  ⚡ Busy: **${busyInGuild.length}**`
-              : "No agents present. Use `/agents deploy` to get invite links.",
-          },
-          { name: "Selected Pool", value: `\`${selectedPoolId}\``, inline: true }
+          { name: "Pool", value: `\`${selectedPoolId}\``, inline: true },
+          { name: "This Server", value: `${inGuild.length} agent${inGuild.length !== 1 ? 's' : ''}`, inline: true },
+          { name: "Status", value: guildHealth, inline: false },
+          { name: "Network Overview", value: statusLine, inline: false }
         );
 
-      // In-guild agent list
+      // In-guild agent list (compact)
       if (inGuild.length > 0) {
         const liveInGuildText = inGuild
           .sort((x, y) => String(x.agentId).localeCompare(String(y.agentId)))
           .map(a => {
-            const status = !a.ready ? '🔴 down' : a.busyKey ? `⚡ busy (${a.busyKind || "?"})` : '🟢 idle';
-            const ident = a.tag || a.botUserId || a.agentId;
-            return `${status}  \`${a.agentId}\`  ${ident}`;
+            const caps = a.podTag ? ` [${a.podTag}]` : "";
+            const statusIcon = !a.ready ? '🔴' : a.busyKey ? '⚡' : '🟢';
+            const busyNote = a.busyKey ? ` (${a.busyKind || "busy"})` : "";
+            const ident = a.tag ? ` — ${a.tag}` : "";
+            return `${statusIcon} \`${a.agentId}\`${caps}${ident}${busyNote}`;
           })
           .join("\n");
-        embed.addFields({ name: "Agents in Guild", value: liveInGuildText.slice(0, 1024) });
+        embed.addFields({ name: `Agents in Server (${inGuild.length})`, value: liveInGuildText.slice(0, 1024) });
       }
 
-      // Online but not in guild
+      // Online but needs invite
       if (onlineNotInGuild.length > 0) {
         const text = onlineNotInGuild
           .sort((x, y) => String(x.agent_id).localeCompare(String(y.agent_id)))
-          .map(a => `🔵 \`${a.agent_id}\`  ${a.tag || ''}  — invite needed`)
+          .map(a => `🔵 \`${a.agent_id}\`${a.tag ? ` — ${a.tag}` : ""}  ← needs invite`)
           .join("\n");
-        embed.addFields({ name: "Online — Not Yet in Guild", value: text.slice(0, 1024) });
+        embed.addFields({ name: `Online — Not Yet in Server (${onlineNotInGuild.length})`, value: text.slice(0, 1024) });
       }
 
       // Offline active agents
       if (offlineAgents.length > 0) {
         const text = offlineAgents
           .sort((x, y) => String(x.agent_id).localeCompare(String(y.agent_id)))
-          .map(a => `🔴 \`${a.agent_id}\`  ${a.tag || ''}  — runner starting`)
+          .slice(0, 10)
+          .map(a => `🔴 \`${a.agent_id}\`${a.tag ? ` — ${a.tag}` : ""}  ← starting`)
           .join("\n");
-        embed.addFields({ name: "Offline (agentRunner starting)", value: text.slice(0, 512) });
+        const more = offlineAgents.length > 10 ? `\n… and ${offlineAgents.length - 10} more` : "";
+        embed.addFields({ name: `Offline — Agent Runner Starting (${offlineAgents.length})`, value: (text + more).slice(0, 512) });
       }
 
       if (inGuild.length === 0 && registeredActive.length === 0) {
-        embed.addFields({ name: "Getting Started", value: "1. `/pools create` — create your pool\n2. `/agents add_token` — register a bot token\n3. `/agents deploy` — get invite links to add bots to this guild" });
+        embed.addFields({
+          name: "🚀 Getting Started",
+          value: "1. `/pools create` — create an agent pool\n2. `/agents add_token` — register a bot token\n3. `/agents deploy` — get invite links to add bots here"
+        });
       }
 
-      await replyInteraction(interaction, { embeds: [embed] });
+      // Action buttons: Deploy, Advisor, Sessions, Setup Music, Setup AI
+      const statusActionRow = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId(buildDeployUiId("refresh", interaction.user.id, 10, selectedPoolId))
+          .setLabel("🚀 Deploy Agents")
+          .setStyle(ButtonStyle.Primary),
+        new ButtonBuilder()
+          .setCustomId(buildAdvisorUiId("refresh", interaction.user.id, 10, selectedPoolId))
+          .setLabel("📊 Pool Advisor")
+          .setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder()
+          .setCustomId(`agentssessions:${interaction.guildId}`)
+          .setLabel("📋 Sessions")
+          .setStyle(ButtonStyle.Secondary)
+      );
+      const statusCapabilityRow = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId(`agentssetup:music:${interaction.guildId}`)
+          .setLabel("🎵 Setup Music")
+          .setStyle(ButtonStyle.Success),
+        new ButtonBuilder()
+          .setCustomId(`agentssetup:ai:${interaction.guildId}`)
+          .setLabel("🤖 Setup AI Tools")
+          .setStyle(ButtonStyle.Success)
+      );
+
+      await replyInteraction(interaction, { embeds: [embed], components: [statusActionRow, statusCapabilityRow] });
     } catch (error) {
       botLogger.error({ err: error }, "[agents:status] Error");
       await replyError(interaction, "Status Failed", `Could not fetch agent status.\n${error.message}`);
@@ -2882,6 +2919,68 @@ export async function handleButton(interaction) {
       });
       return true;
     }
+  }
+
+  return false;
+}
+
+// Handler for status panel quick-action buttons (sessions + setup shortcuts)
+export async function handleStatusButton(interaction) {
+  if (!interaction.isButton?.()) return false;
+  const cid = String(interaction.customId || "");
+
+  if (cid.startsWith("agentssessions:")) {
+    const mgr = global.agentManager;
+    if (!mgr) {
+      await interaction.reply({ embeds: [buildInfoEmbed("Offline", "Agent control is offline.", Colors.ERROR)], flags: MessageFlags.Ephemeral });
+      return true;
+    }
+    const guildId = interaction.guildId;
+    const sessions = mgr.listSessions().filter(s => s.guildId === guildId);
+    const assistantSessions = mgr.listAssistantSessions().filter(s => s.guildId === guildId);
+    const lines = [
+      ...sessions.map(s => `🎵 music  <#${s.voiceChannelId}>  →  \`${s.agentId}\``),
+      ...assistantSessions.map(s => `🤖 assistant  <#${s.voiceChannelId}>  →  \`${s.agentId}\``)
+    ];
+    const embed = buildInfoEmbed(
+      "Active Agent Sessions",
+      lines.length ? "Live sessions in this server:" : "No active sessions in this server.",
+      lines.length ? Colors.INFO : Colors.SUCCESS
+    );
+    if (lines.length) embed.addFields({ name: `Sessions (${lines.length})`, value: lines.map(l => `• ${l}`).join("\n").slice(0, 1024) });
+    await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+    return true;
+  }
+
+  if (cid.startsWith("agentssetup:music:")) {
+    const embed = buildInfoEmbed(
+      "🎵 Music Setup Guide",
+      "To enable music in this server with your agents:",
+      Colors.Music ?? Colors.INFO
+    ).addFields(
+      { name: "1. Deploy Agents", value: "Use `/agents deploy` to invite agent bots with **music** capability into this server.", inline: false },
+      { name: "2. Play Music", value: "Use `/music play <song>` to queue a track. Agents will auto-join your voice channel.", inline: false },
+      { name: "3. Tip: Agent Capabilities", value: "When registering via `/agents add_token`, set `capabilities: music` so the pool advisor prioritises music-ready agents.", inline: false },
+      { name: "4. Need Lavalink?", value: "Lavalink is the audio server. See `SELF_HOSTING.md` for deployment instructions.", inline: false }
+    );
+    await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+    return true;
+  }
+
+  if (cid.startsWith("agentssetup:ai:")) {
+    const embed = buildInfoEmbed(
+      "🤖 AI Tools Setup Guide",
+      "To enable AI tools for agents in this server:",
+      Colors.INFO
+    ).addFields(
+      { name: "1. Set AI Provider", value: "Use `/ai set-provider` to choose `ollama`, `openai`, `anthropic`, or `groq` as the server default.", inline: false },
+      { name: "2. Link Your API Key", value: "Use `/ai token link` to attach your personal API key (encrypted, per-user).", inline: false },
+      { name: "3. Chat with Agents", value: "Use `/ai chat` to talk to the AI. Agents with the **assistant** or **chat** capability will handle voice queries.", inline: false },
+      { name: "4. Image Generation", value: "Use `/ai image` for AI images. Free via HuggingFace FLUX, or use your OpenAI token for premium quality.", inline: false },
+      { name: "5. Deploy AI-Capable Agents", value: "Register agents with `capabilities: chat,tts` via `/agents add_token` for full voice assistant support.", inline: false }
+    );
+    await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+    return true;
   }
 
   return false;

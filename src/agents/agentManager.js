@@ -102,7 +102,18 @@ export class AgentManager {
     // A2: WS heartbeat — manager actively pings agents, lastSeen updated on pong
     this.heartbeatIntervalMs = safeInt(process.env.AGENT_HEARTBEAT_INTERVAL_MS, 15_000);
     this._heartbeatTimer = null;
+
+    // Hardening: per-IP connection rate limiting
+    // Max simultaneous WS connections per source IP (prevents agent identity spoofing storms)
+    this.maxConnsPerIp = safeInt(process.env.AGENT_MAX_CONNS_PER_IP, 20);
+    this._ipConnCount = new Map(); // ip -> count of active connections
+
+    // Hardening: total max simultaneous unauthenticated connections
+    this.maxTotalConns = safeInt(process.env.AGENT_MAX_TOTAL_CONNS, 200);
   }
+
+  /** Alias for liveAgents — keeps external callers (dashboard, commands) working. */
+  get agents() { return this.liveAgents; }
 
   async start() {
     if (this.started) return;
@@ -163,12 +174,33 @@ export class AgentManager {
   }
 
   handleConnection(ws, req) {
+    const remoteIp = req?.socket?.remoteAddress || req?.headers?.["x-forwarded-for"]?.split(",")[0]?.trim() || null;
+    ws.__remoteAddress = remoteIp;
+
+    // Per-IP connection cap
+    if (remoteIp && this.maxConnsPerIp > 0) {
+      const ipCount = (this._ipConnCount.get(remoteIp) || 0) + 1;
+      if (ipCount > this.maxConnsPerIp) {
+        logger.warn({ remoteIp, ipCount }, "[AgentManager] Per-IP connection limit exceeded — closing");
+        try { ws.close(1008, "too-many-connections"); } catch {}
+        return;
+      }
+      this._ipConnCount.set(remoteIp, ipCount);
+    }
+
+    // Total connection cap (unauthenticated flood protection)
+    if (this.maxTotalConns > 0 && this.wss.clients.size > this.maxTotalConns) {
+      logger.warn({ total: this.wss.clients.size }, "[AgentManager] Total connection limit exceeded — closing");
+      try { ws.close(1008, "server-full"); } catch {}
+      if (remoteIp) this._ipConnCount.set(remoteIp, Math.max(0, (this._ipConnCount.get(remoteIp) || 1) - 1));
+      return;
+    }
+
     // Enforce a fast handshake to avoid idle connection buildup.
     const handshakeMs = Math.max(1000, Math.trunc(Number(process.env.AGENT_CONTROL_HANDSHAKE_MS || 8000)));
-    ws.__remoteAddress = req?.socket?.remoteAddress || null;
     ws.__helloTimer = setTimeout(() => {
       if (!ws.__agentId) {
-        logger.warn({ remoteAddress: ws._socket?.remoteAddress }, "Agent WS connected but no hello received within timeout — closing connection");
+        logger.warn({ remoteAddress: remoteIp }, "Agent WS connected but no hello received within timeout — closing connection");
         try { ws.close(1008, "hello-required"); } catch {}
       }
     }, handshakeMs);
@@ -194,6 +226,12 @@ export class AgentManager {
       if (ws.__helloTimer) {
         try { clearTimeout(ws.__helloTimer); } catch {}
         ws.__helloTimer = null;
+      }
+      // Release per-IP connection slot
+      if (ws.__remoteAddress) {
+        const prev = this._ipConnCount.get(ws.__remoteAddress) || 0;
+        if (prev <= 1) this._ipConnCount.delete(ws.__remoteAddress);
+        else this._ipConnCount.set(ws.__remoteAddress, prev - 1);
       }
       // Make async cleanup non-blocking
       this.handleClose(ws).catch(err => {
@@ -252,8 +290,13 @@ export class AgentManager {
     if (msg?.type === "event") return void this.handleEvent(ws, msg);
     if (msg?.type === "resp") return void this.handleResponse(ws, msg);
 
-    // Log unknown message types rather than silently ignoring
+    // Log unknown message types and close connection if unauthenticated
     logger.warn('[AgentManager] Unknown WS message type', { type: msg?.type, agentId: ws.__agentId });
+    // Terminate connections that send unknown types before authenticating (potential probes)
+    if (!ws.__agentId) {
+      try { ws.send(JSON.stringify({ type: "error", error: "Unknown message type" })); } catch {}
+      try { ws.close(1008, "protocol-error"); } catch {}
+    }
   }
 
   handleHello(ws, msg) { // Now directly from an agent

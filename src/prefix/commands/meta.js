@@ -1,4 +1,4 @@
-import { PermissionsBitField } from "discord.js";
+import { PermissionsBitField, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
 import { reply, parseIntSafe } from "../helpers.js";
 import { loadGuildData, saveGuildData } from "../../utils/storage.js";
 import { readAgentTokensFromEnv } from "../../agents/env.js";
@@ -114,22 +114,63 @@ export default [
       if (sub === "status") {
         const list = mgr?.listAgents?.() ?? [];
         const guildId = message.guildId;
-        const lines = list.map(a => {
-          const inGuild = a.guildIds?.includes?.(guildId);
-          const busy = a.busyKey ? "busy" : "idle";
-          return `${a.agentId} ${a.ready ? "ready" : "down"} ${busy} ${inGuild ? "in-guild" : "not-in-guild"}`;
-        });
-        return reply(message, lines.length ? lines.join("\n") : "No agents connected.");
+        const inGuild = list.filter(a => a.guildIds?.includes?.(guildId));
+        const idle = inGuild.filter(a => a.ready && !a.busyKey);
+        const busy = inGuild.filter(a => a.ready && a.busyKey);
+
+        const statusLines = inGuild.length
+          ? inGuild.sort((a, b) => String(a.agentId).localeCompare(String(b.agentId)))
+              .map(a => {
+                const icon = !a.ready ? "🔴" : a.busyKey ? "⚡" : "🟢";
+                const note = a.busyKey ? ` (${a.busyKind || "busy"})` : "";
+                const tag = a.tag ? ` — ${a.tag}` : "";
+                return `${icon} \`${a.agentId}\`${tag}${note}`;
+              })
+          : ["No agents in this server. Use `/agents deploy` or `agents invite`."];
+
+        const embed = new EmbedBuilder()
+          .setTitle("🤖 Agent Status")
+          .setColor(inGuild.length > 0 ? 0x57F287 : list.length > 0 ? 0xFEE75C : 0x5865F2)
+          .setTimestamp()
+          .addFields(
+            { name: "Network", value: `🟢 Online: **${list.length}**  ·  🔵 In server: **${inGuild.length}**`, inline: false },
+            { name: "Activity", value: `🎵 Idle: **${idle.length}**  ·  ⚡ Busy: **${busy.length}**`, inline: false },
+            { name: `Agents (${inGuild.length})`, value: statusLines.join("\n").slice(0, 1024), inline: false }
+          )
+          .setFooter({ text: "Use /agents status for the full interactive panel" });
+
+        const row = new ActionRowBuilder().addComponents(
+          new ButtonBuilder()
+            .setCustomId(`agentssessions:${guildId}`)
+            .setLabel("📋 Sessions")
+            .setStyle(ButtonStyle.Secondary),
+          new ButtonBuilder()
+            .setCustomId(`agentssetup:music:${guildId}`)
+            .setLabel("🎵 Music Setup")
+            .setStyle(ButtonStyle.Success),
+          new ButtonBuilder()
+            .setCustomId(`agentssetup:ai:${guildId}`)
+            .setLabel("🤖 AI Setup")
+            .setStyle(ButtonStyle.Success)
+        );
+
+        return message.reply({ embeds: [embed], components: [row] });
       }
 
       if (sub === "sessions") {
         const sessions = mgr?.listSessions?.() ?? [];
         const assistantSessions = mgr?.listAssistantSessions?.() ?? [];
         const guildId = message.guildId;
-        const musicLines = sessions.filter(s => s.guildId === guildId).map(s => `music ${s.voiceChannelId} -> ${s.agentId}`);
-        const assistantLines = assistantSessions.filter(s => s.guildId === guildId).map(s => `assistant ${s.voiceChannelId} -> ${s.agentId}`);
-        const lines = [...musicLines, ...assistantLines];
-        return reply(message, lines.length ? lines.join("\n") : "No sessions for this guild.");
+        const lines = [
+          ...sessions.filter(s => s.guildId === guildId).map(s => `🎵 music  <#${s.voiceChannelId}>  →  \`${s.agentId}\``),
+          ...assistantSessions.filter(s => s.guildId === guildId).map(s => `🤖 assistant  <#${s.voiceChannelId}>  →  \`${s.agentId}\``)
+        ];
+        const embed = new EmbedBuilder()
+          .setTitle("📋 Active Agent Sessions")
+          .setColor(lines.length ? 0x5865F2 : 0x57F287)
+          .setDescription(lines.length ? lines.map(l => `• ${l}`).join("\n").slice(0, 4096) : "No active sessions in this server.")
+          .setTimestamp();
+        return message.reply({ embeds: [embed] });
       }
 
       if (sub === "assign") {

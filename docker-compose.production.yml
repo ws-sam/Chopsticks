@@ -34,6 +34,12 @@ services:
     mem_limit: 512m
     mem_reservation: 256m
     cpus: '1.0'
+    healthcheck:
+      test: ["CMD", "node", "-e", "const p=process.env.HEALTH_PORT||process.env.METRICS_PORT||9100;require('http').get('http://localhost:'+p+'/healthz',(r)=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
     cap_drop:
       - ALL
     security_opt:
@@ -61,6 +67,10 @@ services:
       - LAVALINK_HOST=${LAVALINK_HOST:-lavalink}
       - LAVALINK_PORT=${LAVALINK_PORT:-2333}
       - LAVALINK_PASSWORD=${LAVALINK_PASSWORD:-youshallnotpass}
+      # Explicit override — prevents stale .env passwords from breaking the container.
+      # Connects directly to postgres (same as bot); pgbouncer uses md5 but postgres 16 requires scram-sha-256.
+      - POSTGRES_URL=postgres://${POSTGRES_USER:-chopsticks}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-chopsticks}
+      - DATABASE_URL=postgres://${POSTGRES_USER:-chopsticks}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-chopsticks}
     networks:
       - chopsticks
     depends_on:
@@ -73,6 +83,12 @@ services:
     mem_limit: 1g
     mem_reservation: 512m
     cpus: '1.5'
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('fs').statSync('/proc/1/status')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
     cap_drop:
       - ALL
     security_opt:

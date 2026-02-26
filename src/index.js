@@ -28,7 +28,7 @@ import { timingSafeEqual } from "node:crypto";
 import { spawn } from "node:child_process";
 import { ActivityType, Client, Collection, GatewayIntentBits, Events, Partials, PermissionFlagsBits } from "discord.js";
 import { AgentManager } from "./agents/agentManager.js";
-import { handleButton as handleAgentsButton, handleSelect as handleAgentsSelect } from "./commands/agents.js";
+import { handleButton as handleAgentsButton, handleSelect as handleAgentsSelect, handleStatusButton as handleAgentsStatusButton } from "./commands/agents.js";
 import {
   handleButton as handleMusicButton,
   handleSelect as handleMusicSelect,
@@ -1187,6 +1187,7 @@ client.on(Events.InteractionCreate, async interaction => {
     try {
       if (await handlePoolGlobalButton(interaction)) return;
       if (await handleAgentsButton(interaction)) return;
+      if (await handleAgentsStatusButton(interaction)) return;
       if (await handlePoolsButton(interaction)) return;
       if (await handleAudiobookButton(interaction)) return;
       if (await handleTicketsButton(interaction)) return;

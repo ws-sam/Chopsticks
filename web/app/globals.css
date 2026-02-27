@@ -2242,3 +2242,20 @@ footer {
   .tut-chrome-url { display: none; }
   .tut-cta-bar    { flex-direction: column; align-items: flex-start; }
 }
+
+/* Self-host link card in sidebar */
+.tut-navcard-link {
+  text-decoration: none;
+  border-style: dashed;
+  opacity: 0.8;
+  margin-top: 0.25rem;
+}
+.tut-navcard-link:hover {
+  opacity: 1;
+  border-style: solid;
+  border-color: rgba(248,113,113,0.35);
+  background: rgba(248,113,113,0.04);
+}
+.tut-mobile-tab {
+  text-decoration: none;
+}

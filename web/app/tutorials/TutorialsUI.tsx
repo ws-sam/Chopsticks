@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import {
   ArrowRightIcon, ShieldIcon, CoinIcon, RadioIcon,
   ServerIcon, PaletteIcon, BookOpenIcon, UsersIcon,
@@ -43,7 +43,7 @@ const TUTORIALS: Tutorial[] = [
     slug: 'getting-started',
     icon: BookOpenIcon,
     title: 'Getting Started',
-    preview: '/images/preview-setup.svg',
+    preview: '/images/preview-setup.svg?v=9',
     desc: 'Add Chopsticks to your server, grant the right permissions, and run your first commands. Five minutes from zero to working.',
     difficulty: 'beginner',
     time: '5 min',
@@ -59,7 +59,7 @@ const TUTORIALS: Tutorial[] = [
     slug: 'moderation',
     icon: ShieldIcon,
     title: 'Moderation Setup',
-    preview: '/images/preview-moderation.svg',
+    preview: '/images/preview-moderation.svg?v=9',
     desc: 'Configure mod roles, a dedicated log channel, and test every action — ban, kick, mute, warn, and purge.',
     difficulty: 'beginner',
     time: '10 min',
@@ -75,7 +75,7 @@ const TUTORIALS: Tutorial[] = [
     slug: 'economy',
     icon: CoinIcon,
     title: 'Economy Setup',
-    preview: '/images/preview-economy.svg',
+    preview: '/images/preview-economy.svg?v=9',
     desc: 'Set up the credits system, configure daily rewards, build a shop, and keep your community engaged with leaderboards.',
     difficulty: 'beginner',
     time: '15 min',
@@ -91,7 +91,7 @@ const TUTORIALS: Tutorial[] = [
     slug: 'agent-pool',
     icon: RadioIcon,
     title: 'Agent System',
-    preview: '/images/preview-agents.svg',
+    preview: '/images/preview-agents.svg?v=9',
     desc: 'Deploy and configure agents — voice actors, support bots, trivia hosts, and more. Feature in active development.',
     difficulty: 'intermediate',
     time: '20 min',
@@ -108,7 +108,7 @@ const TUTORIALS: Tutorial[] = [
     slug: 'theme',
     icon: PaletteIcon,
     title: 'Customising /theme',
-    preview: '/images/preview-theme.svg',
+    preview: '/images/preview-theme.svg?v=9',
     desc: "Change embed colors, rename the bot's persona, and disable modules — all from inside Discord, no code required.",
     difficulty: 'beginner',
     time: '8 min',
@@ -125,7 +125,7 @@ const TUTORIALS: Tutorial[] = [
     slug: 'welcome-messages',
     icon: UsersIcon,
     title: 'Welcome Messages',
-    preview: '/images/preview-welcome.svg',
+    preview: '/images/preview-welcome.svg?v=9',
     desc: 'Greet new members automatically with personalised messages, DM welcomes, goodbye notices, and live member counts.',
     difficulty: 'beginner',
     time: '10 min',
@@ -143,17 +143,12 @@ const TUTORIALS: Tutorial[] = [
     slug: 'self-host',
     icon: ServerIcon,
     title: 'Self-hosting',
-    preview: '/images/preview-selfhost.svg',
+    preview: '/images/preview-selfhost.svg?v=9',
     desc: 'Run your own Chopsticks instance with Docker. Full stack: bot, database, Redis. From clone to online in under 15 minutes.',
     difficulty: 'advanced',
     time: '30 min',
     steps: [
-      { heading: 'Prerequisites', body: 'Docker Engine v24+ with Compose v2, a Discord application + bot token from the Developer Portal, and at least 1 GB of free RAM.' },
-      { heading: '1. Clone and configure', body: <span><pre style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem', lineHeight: 1.6, color: 'var(--text-muted)', background: 'var(--surface-raised)', border: '1px solid var(--border)', borderRadius: '0.5rem', padding: '0.875rem 1rem', margin: '0.5rem 0', overflow: 'auto' }}>{`git clone https://github.com/WokSpec/Chopsticks.git\ncd Chopsticks\ncp .env.example .env`}</pre>Open <code style={cs}>.env</code> and fill in your <code style={cs}>DISCORD_TOKEN</code> and <code style={cs}>CLIENT_ID</code>.</span> },
-      { heading: '2. Start with Docker Compose', body: <span><pre style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem', lineHeight: 1.6, color: 'var(--text-muted)', background: 'var(--surface-raised)', border: '1px solid var(--border)', borderRadius: '0.5rem', padding: '0.875rem 1rem', margin: '0.5rem 0', overflow: 'auto' }}>{`docker compose -f docker-compose.free.yml up -d`}</pre></span> },
-      { heading: '3. Verify it is running', body: <span><pre style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem', lineHeight: 1.6, color: 'var(--text-muted)', background: 'var(--surface-raised)', border: '1px solid var(--border)', borderRadius: '0.5rem', padding: '0.875rem 1rem', margin: '0.5rem 0', overflow: 'auto' }}>{`docker compose logs bot --follow`}</pre>You should see the bot come online and log into Discord.</span> },
-      { heading: '4. Stay updated', body: <span><pre style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem', lineHeight: 1.6, color: 'var(--text-muted)', background: 'var(--surface-raised)', border: '1px solid var(--border)', borderRadius: '0.5rem', padding: '0.875rem 1rem', margin: '0.5rem 0', overflow: 'auto' }}>{`git pull && docker compose build && docker compose up -d`}</pre>Watch <a href={GITHUB + '/releases'} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }}>GitHub releases</a> for breaking changes before updating.</span> },
-      { heading: 'Need help?', body: <span>Open a <a href={GITHUB + '/discussions'} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }}>GitHub Discussion</a> or <a href={GITHUB + '/issues'} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }}>issue</a>. Full guide on the <a href="/self-host" style={{ color: 'var(--accent)' }}>Self-host page</a>.</span> },
+      { heading: 'Full guide on the Self-host page', body: <span>The complete self-hosting walkthrough lives on its own dedicated page. <a href="/self-host" style={{ color: 'var(--accent)' }}>Go to the Self-hosting guide →</a></span> },
     ],
   },
 ];
@@ -194,6 +189,10 @@ export default function TutorialsUI() {
               {tut.title}
             </button>
           ))}
+          <a href="/self-host" className="tut-mobile-tab">
+            <ServerIcon size={12} />
+            Self-hosting
+          </a>
         </div>
       </div>
 
@@ -222,6 +221,20 @@ export default function TutorialsUI() {
               {i === active && <div className="tut-navcard-bar" />}
             </button>
           ))}
+
+          {/* Self-host link card — routes to dedicated page */}
+          <a href="/self-host" className="tut-navcard tut-navcard-link">
+            <div className="tut-navcard-icon-wrap">
+              <ServerIcon size={15} />
+            </div>
+            <div className="tut-navcard-text">
+              <span className="tut-navcard-title">Self-hosting</span>
+              <div className="tut-navcard-chips">
+                <span className="tutorial-tag tag-advanced">Advanced</span>
+                <span className="tut-navcard-time">Full guide →</span>
+              </div>
+            </div>
+          </a>
 
           {/* Sidebar CTA */}
           <a href={BOT_INVITE} target="_blank" rel="noopener noreferrer" className="tut-sidebar-cta">

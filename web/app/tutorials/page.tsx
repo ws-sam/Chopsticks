@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { ArrowRightIcon, ShieldIcon, CoinIcon, RadioIcon, ServerIcon, PaletteIcon, BookOpenIcon } from '../icons';
+import { ArrowRightIcon, ShieldIcon, CoinIcon, RadioIcon, ServerIcon, PaletteIcon, BookOpenIcon, UsersIcon } from '../icons';
 import React from 'react';
 
 export const metadata: Metadata = {
@@ -96,6 +96,25 @@ const TUTORIALS: Tutorial[] = [
       { heading: '3. Disable a module', body: 'Run /theme feature music:off to disable music commands in your server. Toggles: music, economy, games, ai. Re-enable with /theme feature music:on.' },
       { heading: '4. Check current theme', body: 'Run /theme view to see your active theme settings at a glance.' },
       { heading: 'For deeper customisation', body: 'If you want to change the bot\'s name globally or avatar, that requires a self-hosted instance. See the Self-hosting tutorial.' },
+    ],
+  },
+  {
+    slug: 'welcome-messages',
+    icon: UsersIcon,
+    title: 'Welcome Messages',
+    preview: '/images/preview-welcome.svg',
+    desc: 'Greet new members automatically with personalised messages, DM welcomes, goodbye notices, and live member counts.',
+    difficulty: 'beginner',
+    time: '10 min',
+    steps: [
+      { heading: 'What /welcome does', body: 'The /welcome command lets you configure per-server welcome messages. You can set the channel, the message text, a DM welcome, a goodbye message, and show a live member count.' },
+      { heading: '1. Set the welcome channel', body: <span>Run <code style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent)', fontSize: '0.82rem' }}>/welcome set #welcome</code>. Chopsticks will post welcome messages here whenever a new member joins.</span> },
+      { heading: '2. Customise the message', body: <span>Run <code style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent)', fontSize: '0.82rem' }}>/welcome message Welcome to {'{server}'}, {'{user}'}! You are member #{'{membercount}'}.</code> Placeholders: <code style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent)', fontSize: '0.82rem' }}>{'{user}'}</code> (mention), <code style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent)', fontSize: '0.82rem' }}>{'{server}'}</code> (server name), <code style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent)', fontSize: '0.82rem' }}>{'{membercount}'}</code> (current count).</span> },
+      { heading: '3. Enable a DM welcome', body: <span>Run <code style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent)', fontSize: '0.82rem' }}>/welcome dm-set</code> to set a private DM greeting, then <code style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent)', fontSize: '0.82rem' }}>/welcome dm-enable</code> to activate it. Handy for sending rules or getting-started info privately.</span> },
+      { heading: '4. Add a goodbye message', body: <span>Run <code style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent)', fontSize: '0.82rem' }}>/welcome goodbye-set</code> to set a farewell message and <code style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent)', fontSize: '0.82rem' }}>/welcome goodbye-enable</code>. Posts in the same welcome channel when a member leaves.</span> },
+      { heading: '5. Show member count', body: <span>Run <code style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent)', fontSize: '0.82rem' }}>/welcome membercount</code> to enable a live member-count line in the welcome embed. Disable with <code style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent)', fontSize: '0.82rem' }}>/welcome membercount-disable</code>.</span> },
+      { heading: '6. Preview and test', body: <span>Run <code style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent)', fontSize: '0.82rem' }}>/welcome preview</code> to trigger a test welcome message in the configured channel — no need to leave and rejoin.</span> },
+      { heading: '7. Disable welcome messages', body: <span>Run <code style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent)', fontSize: '0.82rem' }}>/welcome disable</code> to turn off all welcome messages for your server.</span> },
     ],
   },
   {

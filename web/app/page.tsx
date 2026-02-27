@@ -197,8 +197,10 @@ export default function HomePage() {
         <div className="container" style={{ position: 'relative', zIndex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4rem', alignItems: 'center', padding: '5rem 1.5rem' }}>
           {/* Left */}
           <div>
-            <div className="badge" style={{ marginBottom: '1.5rem' }}>
-              <span className="dot-live" /> Live · Agent-powered Discord bot
+            <div className="badge" style={{ marginBottom: '1.5rem', background: 'rgba(30,30,30,0.7)', border: '1px solid rgba(180,100,30,0.35)', color: '#c8c8c8', gap: '0.5rem' }}>
+              <span style={{ fontWeight: 700, color: '#e8742a', letterSpacing: '0.02em' }}>WokSpec</span>
+              <span style={{ color: 'rgba(180,100,30,0.5)', fontSize: '0.7rem' }}>▸</span>
+              Developed by WokSpec
             </div>
             <h1 style={{ fontFamily: 'var(--font-heading)', fontWeight: 800, fontSize: 'clamp(2.75rem, 6vw, 4.5rem)', lineHeight: 1.0, letterSpacing: '-0.05em', color: 'var(--text)', marginBottom: '1.5rem' }}>
               One bot.<br />

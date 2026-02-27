@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import Image from 'next/image';
 import { ArrowRightIcon, ShieldIcon, CoinIcon, RadioIcon, ServerIcon, PaletteIcon, BookOpenIcon } from '../icons';
 import React from 'react';
 
@@ -21,7 +20,7 @@ const TUTORIALS: Tutorial[] = [
     slug: 'getting-started',
     icon: BookOpenIcon,
     title: 'Getting Started',
-    preview: '/images/preview-setup.png',
+    preview: '/images/preview-setup.svg',
     desc: 'Add Chopsticks to your server, grant the right permissions, and run your first commands. Five minutes from zero to working.',
     difficulty: 'beginner',
     time: '5 min',
@@ -37,7 +36,7 @@ const TUTORIALS: Tutorial[] = [
     slug: 'moderation',
     icon: ShieldIcon,
     title: 'Moderation Setup',
-    preview: '/images/preview-moderation.png',
+    preview: '/images/preview-moderation.svg',
     desc: 'Configure mod roles, a dedicated log channel, and test every action — ban, kick, mute, warn, and purge.',
     difficulty: 'beginner',
     time: '10 min',
@@ -53,7 +52,7 @@ const TUTORIALS: Tutorial[] = [
     slug: 'economy',
     icon: CoinIcon,
     title: 'Economy Setup',
-    preview: '/images/preview-economy.png',
+    preview: '/images/preview-economy.svg',
     desc: 'Set up the credits system, configure daily rewards, build a shop, and keep your community engaged with leaderboards.',
     difficulty: 'beginner',
     time: '15 min',
@@ -69,7 +68,7 @@ const TUTORIALS: Tutorial[] = [
     slug: 'agent-pool',
     icon: RadioIcon,
     title: 'Using the Agent Pool',
-    preview: '/images/preview-agents.png',
+    preview: '/images/preview-agents.svg',
     desc: 'Understand how the community Agent Pool works, configure it for your server, and deploy an agent to a voice channel.',
     difficulty: 'intermediate',
     time: '20 min',
@@ -86,6 +85,7 @@ const TUTORIALS: Tutorial[] = [
     slug: 'theme',
     icon: PaletteIcon,
     title: 'Customising with /theme',
+    preview: '/images/preview-theme.svg',
     desc: "Change embed colors, rename the bot's persona, and disable modules — all from inside Discord, no code required.",
     difficulty: 'beginner',
     time: '8 min',
@@ -102,7 +102,7 @@ const TUTORIALS: Tutorial[] = [
     slug: 'self-host',
     icon: ServerIcon,
     title: 'Self-hosting with Docker',
-    preview: '/images/preview-setup.png',
+    preview: '/images/preview-selfhost.svg',
     desc: 'Run your own Chopsticks instance. Full stack: PostgreSQL, Redis, Lavalink. From clone to online in under 15 minutes.',
     difficulty: 'advanced',
     time: '30 min',
@@ -147,7 +147,7 @@ export default function TutorialsPage() {
               <a key={t.slug} href={`#${t.slug}`} className="tutorial-card" style={{ textDecoration: 'none', color: 'inherit' }}>
                 {t.preview && (
                   <div style={{ margin: '-1.25rem -1.25rem 1rem', borderRadius: '0.5rem 0.5rem 0 0', overflow: 'hidden', height: 120, position: 'relative' }}>
-                    <Image src={t.preview} alt={t.title} fill style={{ objectFit: 'cover', objectPosition: 'top left' }} sizes="400px" />
+                    <img src={t.preview} alt={t.title} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top left', display: 'block' }} />
                     {/* Logo badge */}
                     <div style={{ position: 'absolute', bottom: 8, right: 8, width: 26, height: 26, borderRadius: '50%', background: 'rgba(2,4,5,0.75)', border: '1px solid rgba(56,189,248,0.25)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <img src="/images/chopsticks.png" alt="Chopsticks" width={16} height={16} style={{ objectFit: 'contain', display: 'block' }} />
@@ -175,7 +175,7 @@ export default function TutorialsPage() {
               <article key={t.slug} id={t.slug} style={{ scrollMarginTop: '5rem' }}>
                 {t.preview && (
                   <div style={{ marginBottom: '2rem', borderRadius: '0.75rem', overflow: 'hidden', position: 'relative', height: 220, border: '1px solid var(--border)' }}>
-                    <Image src={t.preview} alt={`${t.title} preview`} fill style={{ objectFit: 'cover', objectPosition: 'top left' }} sizes="(max-width:900px) 100vw, 900px" />
+                    <img src={t.preview} alt={t.title + ' preview'} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top left', display: 'block' }} />
                     {/* Logo badge */}
                     <div style={{ position: 'absolute', bottom: 12, right: 12, display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'rgba(2,4,5,0.72)', border: '1px solid rgba(56,189,248,0.2)', borderRadius: 999, padding: '0.25rem 0.6rem 0.25rem 0.3rem', backdropFilter: 'blur(8px)' }}>
                       <img src="/images/chopsticks.png" alt="Chopsticks" width={16} height={16} style={{ objectFit: 'contain', display: 'block' }} />

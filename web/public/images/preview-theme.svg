@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" font-family="'DM Sans',system-ui,sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1e1f22"/><stop offset="100%" stop-color="#0d0f12"/>
+    </linearGradient>
+    <radialGradient id="g1" cx="15%" cy="20%" r="55%">
+      <stop offset="0%" stop-color="#f97316" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#f97316" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="g2" cx="85%" cy="80%" r="50%">
+      <stop offset="0%" stop-color="#a78bfa" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#a78bfa" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="sh"><feDropShadow dx="0" dy="4" stdDeviation="10" flood-color="#000" flood-opacity="0.6"/></filter>
+    <filter id="sh2"><feDropShadow dx="0" dy="2" stdDeviation="5" flood-color="#000" flood-opacity="0.5"/></filter>
+    <clipPath id="win"><rect width="800" height="450" rx="0"/></clipPath>
+  </defs>
+  <rect width="800" height="450" fill="url(#bg)"/>
+  <rect width="800" height="450" fill="url(#g1)"/>
+  <rect width="800" height="450" fill="url(#g2)"/>
+  <rect x="0" y="0" width="180" height="450" fill="#2b2d31"/>
+  <rect x="0" y="0" width="180" height="48" fill="#232428"/>
+  <text x="14" y="30" font-size="13" font-weight="700" fill="#fff" font-family="system-ui,sans-serif">🍜 WokSpec</text>
+  <line x1="0" y1="48" x2="180" y2="48" stroke="#1e1f22" stroke-width="1"/>
+  <text x="14" y="74" font-size="10" font-weight="600" fill="#8d8f92" font-family="system-ui,sans-serif" letter-spacing="0.08em">TEXT CHANNELS</text>
+  <text x="18" y="90" font-size="13" fill="#8d8f92" font-family="system-ui,sans-serif"># general</text>
+  <rect x="4" y="102" width="172" height="22" fill="#404249" rx="4"/>
+  <text x="18" y="116" font-size="13" fill="#dde1e7" font-family="system-ui,sans-serif"># bot-commands</text>
+  <text x="18" y="142" font-size="13" fill="#8d8f92" font-family="system-ui,sans-serif"># showcase</text>
+  <text x="18" y="168" font-size="13" fill="#8d8f92" font-family="system-ui,sans-serif"># mod-log</text>
+  <rect x="180" y="0" width="620" height="48" fill="#313338"/>
+  <line x1="180" y1="48" x2="800" y2="48" stroke="#1e1f22" stroke-width="1"/>
+  <text x="194" y="18" font-size="10" fill="#8d8f92" font-family="system-ui,sans-serif">#</text>
+  <text x="206" y="18" font-size="13" font-weight="600" fill="#fff" font-family="system-ui,sans-serif">bot-commands</text>
+  <!-- /theme color embed -->
+  <rect x="220" y="60" width="440" height="110" fill="#2b2d31" rx="6" filter="url(#sh2)"/>
+  <rect x="220" y="60" width="4" height="110" fill="#f97316" rx="2"/>
+  <text x="234" y="80" font-size="14" font-weight="700" fill="#fff" font-family="system-ui,sans-serif">🎨  Theme Updated</text>
+  <text x="234" y="100" font-size="12" fill="#b5bac1" font-family="system-ui,sans-serif">Accent Color</text>
+  <rect x="330" y="87" width="16" height="16" fill="#f97316" rx="3"/>
+  <text x="352" y="100" font-size="12" fill="#dbdee1" font-family="system-ui,sans-serif">#f97316  (Orange)</text>
+  <text x="234" y="124" font-size="12" fill="#b5bac1" font-family="system-ui,sans-serif">Bot Persona</text>
+  <text x="330" y="124" font-size="12" fill="#dbdee1" font-family="system-ui,sans-serif">Wok Helper</text>
+  <text x="234" y="148" font-size="11" fill="#72767d" font-family="system-ui,sans-serif">Changes apply to this server only · /theme reset to restore defaults</text>
+  <!-- Color swatches -->
+  <rect x="220" y="182" width="440" height="80" fill="#232428" rx="4"/>
+  <text x="234" y="200" font-size="11" font-weight="700" fill="#8d8f92" font-family="system-ui,sans-serif">PRESET COLORS</text>
+  <rect x="234" y="208" width="36" height="36" fill="#5865f2" rx="6"/>
+  <text x="252" y="234" text-anchor="middle" font-size="9" fill="#fff" font-family="system-ui,sans-serif">Blurple</text>
+  <rect x="280" y="208" width="36" height="36" fill="#57f287" rx="6"/>
+  <text x="298" y="234" text-anchor="middle" font-size="9" fill="#fff" font-family="system-ui,sans-serif">Green</text>
+  <rect x="326" y="208" width="36" height="36" fill="#f97316" rx="6" stroke="#fff" stroke-width="2"/>
+  <text x="344" y="234" text-anchor="middle" font-size="9" fill="#fff" font-family="system-ui,sans-serif">Orange ✓</text>
+  <rect x="372" y="208" width="36" height="36" fill="#f472b6" rx="6"/>
+  <text x="390" y="234" text-anchor="middle" font-size="9" fill="#fff" font-family="system-ui,sans-serif">Pink</text>
+  <rect x="418" y="208" width="36" height="36" fill="#a78bfa" rx="6"/>
+  <text x="436" y="234" text-anchor="middle" font-size="9" fill="#fff" font-family="system-ui,sans-serif">Violet</text>
+  <rect x="464" y="208" width="36" height="36" fill="#22d3ee" rx="6"/>
+  <text x="482" y="234" text-anchor="middle" font-size="9" fill="#fff" font-family="system-ui,sans-serif">Cyan</text>
+  <rect x="510" y="208" width="36" height="36" fill="#faa61a" rx="6"/>
+  <text x="528" y="234" text-anchor="middle" font-size="9" fill="#fff" font-family="system-ui,sans-serif">Yellow</text>
+  <rect x="556" y="208" width="36" height="36" fill="#ed4245" rx="6"/>
+  <text x="574" y="234" text-anchor="middle" font-size="9" fill="#fff" font-family="system-ui,sans-serif">Red</text>
+  <!-- Module toggles -->
+  <rect x="220" y="272" width="440" height="110" fill="#232428" rx="4"/>
+  <text x="234" y="290" font-size="11" font-weight="700" fill="#8d8f92" font-family="system-ui,sans-serif">MODULE TOGGLES</text>
+  <!-- Row 1 -->
+  <rect x="234" y="296" width="110" height="28" fill="#383a40" rx="4"/>
+  <text x="244" y="314" font-size="12" fill="#57f287" font-family="system-ui,sans-serif">✓  Music</text>
+  <rect x="354" y="296" width="110" height="28" fill="#383a40" rx="4"/>
+  <text x="364" y="314" font-size="12" fill="#57f287" font-family="system-ui,sans-serif">✓  Economy</text>
+  <rect x="474" y="296" width="110" height="28" fill="#383a40" rx="4"/>
+  <text x="484" y="314" font-size="12" fill="#57f287" font-family="system-ui,sans-serif">✓  Games</text>
+  <!-- Row 2 -->
+  <rect x="234" y="332" width="110" height="28" fill="#383a40" rx="4"/>
+  <text x="244" y="350" font-size="12" fill="#57f287" font-family="system-ui,sans-serif">✓  AI</text>
+  <rect x="354" y="332" width="110" height="28" fill="#383a40" rx="4"/>
+  <text x="364" y="350" font-size="12" fill="#ed4245" font-family="system-ui,sans-serif">✗  Levels</text>
+  <rect x="474" y="332" width="110" height="28" fill="#383a40" rx="4"/>
+  <text x="484" y="350" font-size="12" fill="#57f287" font-family="system-ui,sans-serif">✓  Agents</text>
+  <rect x="188" y="394" width="490" height="32" fill="#383a40" rx="8"/>
+  <text x="204" y="415" font-size="13" fill="#4e5058" font-family="system-ui,sans-serif">Message #bot-commands</text>
+</svg>

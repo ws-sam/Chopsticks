@@ -1,100 +1,70 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" font-family="'DM Sans',system-ui,sans-serif">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#020405"/>
-      <stop offset="100%" stop-color="#0d0510"/>
+      <stop offset="0%" stop-color="#1e1f22"/><stop offset="100%" stop-color="#0d0f12"/>
     </linearGradient>
-    <radialGradient id="glow1" cx="50%" cy="40%" r="55%">
-      <stop offset="0%" stop-color="#f472b6" stop-opacity="0.16"/>
+    <radialGradient id="g1" cx="15%" cy="20%" r="55%">
+      <stop offset="0%" stop-color="#f472b6" stop-opacity="0.15"/>
       <stop offset="100%" stop-color="#f472b6" stop-opacity="0"/>
     </radialGradient>
-    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="8" stdDeviation="14" flood-color="#000" flood-opacity="0.7"/>
-    </filter>
-    <pattern id="grid" width="52" height="52" patternUnits="userSpaceOnUse">
-      <path d="M 52 0 L 0 0 0 52" fill="none" stroke="rgba(255,255,255,0.018)" stroke-width="1"/>
-    </pattern>
+    <radialGradient id="g2" cx="85%" cy="80%" r="50%">
+      <stop offset="0%" stop-color="#a78bfa" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#a78bfa" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="sh"><feDropShadow dx="0" dy="4" stdDeviation="10" flood-color="#000" flood-opacity="0.6"/></filter>
+    <filter id="sh2"><feDropShadow dx="0" dy="2" stdDeviation="5" flood-color="#000" flood-opacity="0.5"/></filter>
+    <clipPath id="win"><rect width="800" height="450" rx="0"/></clipPath>
   </defs>
   <rect width="800" height="450" fill="url(#bg)"/>
-  <rect width="800" height="450" fill="url(#glow1)"/>
-  <rect width="800" height="450" fill="url(#grid)"/>
-
-  <!-- Now Playing embed -->
-  <g filter="url(#shadow)">
-    <rect x="160" y="60" width="480" height="280" rx="14" fill="#313338"/>
-    <rect x="160" y="60" width="480" height="280" rx="14" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
-
-    <!-- Header -->
-    <rect x="160" y="60" width="480" height="40" rx="14" fill="#2b2d31"/>
-    <rect x="160" y="86" width="480" height="14" fill="#2b2d31"/>
-    <text x="185" y="85" fill="#f2f3f5" font-size="12" font-weight="700"># music</text>
-    <text x="300" y="85" fill="rgba(148,155,164,0.5)" font-size="11">🎵 Lounge · 8 listening</text>
-
-    <!-- Bot message area -->
-    <rect x="175" y="114" width="450" height="205" rx="6" fill="rgba(0,0,0,0.12)"/>
-    <circle cx="197" cy="128" r="14" fill="linear-gradient(135deg,#38bdf8,#0284c7)"/>
-    <rect x="183" y="114" width="28" height="28" rx="14" fill="#38bdf8" opacity="0.25"/>
-    <text x="197" y="132" text-anchor="middle" fill="#38bdf8" font-size="9" font-weight="800">CH</text>
-    <text x="219" y="128" fill="#38bdf8" font-size="12" font-weight="700">Chopsticks</text>
-    <rect x="261" y="119" width="26" height="12" rx="2" fill="#5865f2"/>
-    <text x="274" y="129" text-anchor="middle" fill="#fff" font-size="8" font-weight="700">APP</text>
-
-    <!-- Now playing embed card -->
-    <rect x="219" y="138" width="390" height="170" rx="6" fill="#2b2d31"/>
-    <rect x="219" y="138" width="4" height="170" rx="2" fill="#f472b6"/>
-
-    <!-- Album art mockup -->
-    <rect x="231" y="152" width="64" height="64" rx="8" fill="rgba(244,114,182,0.15)"/>
-    <rect x="231" y="152" width="64" height="64" rx="8" fill="none" stroke="rgba(244,114,182,0.3)" stroke-width="1"/>
-    <text x="263" y="192" text-anchor="middle" fill="#f472b6" font-size="24">♪</text>
-
-    <!-- Track info -->
-    <text x="307" y="168" fill="#f2f3f5" font-size="13" font-weight="700">Now Playing</text>
-    <text x="307" y="186" fill="#b5bac1" font-size="12">lofi hip hop radio — beats to relax</text>
-    <text x="307" y="202" fill="rgba(148,155,164,0.6)" font-size="11">YouTube · Live stream</text>
-
-    <!-- Fields -->
-    <text x="231" y="234" fill="#9ca3af" font-size="10" font-weight="700" letter-spacing="0.5">REQUESTED BY</text>
-    <text x="231" y="250" fill="#b5bac1" font-size="11">Alex#0001</text>
-    <text x="370" y="234" fill="#9ca3af" font-size="10" font-weight="700" letter-spacing="0.5">QUEUE</text>
-    <text x="370" y="250" fill="#b5bac1" font-size="11">4 tracks · ~18 min</text>
-    <text x="510" y="234" fill="#9ca3af" font-size="10" font-weight="700" letter-spacing="0.5">VOLUME</text>
-    <text x="510" y="250" fill="#b5bac1" font-size="11">80%</text>
-
-    <!-- Progress bar -->
-    <text x="231" y="276" fill="#b5bac1" font-size="10">0:00</text>
-    <rect x="258" y="269" width="300" height="4" rx="2" fill="rgba(255,255,255,0.1)"/>
-    <rect x="258" y="269" width="120" height="4" rx="2" fill="#f472b6"/>
-    <circle cx="378" cy="271" r="5" fill="#f472b6"/>
-    <text x="564" y="276" fill="#b5bac1" font-size="10">Live</text>
-
-    <!-- Controls bar -->
-    <rect x="175" y="327" width="450" height="50" rx="6" fill="#2b2d31"/>
-    <text x="220" y="357" text-anchor="middle" fill="rgba(148,155,164,0.6)" font-size="16">⏮</text>
-    <circle cx="270" cy="352" r="14" fill="#5865f2"/>
-    <text x="270" y="357" text-anchor="middle" fill="#fff" font-size="16">⏸</text>
-    <text x="320" y="357" text-anchor="middle" fill="rgba(148,155,164,0.6)" font-size="16">⏭</text>
-    <text x="370" y="357" text-anchor="middle" fill="rgba(148,155,164,0.6)" font-size="14">🔀</text>
-    <text x="415" y="357" text-anchor="middle" fill="rgba(148,155,164,0.6)" font-size="14">🔁</text>
+  <rect width="800" height="450" fill="url(#g1)"/>
+  <rect width="800" height="450" fill="url(#g2)"/>
+  <rect x="0" y="0" width="180" height="450" fill="#2b2d31"/>
+  <rect x="0" y="0" width="180" height="48" fill="#232428"/>
+  <text x="14" y="30" font-size="13" font-weight="700" fill="#fff" font-family="system-ui,sans-serif">🍜 WokSpec</text>
+  <line x1="0" y1="48" x2="180" y2="48" stroke="#1e1f22" stroke-width="1"/>
+  <text x="14" y="74" font-size="10" font-weight="600" fill="#8d8f92" font-family="system-ui,sans-serif" letter-spacing="0.08em">TEXT CHANNELS</text>
+  <text x="18" y="90" font-size="13" fill="#8d8f92" font-family="system-ui,sans-serif"># general</text>
+  <rect x="4" y="102" width="172" height="22" fill="#404249" rx="4"/>
+  <text x="18" y="116" font-size="13" fill="#dde1e7" font-family="system-ui,sans-serif"># music</text>
+  <text x="18" y="142" font-size="13" fill="#8d8f92" font-family="system-ui,sans-serif"># requests</text>
+  <text x="18" y="168" font-size="13" fill="#8d8f92" font-family="system-ui,sans-serif"># dj-log</text>
+  <rect x="180" y="0" width="620" height="48" fill="#313338"/>
+  <line x1="180" y1="48" x2="800" y2="48" stroke="#1e1f22" stroke-width="1"/>
+  <text x="194" y="18" font-size="10" fill="#8d8f92" font-family="system-ui,sans-serif">#</text>
+  <text x="206" y="18" font-size="13" font-weight="600" fill="#fff" font-family="system-ui,sans-serif">music</text>
+  <!-- Now playing embed -->
+  <rect x="220" y="62" width="450" height="180" fill="#2b2d31" rx="6" filter="url(#sh2)"/>
+  <rect x="220" y="62" width="4" height="180" fill="#f472b6" rx="2"/>
+  <text x="234" y="82" font-size="11" font-weight="700" fill="#f472b6" font-family="system-ui,sans-serif">NOW PLAYING</text>
+  <text x="234" y="102" font-size="16" font-weight="700" fill="#fff" font-family="system-ui,sans-serif">Lofi Hip Hop — Sleepy Vibes</text>
+  <text x="234" y="118" font-size="12" fill="#8d8f92" font-family="system-ui,sans-serif">Artist: ChillBeats Studio · Album: Study Playlist Vol. 3</text>
+  <!-- Progress bar -->
+  <rect x="234" y="130" width="420" height="6" fill="#383a40" rx="3"/>
+  <rect x="234" y="130" width="168" height="6" fill="#f472b6" rx="3"/>
+  <circle cx="402" cy="133" r="7" fill="#fff"/>
+  <text x="234" y="152" font-size="11" fill="#8d8f92" font-family="system-ui,sans-serif">1:24</text>
+  <text x="634" y="152" font-size="11" fill="#8d8f92" font-family="system-ui,sans-serif">3:32</text>
+  <!-- Waveform -->
+  <g opacity="0.7">
+  <rect x="234" y="152" width="7" height="28" fill="#f472b6" rx="2" opacity="0.5"/><rect x="245" y="160" width="7" height="20" fill="#f472b6" rx="2" opacity="0.6"/><rect x="256" y="168" width="7" height="12" fill="#f472b6" rx="2" opacity="0.7"/><rect x="267" y="176" width="7" height="4" fill="#f472b6" rx="2" opacity="0.8"/><rect x="278" y="168" width="7" height="12" fill="#f472b6" rx="2" opacity="0.9"/><rect x="289" y="160" width="7" height="20" fill="#f472b6" rx="2" opacity="0.5"/><rect x="300" y="152" width="7" height="28" fill="#f472b6" rx="2" opacity="0.6"/><rect x="311" y="152" width="7" height="28" fill="#f472b6" rx="2" opacity="0.7"/><rect x="322" y="160" width="7" height="20" fill="#f472b6" rx="2" opacity="0.8"/><rect x="333" y="168" width="7" height="12" fill="#f472b6" rx="2" opacity="0.9"/><rect x="344" y="176" width="7" height="4" fill="#f472b6" rx="2" opacity="0.5"/><rect x="355" y="168" width="7" height="12" fill="#f472b6" rx="2" opacity="0.6"/><rect x="366" y="160" width="7" height="20" fill="#f472b6" rx="2" opacity="0.7"/><rect x="377" y="152" width="7" height="28" fill="#f472b6" rx="2" opacity="0.8"/><rect x="388" y="152" width="7" height="28" fill="#f472b6" rx="2" opacity="0.9"/><rect x="399" y="160" width="7" height="20" fill="#f472b6" rx="2" opacity="0.5"/><rect x="410" y="168" width="7" height="12" fill="#f472b6" rx="2" opacity="0.6"/><rect x="421" y="176" width="7" height="4" fill="#f472b6" rx="2" opacity="0.7"/><rect x="432" y="168" width="7" height="12" fill="#f472b6" rx="2" opacity="0.8"/><rect x="443" y="160" width="7" height="20" fill="#f472b6" rx="2" opacity="0.9"/><rect x="454" y="152" width="7" height="28" fill="#f472b6" rx="2" opacity="0.5"/><rect x="465" y="152" width="7" height="28" fill="#f472b6" rx="2" opacity="0.6"/><rect x="476" y="160" width="7" height="20" fill="#f472b6" rx="2" opacity="0.7"/><rect x="487" y="168" width="7" height="12" fill="#f472b6" rx="2" opacity="0.8"/><rect x="498" y="176" width="7" height="4" fill="#f472b6" rx="2" opacity="0.9"/><rect x="509" y="168" width="7" height="12" fill="#f472b6" rx="2" opacity="0.5"/><rect x="520" y="160" width="7" height="20" fill="#f472b6" rx="2" opacity="0.6"/><rect x="531" y="152" width="7" height="28" fill="#f472b6" rx="2" opacity="0.7"/><rect x="542" y="152" width="7" height="28" fill="#f472b6" rx="2" opacity="0.8"/><rect x="553" y="160" width="7" height="20" fill="#f472b6" rx="2" opacity="0.9"/><rect x="564" y="168" width="7" height="12" fill="#f472b6" rx="2" opacity="0.5"/><rect x="575" y="176" width="7" height="4" fill="#f472b6" rx="2" opacity="0.6"/><rect x="586" y="168" width="7" height="12" fill="#f472b6" rx="2" opacity="0.7"/><rect x="597" y="160" width="7" height="20" fill="#f472b6" rx="2" opacity="0.8"/><rect x="608" y="152" width="7" height="28" fill="#f472b6" rx="2" opacity="0.9"/><rect x="619" y="152" width="7" height="28" fill="#f472b6" rx="2" opacity="0.5"/><rect x="630" y="160" width="7" height="20" fill="#f472b6" rx="2" opacity="0.6"/><rect x="641" y="168" width="7" height="12" fill="#f472b6" rx="2" opacity="0.7"/>
   </g>
-
-  <!-- Waveform visualization -->
-  <g opacity="0.5">
-    <rect x="56" y="120" width="72" height="210" rx="8" fill="#0a0d10" stroke="rgba(244,114,182,0.2)" stroke-width="1"/>
-    <text x="92" y="142" text-anchor="middle" fill="rgba(148,155,164,0.6)" font-size="9" font-weight="700" letter-spacing="1">PLAYING</text>
-    <!-- Mini waveform bars -->
-    <rect x="65" y="185" width="6" height="30" rx="3" fill="#f472b6" opacity="0.7"/>
-    <rect x="75" y="170" width="6" height="45" rx="3" fill="#f472b6" opacity="0.9"/>
-    <rect x="85" y="180" width="6" height="35" rx="3" fill="#f472b6" opacity="0.8"/>
-    <rect x="95" y="162" width="6" height="53" rx="3" fill="#f472b6" opacity="1"/>
-    <rect x="105" y="175" width="6" height="40" rx="3" fill="#f472b6" opacity="0.85"/>
-    <rect x="115" y="188" width="6" height="27" rx="3" fill="#f472b6" opacity="0.7"/>
-
-    <text x="92" y="262" text-anchor="middle" fill="#f472b6" font-size="11" font-weight="700">LIVE</text>
-    <text x="92" y="277" text-anchor="middle" fill="#7e8a98" font-size="9">8 in VC</text>
-    <text x="92" y="294" text-anchor="middle" fill="#7e8a98" font-size="9">49 max</text>
-    <text x="92" y="311" text-anchor="middle" fill="#7e8a98" font-size="9">sessions</text>
-  </g>
-
-  <text x="400" y="378" text-anchor="middle" fill="rgba(244,114,182,0.5)" font-size="11" font-weight="600" letter-spacing="2">VOICE &amp; MUSIC · INTERMEDIATE</text>
+  <!-- Volume/queue controls -->
+  <rect x="220" y="256" width="450" height="34" fill="#232428" rx="4"/>
+  <text x="236" y="278" font-size="20" fill="#fff" font-family="system-ui,sans-serif">⏮</text>
+  <text x="268" y="278" font-size="20" fill="#f472b6" font-family="system-ui,sans-serif">⏸</text>
+  <text x="300" y="278" font-size="20" fill="#fff" font-family="system-ui,sans-serif">⏭</text>
+  <text x="336" y="278" font-size="20" fill="#fff" font-family="system-ui,sans-serif">🔀</text>
+  <text x="368" y="278" font-size="20" fill="#fff" font-family="system-ui,sans-serif">🔁</text>
+  <text x="420" y="274" font-size="11" fill="#8d8f92" font-family="system-ui,sans-serif">Volume</text>
+  <rect x="464" y="268" width="100" height="6" fill="#383a40" rx="3"/>
+  <rect x="464" y="268" width="70" height="6" fill="#f472b6" rx="3"/>
+  <circle cx="534" cy="271" r="5" fill="#fff"/>
+  <!-- Queue -->
+  <rect x="220" y="300" width="450" height="112" fill="#232428" rx="4"/>
+  <text x="234" y="318" font-size="11" font-weight="700" fill="#8d8f92" font-family="system-ui,sans-serif">UP NEXT  —  3 tracks in queue</text>
+  <text x="244" y="338" font-size="12" fill="#dbdee1" font-family="system-ui,sans-serif">1.  Jazz Night — Miles &amp; Co.                              3:18</text>
+  <text x="244" y="356" font-size="12" fill="#8d8f92" font-family="system-ui,sans-serif">2.  Chill Wave — Ambient Dreams                          4:02</text>
+  <text x="244" y="374" font-size="12" fill="#8d8f92" font-family="system-ui,sans-serif">3.  Lo-Fi Rain — Study Session                             5:11</text>
+  <rect x="188" y="422" width="490" height="22" fill="#383a40" rx="8"/>
+  <text x="204" y="437" font-size="12" fill="#4e5058" font-family="system-ui,sans-serif">Message #music</text>
 </svg>

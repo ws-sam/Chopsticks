@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://chopsticks.wokspec.org/sitemap.xml

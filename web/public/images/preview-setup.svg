@@ -1,115 +1,65 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" font-family="'DM Sans',system-ui,sans-serif">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#020405"/>
-      <stop offset="100%" stop-color="#060c14"/>
+      <stop offset="0%" stop-color="#1e1f22"/><stop offset="100%" stop-color="#0d0f12"/>
     </linearGradient>
-    <radialGradient id="glow1" cx="20%" cy="30%" r="50%">
-      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.18"/>
-      <stop offset="100%" stop-color="#38bdf8" stop-opacity="0"/>
+    <radialGradient id="g1" cx="15%" cy="20%" r="55%">
+      <stop offset="0%" stop-color="#57f287" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#57f287" stop-opacity="0"/>
     </radialGradient>
-    <radialGradient id="glow2" cx="80%" cy="70%" r="40%">
-      <stop offset="0%" stop-color="#a78bfa" stop-opacity="0.14"/>
-      <stop offset="100%" stop-color="#a78bfa" stop-opacity="0"/>
+    <radialGradient id="g2" cx="85%" cy="80%" r="50%">
+      <stop offset="0%" stop-color="#5865f2" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#5865f2" stop-opacity="0"/>
     </radialGradient>
-    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="8" stdDeviation="16" flood-color="#000" flood-opacity="0.7"/>
-    </filter>
+    <filter id="sh"><feDropShadow dx="0" dy="4" stdDeviation="10" flood-color="#000" flood-opacity="0.6"/></filter>
+    <filter id="sh2"><feDropShadow dx="0" dy="2" stdDeviation="5" flood-color="#000" flood-opacity="0.5"/></filter>
+    <clipPath id="win"><rect width="800" height="450" rx="0"/></clipPath>
   </defs>
-
-  <!-- Background -->
   <rect width="800" height="450" fill="url(#bg)"/>
-  <rect width="800" height="450" fill="url(#glow1)"/>
-  <rect width="800" height="450" fill="url(#glow2)"/>
-
-  <!-- Grid pattern -->
-  <defs>
-    <pattern id="grid" width="52" height="52" patternUnits="userSpaceOnUse">
-      <path d="M 52 0 L 0 0 0 52" fill="none" stroke="rgba(255,255,255,0.018)" stroke-width="1"/>
-    </pattern>
-  </defs>
-  <rect width="800" height="450" fill="url(#grid)"/>
-
-  <!-- Discord invite window -->
-  <g filter="url(#shadow)">
-    <rect x="200" y="70" width="400" height="310" rx="12" fill="#313338"/>
-    <rect x="200" y="70" width="400" height="310" rx="12" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
-
-    <!-- Title bar -->
-    <rect x="200" y="70" width="400" height="44" rx="12" fill="#2b2d31"/>
-    <rect x="200" y="102" width="400" height="12" fill="#2b2d31"/>
-
-    <!-- Traffic lights -->
-    <circle cx="224" cy="92" r="5" fill="#ef4444" opacity="0.7"/>
-    <circle cx="242" cy="92" r="5" fill="#f59e0b" opacity="0.7"/>
-    <circle cx="260" cy="92" r="5" fill="#22c55e" opacity="0.7"/>
-
-    <!-- Title text -->
-    <text x="400" y="97" text-anchor="middle" fill="rgba(148,155,164,0.7)" font-size="11" font-family="monospace">Add Chopsticks to your server</text>
-
-    <!-- Server icon -->
-    <rect x="240" y="132" width="56" height="56" rx="16" fill="#38bdf8" opacity="0.15"/>
-    <rect x="240" y="132" width="56" height="56" rx="16" fill="none" stroke="rgba(56,189,248,0.4)" stroke-width="1"/>
-    <text x="268" y="167" text-anchor="middle" fill="#38bdf8" font-size="14" font-weight="800">CH</text>
-
-    <!-- Bot name -->
-    <text x="318" y="149" fill="#f2f3f5" font-size="18" font-weight="700">Chopsticks</text>
-    <text x="318" y="168" fill="#b5bac1" font-size="12">by WokSpec</text>
-
-    <!-- Bot tag badge -->
-    <rect x="318" y="175" width="30" height="14" rx="3" fill="#5865f2"/>
-    <text x="333" y="186" text-anchor="middle" fill="#fff" font-size="9" font-weight="700">BOT</text>
-
-    <!-- Divider -->
-    <line x1="220" y1="200" x2="580" y2="200" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
-
-    <!-- Permissions section -->
-    <text x="220" y="222" fill="rgba(148,155,164,0.6)" font-size="10" font-weight="700" letter-spacing="1">PERMISSIONS</text>
-
-    <!-- Permission items -->
-    <g>
-      <circle cx="236" cy="241" r="5" fill="#4ade80" opacity="0.8"/>
-      <text x="249" y="245" fill="#b5bac1" font-size="12">Send Messages &amp; Embed Links</text>
-    </g>
-    <g>
-      <circle cx="236" cy="261" r="5" fill="#4ade80" opacity="0.8"/>
-      <text x="249" y="265" fill="#b5bac1" font-size="12">Use Application Commands</text>
-    </g>
-    <g>
-      <circle cx="236" cy="281" r="5" fill="#4ade80" opacity="0.8"/>
-      <text x="249" y="285" fill="#b5bac1" font-size="12">Connect &amp; Speak (voice)</text>
-    </g>
-    <g>
-      <circle cx="236" cy="301" r="5" fill="#4ade80" opacity="0.8"/>
-      <text x="249" y="305" fill="#b5bac1" font-size="12">Manage Roles (economy)</text>
-    </g>
-
-    <!-- Divider -->
-    <line x1="220" y1="320" x2="580" y2="320" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
-
-    <!-- Authorize button -->
-    <rect x="220" y="330" width="360" height="38" rx="8" fill="#5865f2"/>
-    <text x="400" y="354" text-anchor="middle" fill="#fff" font-size="14" font-weight="700">Authorise</text>
-  </g>
-
-  <!-- Step badge -->
-  <rect x="52" y="180" width="120" height="90" rx="10" fill="#0a0d10" stroke="rgba(56,189,248,0.2)" stroke-width="1"/>
-  <circle cx="72" cy="200" r="10" fill="rgba(56,189,248,0.1)" stroke="rgba(56,189,248,0.3)" stroke-width="1"/>
-  <text x="72" y="204" text-anchor="middle" fill="#38bdf8" font-size="11" font-weight="700">1</text>
-  <text x="90" y="204" fill="#f2f3f5" font-size="11" font-weight="600">Invite</text>
-  <text x="62" y="222" fill="#7e8a98" font-size="10">Visit invite link,</text>
-  <text x="62" y="236" fill="#7e8a98" font-size="10">pick your server</text>
-  <text x="62" y="254" fill="#4ade80" font-size="10" font-weight="600">✓ ~30 seconds</text>
-
-  <!-- Step 2 badge -->
-  <rect x="628" y="180" width="120" height="90" rx="10" fill="#0a0d10" stroke="rgba(167,139,250,0.2)" stroke-width="1"/>
-  <circle cx="648" cy="200" r="10" fill="rgba(167,139,250,0.1)" stroke="rgba(167,139,250,0.3)" stroke-width="1"/>
-  <text x="648" y="204" text-anchor="middle" fill="#a78bfa" font-size="11" font-weight="700">2</text>
-  <text x="666" y="204" fill="#f2f3f5" font-size="11" font-weight="600">Setup</text>
-  <text x="638" y="222" fill="#7e8a98" font-size="10">Run /setup to</text>
-  <text x="638" y="236" fill="#7e8a98" font-size="10">initialise modules</text>
-  <text x="638" y="254" fill="#4ade80" font-size="10" font-weight="600">✓ ~1 minute</text>
-
-  <!-- Label -->
-  <text x="400" y="420" text-anchor="middle" fill="rgba(56,189,248,0.5)" font-size="11" font-weight="600" letter-spacing="2">GETTING STARTED · BEGINNER</text>
+  <rect width="800" height="450" fill="url(#g1)"/>
+  <rect width="800" height="450" fill="url(#g2)"/>
+  <rect x="0" y="0" width="180" height="450" fill="#2b2d31"/>
+  <rect x="0" y="0" width="180" height="48" fill="#232428"/>
+  <text x="14" y="30" font-size="13" font-weight="700" fill="#fff" font-family="system-ui,sans-serif">🍜 WokSpec</text>
+  <line x1="0" y1="48" x2="180" y2="48" stroke="#1e1f22" stroke-width="1"/>
+  <text x="14" y="74" font-size="10" font-weight="600" fill="#8d8f92" font-family="system-ui,sans-serif" letter-spacing="0.08em">TEXT CHANNELS</text>
+  <text x="18" y="90" font-size="13" fill="#8d8f92" font-family="system-ui,sans-serif"># welcome</text>
+  <text x="18" y="116" font-size="13" fill="#8d8f92" font-family="system-ui,sans-serif"># general</text>
+  <rect x="4" y="128" width="172" height="22" fill="#404249" rx="4"/>
+  <text x="18" y="142" font-size="13" fill="#dde1e7" font-family="system-ui,sans-serif"># bot-commands</text>
+  <text x="18" y="168" font-size="13" fill="#8d8f92" font-family="system-ui,sans-serif"># mod-log</text>
+  <rect x="180" y="0" width="620" height="48" fill="#313338"/>
+  <line x1="180" y1="48" x2="800" y2="48" stroke="#1e1f22" stroke-width="1"/>
+  <text x="194" y="18" font-size="10" fill="#8d8f92" font-family="system-ui,sans-serif">#</text>
+  <text x="206" y="18" font-size="13" font-weight="600" fill="#fff" font-family="system-ui,sans-serif">bot-commands</text>
+  <circle cx="204" cy="76" r="16" fill="#5865f2"/>
+  <text x="204" y="81" text-anchor="middle" font-size="11" fill="#fff" font-family="system-ui,sans-serif">🤖</text>
+  <text x="226" y="70" font-size="13" font-weight="600" fill="#fff" font-family="system-ui,sans-serif">Chopsticks</text>
+  <text x="318" y="70" font-size="11" fill="#56595d" font-family="system-ui,sans-serif">Today at 3:42 PM</text>
+  <text x="226" y="84" font-size="13" fill="#dbdee1" font-family="system-ui,sans-serif">/setup  →  Server initialized</text>
+    <rect x="220" y="74" width="440" height="148" fill="#2b2d31" rx="4" filter="url(#sh2)"/>
+  <rect x="220" y="74" width="4" height="148" fill="#57f287" rx="2"/>
+  <text x="234" y="96" font-size="14" font-weight="700" fill="#fff" font-family="system-ui,sans-serif">✅  Server Configured</text>
+  <text x="234" y="112" font-size="11" font-weight="700" fill="#b5bac1" font-family="system-ui,sans-serif">Prefix</text>
+  <text x="234" y="126" font-size="12" fill="#dbdee1" font-family="system-ui,sans-serif">!  (use /prefix to change)</text>
+  <text x="234" y="144" font-size="11" font-weight="700" fill="#b5bac1" font-family="system-ui,sans-serif">Modules Enabled</text>
+  <text x="234" y="158" font-size="12" fill="#dbdee1" font-family="system-ui,sans-serif">Moderation · Economy · Levels · Voice</text>
+  <text x="234" y="176" font-size="11" font-weight="700" fill="#b5bac1" font-family="system-ui,sans-serif">Mod Log Channel</text>
+  <text x="234" y="190" font-size="12" fill="#dbdee1" font-family="system-ui,sans-serif">#mod-log</text>
+  <line x1="234" y1="202" x2="646" y2="202" stroke="#3a3c40" stroke-width="1"/>
+  <text x="234" y="214" font-size="11" fill="#72767d" font-family="system-ui,sans-serif">Tip: run /help to explore all commands</text>
+  <!-- Input bar -->
+  <rect x="188" y="410" width="598" height="32" fill="#383a40" rx="8"/>
+  <text x="204" y="431" font-size="13" fill="#4e5058" font-family="system-ui,sans-serif">Message #bot-commands</text>
+  <!-- Slash hint -->
+  <rect x="188" y="280" width="300" height="100" fill="#2b2d31" rx="8" filter="url(#sh2)"/>
+  <text x="202" y="300" font-size="11" font-weight="700" fill="#b5bac1" font-family="system-ui,sans-serif">⚡ SLASH COMMANDS</text>
+  <text x="202" y="318" font-size="12" fill="#5865f2" font-family="system-ui,sans-serif">/setup</text>
+  <text x="240" y="318" font-size="12" fill="#dbdee1" font-family="system-ui,sans-serif">Initialize server</text>
+  <text x="202" y="336" font-size="12" fill="#5865f2" font-family="system-ui,sans-serif">/prefix</text>
+  <text x="248" y="336" font-size="12" fill="#dbdee1" font-family="system-ui,sans-serif">Change prefix</text>
+  <text x="202" y="354" font-size="12" fill="#5865f2" font-family="system-ui,sans-serif">/help</text>
+  <text x="236" y="354" font-size="12" fill="#dbdee1" font-family="system-ui,sans-serif">All commands</text>
+  <text x="202" y="372" font-size="12" fill="#5865f2" font-family="system-ui,sans-serif">/dashboard</text>
+  <text x="274" y="372" font-size="12" fill="#dbdee1" font-family="system-ui,sans-serif">Admin panel</text>
 </svg>

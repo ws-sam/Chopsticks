@@ -1052,7 +1052,7 @@ client.on(Events.MessageCreate, async message => {
           .replace("{user.tag}", message.author.tag)
           .replace("{guild}", message.guild?.name || "")
           .replace("{channel}", message.channel?.name || "");
-        await message.reply(rendered);
+        await message.reply(rendered).catch(() => {});
         return;
       }
       const macro = guildData.macros?.[name];
@@ -1108,7 +1108,7 @@ client.on(Events.MessageCreate, async message => {
   // Enforce slash-command meta.userPerms for prefix path
   const permCheck = await checkMetaPerms(message, name);
   if (!permCheck.ok) {
-    await message.reply({ content: `❌ ${permCheck.reason}` });
+    await message.reply({ content: `❌ ${permCheck.reason}` }).catch(() => {});
     return;
   }
 

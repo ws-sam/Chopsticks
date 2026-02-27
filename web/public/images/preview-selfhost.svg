@@ -1,57 +1,23 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" font-family="system-ui,-apple-system,sans-serif">
-<defs>
-  <radialGradient id="ga" cx="15%" cy="25%" r="60%">
-    <stop offset="0%" stop-color="#94a3b8" stop-opacity="0.12"/>
-    <stop offset="100%" stop-color="#94a3b8" stop-opacity="0"/>
-  </radialGradient>
-  <radialGradient id="gb" cx="85%" cy="80%" r="55%">
-    <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.10"/>
-    <stop offset="100%" stop-color="#38bdf8" stop-opacity="0"/>
-  </radialGradient>
-  <filter id="sh" x="-5%" y="-5%" width="110%" height="110%">
-    <feDropShadow dx="0" dy="2" stdDeviation="5" flood-color="#000" flood-opacity="0.5"/>
-  </filter>
-  <clipPath id="bot_av"><circle cx="16" cy="16" r="16"/></clipPath>
-  
-</defs>
-<rect width="800" height="450" fill="#0d0f12"/>
-<rect x="50" y="20" width="700" height="410" fill="#1a1b1e" rx="10" filter="url(#sh)"/>
-<rect x="50" y="20" width="700" height="30" fill="#232428" rx="10"/>
-<rect x="50" y="34" width="700" height="16" fill="#232428"/>
-<circle cx="66" cy="35" r="6" fill="#ed4245"/>
-<circle cx="84" cy="35" r="6" fill="#faa61a"/>
-<circle cx="102" cy="35" r="6" fill="#57f287"/>
-<text x="400" y="39" text-anchor="middle" font-size="11" fill="#72767d" font-family="system-ui,sans-serif">zsh  —  Chopsticks</text>
-<clipPath id="logo_tr"><circle cx="728" cy="35" r="12"/></clipPath>
-<image href="data:image/png;base64,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" x="716" y="23" width="24" height="24" clip-path="url(#logo_tr)" preserveAspectRatio="xMidYMid meet"/>
-<line x1="50" y1="50" x2="750" y2="50" stroke="#2a2b2e" stroke-width="1"/>
-<text x="64" y="68" font-size="11" fill="#72767d" font-family="'SF Mono',monospace,system-ui">user@server:~/Chopsticks$ </text>
-<text x="235.6" y="68" font-size="11" fill="#a8d8f0" font-family="'SF Mono',monospace,system-ui">git clone https://github.com/WokSpec/Chopsticks.git</text>
-<text x="64" y="85" font-size="11" fill="#57f287" font-family="'SF Mono',monospace,system-ui">Cloning into 'Chopsticks'...  done.</text>
-<text x="64" y="102" font-size="11" fill="#72767d" font-family="'SF Mono',monospace,system-ui">user@server:~/Chopsticks$ </text>
-<text x="235.6" y="102" font-size="11" fill="#a8d8f0" font-family="'SF Mono',monospace,system-ui">cp .env.example .env  &&  nano .env</text>
-<text x="64" y="119" font-size="11" fill="#72767d" font-family="'SF Mono',monospace,system-ui">user@server:~/Chopsticks$ </text>
-<text x="235.6" y="119" font-size="11" fill="#a8d8f0" font-family="'SF Mono',monospace,system-ui">docker compose --profile free up -d</text>
-<text x="64" y="136" font-size="11" fill="#f97316" font-family="'SF Mono',monospace,system-ui">[+] Running 4/4</text>
-<text x="64" y="153" font-size="11" fill="#57f287" font-family="'SF Mono',monospace,system-ui"> ✔  Container chopsticks-postgres  Started</text>
-<text x="64" y="170" font-size="11" fill="#57f287" font-family="'SF Mono',monospace,system-ui"> ✔  Container chopsticks-redis     Started</text>
-<text x="64" y="187" font-size="11" fill="#57f287" font-family="'SF Mono',monospace,system-ui"> ✔  Container chopsticks-bot       Started</text>
-<text x="64" y="204" font-size="11" fill="#72767d" font-family="'SF Mono',monospace,system-ui">user@server:~/Chopsticks$ </text>
-<text x="235.6" y="204" font-size="11" fill="#a8d8f0" font-family="'SF Mono',monospace,system-ui">docker compose logs bot --tail 4</text>
-<text x="64" y="221" font-size="11" fill="#b5bac1" font-family="'SF Mono',monospace,system-ui">bot | INFO  ✅ Database schema ensured.</text>
-<text x="64" y="238" font-size="11" fill="#b5bac1" font-family="'SF Mono',monospace,system-ui">bot | INFO  🎵 Primary Lavalink initialized.</text>
-<text x="64" y="255" font-size="11" fill="#57f287" font-family="'SF Mono',monospace,system-ui">bot | INFO  ✅ Ready as Chopsticks#1234  (6 guilds)</text>
-<text x="64" y="272" font-size="11" fill="#72767d" font-family="'SF Mono',monospace,system-ui">user@server:~/Chopsticks$ </text>
-<rect x="64" y="260" width="7" height="13" fill="#dbdee1" rx="1" opacity="0.8"/>
-<rect x="598" y="58" width="136" height="76" fill="#1e1f22" rx="6"/>
-<text x="610" y="72" font-size="9" font-weight="700" fill="#8d8f92" font-family="system-ui,sans-serif" letter-spacing="0.07em">CONTAINERS</text>
-<circle cx="612" cy="86" r="4" fill="#57f287"/>
-<text x="622" y="90" font-size="10" fill="#dbdee1" font-family="system-ui,sans-serif">bot</text>
-<text x="722" y="90" text-anchor="end" font-size="10" fill="#8d8f92" font-family="system-ui,sans-serif">Up 3m</text>
-<circle cx="612" cy="102" r="4" fill="#57f287"/>
-<text x="622" y="106" font-size="10" fill="#dbdee1" font-family="system-ui,sans-serif">postgres</text>
-<text x="722" y="106" text-anchor="end" font-size="10" fill="#8d8f92" font-family="system-ui,sans-serif">Up 3m</text>
-<circle cx="612" cy="118" r="4" fill="#57f287"/>
-<text x="622" y="122" font-size="10" fill="#dbdee1" font-family="system-ui,sans-serif">redis</text>
-<text x="722" y="122" text-anchor="end" font-size="10" fill="#8d8f92" font-family="system-ui,sans-serif">Up 3m</text>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450"><defs><filter id="sh"><feDropShadow dx="0" dy="1" stdDeviation="3" flood-color="#000" flood-opacity="0.4"/></filter></defs><rect width="800" height="450" fill="#313338"/><rect x="0" y="0" width="800" height="450" fill="#1e1e2e" rx="0"/>
+<rect x="0" y="0" width="800" height="32" fill="#313244" rx="0"/>
+<circle cx="18" cy="16" r="6" fill="#ed4245"/>
+<circle cx="36" cy="16" r="6" fill="#faa61a"/>
+<circle cx="54" cy="16" r="6" fill="#23a55a"/>
+<text x="400" y="20" font-size="12" font-weight="700" fill="#cdd6f4" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif">Chopsticks — Self-Host Setup</text>
+<text x="16" y="60" font-size="12" font-weight="700" fill="#a6e3a1" text-anchor="start" font-family="ui-sans-serif,system-ui,sans-serif">$ </text>
+<text x="30" y="60" font-size="12" font-weight="normal" fill="#89b4fa" text-anchor="start" font-family="ui-sans-serif,system-ui,sans-serif">git clone https://github.com/WokSpec/Chopsticks.git &amp;&amp; cd Chopsticks</text>
+<text x="16" y="80" font-size="12" font-weight="normal" fill="#cdd6f4" text-anchor="start" font-family="ui-sans-serif,system-ui,sans-serif">Cloning into Chopsticks...</text>
+<text x="16" y="100" font-size="12" font-weight="700" fill="#a6e3a1" text-anchor="start" font-family="ui-sans-serif,system-ui,sans-serif">$ </text>
+<text x="30" y="100" font-size="12" font-weight="normal" fill="#89b4fa" text-anchor="start" font-family="ui-sans-serif,system-ui,sans-serif">cp .env.example .env  # add your BOT_TOKEN and MONGO_URI</text>
+<text x="16" y="130" font-size="12" font-weight="700" fill="#a6e3a1" text-anchor="start" font-family="ui-sans-serif,system-ui,sans-serif">$ </text>
+<text x="30" y="130" font-size="12" font-weight="normal" fill="#89b4fa" text-anchor="start" font-family="ui-sans-serif,system-ui,sans-serif">docker-compose -f docker-compose.free.yml up -d</text>
+<text x="16" y="150" font-size="12" font-weight="normal" fill="#cdd6f4" text-anchor="start" font-family="ui-sans-serif,system-ui,sans-serif">[+] Running 3/3</text>
+<text x="16" y="170" font-size="12" font-weight="normal" fill="#cdd6f4" text-anchor="start" font-family="ui-sans-serif,system-ui,sans-serif">  chopsticks-bot      Started</text>
+<text x="16" y="190" font-size="12" font-weight="normal" fill="#cdd6f4" text-anchor="start" font-family="ui-sans-serif,system-ui,sans-serif">  chopsticks-db       Started</text>
+<text x="16" y="210" font-size="12" font-weight="normal" fill="#cdd6f4" text-anchor="start" font-family="ui-sans-serif,system-ui,sans-serif">  chopsticks-redis    Started</text>
+<text x="16" y="230" font-size="12" font-weight="700" fill="#a6e3a1" text-anchor="start" font-family="ui-sans-serif,system-ui,sans-serif">$ </text>
+<text x="30" y="230" font-size="12" font-weight="normal" fill="#89b4fa" text-anchor="start" font-family="ui-sans-serif,system-ui,sans-serif">docker logs chopsticks-bot --tail 5</text>
+<text x="16" y="250" font-size="12" font-weight="normal" fill="#cdd6f4" text-anchor="start" font-family="ui-sans-serif,system-ui,sans-serif">[Chopsticks] Connected as Chopsticks#0001</text>
+<text x="16" y="270" font-size="12" font-weight="normal" fill="#cdd6f4" text-anchor="start" font-family="ui-sans-serif,system-ui,sans-serif">[Chopsticks] 162 prefix commands loaded</text>
+<text x="16" y="290" font-size="12" font-weight="normal" fill="#cdd6f4" text-anchor="start" font-family="ui-sans-serif,system-ui,sans-serif">[Chopsticks] 20 slash commands registered</text>
+<text x="16" y="310" font-size="12" font-weight="normal" fill="#cdd6f4" text-anchor="start" font-family="ui-sans-serif,system-ui,sans-serif">[Chopsticks] Ready.</text></svg>

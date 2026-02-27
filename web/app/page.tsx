@@ -43,8 +43,8 @@ const MSGS: Array<{
   { user: 'Chopsticks', avatar: '/images/chopsticks.png',         color: '#5865f2', type: 'bot',  embed: { color: '#5865f2', title: '🎵 Now Playing', fields: [{ k: 'Track', v: 'Never Gonna Give You Up — Rick Astley' }, { k: 'Duration', v: '3:32' }] } },
   { user: 'Mikel',      avatar: '/images/avatar-mousememe.jpg',   color: '#22d3ee', type: 'user', content: '!balance' },
   { user: 'Chopsticks', avatar: '/images/chopsticks.png',         color: '#5865f2', type: 'bot',  embed: { color: '#4ade80', title: '💰 Balance', fields: [{ k: 'Wallet', v: '4,280 coins' }, { k: 'Bank', v: '12,500 coins · Rank #3' }] } },
-  { user: 'Nakari',     avatar: '/images/avatar-patrickstar.jpg', color: '#a78bfa', type: 'user', content: '!ask What is the meaning of life?' },
-  { user: 'Chopsticks', avatar: '/images/chopsticks.png',         color: '#5865f2', type: 'bot',  embed: { color: '#22d3ee', title: '🧠 AI Response', fields: [{ k: 'Answer', v: '42. But also: connection, purpose, and really good music.' }] } },
+  { user: 'Nakari',     avatar: '/images/avatar-patrickstar.jpg', color: '#a78bfa', type: 'user', content: '!trivia start' },
+  { user: 'Chopsticks', avatar: '/images/chopsticks.png',         color: '#5865f2', type: 'bot',  embed: { color: '#a78bfa', title: '🎮 Trivia Started', fields: [{ k: 'Category', v: 'General Knowledge' }, { k: 'Players', v: 'Euxine, Mikel, Nakari' }] } },
 ];
 
 function Avatar({ src, size = 36, bot = false }: { src: string; size?: number; bot?: boolean }) {

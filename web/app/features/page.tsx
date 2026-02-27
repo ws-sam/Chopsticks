@@ -8,7 +8,7 @@ import {
 
 export const metadata: Metadata = {
   title: 'Features — Chopsticks',
-  description: 'Everything Chopsticks can do: 49 concurrent music players, near-human AI agents, gamification platform, raid protection, fully programmable automation, and open source AI integration.',
+  description: 'Everything Chopsticks can do: personal playlist channels, AI audiobook narration, near-human agents, gamification platform, raid protection, fully programmable automation, and open-source AI integration.',
   alternates: { canonical: 'https://chopsticks.wokspec.org/features' },
 };
 
@@ -52,16 +52,16 @@ const PILLARS = [
     Icon: MusicIcon,
     color: '#f472b6',
     label: 'Voice & Media',
-    headline: '49 concurrent. One command.',
+    headline: 'Your playlist. Your VC. Your agent.',
     bullets: [
-      '49 simultaneous music sessions — one per voice channel, running in parallel across your entire server',
-      'YouTube, Spotify, SoundCloud — search or URL, no account linking required',
-      'Full queue control: skip, remove, shuffle, loop, seek, volume, lyrics',
-      'Agents can read books, research papers, bedtime stories, D&D lore, or any text aloud in VC',
-      'Soundboard mode: spend credits to trigger sound effects in voice channels on demand',
-      'Lobby and ambient modes: permanently assign an agent as background audio for waiting rooms',
+      'Create a personal playlist channel — a drag-and-drop thread where you drop audio files and build your queue',
+      'Deploy an agent to pull from your playlist and play it live in any voice channel, on demand',
+      'Audiobook mode: drop PDFs, text files, books, or research papers into your playlist and an agent reads them aloud in a human-like voice',
+      'YouTube, Spotify, and SoundCloud still supported for URL-based queue building',
+      'Full queue control: skip, seek, shuffle, loop, volume, and live lyrics',
+      'These features are constantly in development — we urge contribution to help mainstream them',
     ],
-    cmds: ['/music play', '/music loop', '/music lyrics', '/agent read', '/agent voice', '/assistant bind'],
+    cmds: ['!play', '!queue', '!skip', '!playlist', '!audiobook', '/agents join'],
   },
   {
     Icon: RadioIcon,
@@ -76,7 +76,7 @@ const PILLARS = [
       'Spend server credits to deploy agents: join VC and play a sound, interrupt a conversation, run a session',
       'Configurable guardrails: per-server action allowlists, session cost, and duration caps',
     ],
-    cmds: ['/agent join', '/agent style', '/agent assign', '/agent public', '/assistant bind', '/setup agent-pool'],
+    cmds: ['/agents join', '/agents style', '/agents list', '/setup', '/assistant bind'],
   },
   {
     Icon: CoinIcon,
@@ -91,7 +91,7 @@ const PILLARS = [
       'Leaderboards for credits, XP, collection completeness, and custom server stats',
       'Giveaways, heists, and auctions — built-in community engagement events',
     ],
-    cmds: ['/daily', '/work', '/quests', '/craft', '/gather', '/shop', '/leaderboard'],
+    cmds: ['!daily', '!work', '!quests', '!craft', '!shop', '!leaderboard'],
   },
   {
     Icon: ShieldIcon,
@@ -106,7 +106,7 @@ const PILLARS = [
       'Hierarchy-safe: no moderator can act above their own rank. The bot mirrors Discord\'s native permission model',
       'Warning history, case records, and clearable files — full audit trail per member',
     ],
-    cmds: ['/setup protection', '/ban', '/warn', '/purge', '/timeout', '/lock', '/slowmode', '/modlogs'],
+    cmds: ['!ban', '!warn', '!purge', '!timeout', '!lock', '!slowmode', '/automod', '/setup'],
   },
   {
     Icon: ZapIcon,
@@ -121,7 +121,7 @@ const PILLARS = [
       'Reaction roles, level-gated roles, and macro aliases — server configuration as infrastructure',
       'Scheduled messages, reminders, and timed events — set it and forget it',
     ],
-    cmds: ['/automations', '/scripts', '/custom', '/tickets', '/reactionroles', '/levels', '/macro'],
+    cmds: ['!poll', '!giveaway', '!remind', '!autorole', '/tickets', '/automations', '/setup'],
   },
   {
     Icon: SparkleIcon,
@@ -136,7 +136,7 @@ const PILLARS = [
       'Deploy AI as customer support: knowledge base, FAQ handling, escalation triggers',
       'Document reading: drop in a research paper, book chapter, or briefing — the agent reads it aloud or summarizes',
     ],
-    cmds: ['/agent chat', '/agent style', '/assistant start', '/assistant bind', '/agent read', '/agent voice'],
+    cmds: ['!ask', '!summarize', '!translate', '!aimodel', '/ai chat', '/agents style'],
   },
 ];
 
@@ -186,7 +186,7 @@ export default function FeaturesPage() {
               What Chopsticks<br />actually does.
             </h1>
             <p style={{ fontSize: '1.05rem', color: 'var(--text-muted)', lineHeight: 1.75, maxWidth: 520, marginBottom: '2rem' }}>
-              One bot. Six capability pillars. 49 concurrent music players. Near-human AI agents. A full gamification platform. Raid protection. Fully programmable automation. All open source.
+              One bot. Six capability pillars. Personal playlist channels. AI audiobook narration. Near-human agents. A full gamification platform. Raid protection. Fully programmable automation. All open source.
             </p>
             <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
               <a href={BOT_INVITE} target="_blank" rel="noopener noreferrer" className="btn btn-primary" style={{ padding: '0.75rem 1.5rem', fontSize: '0.88rem' }}>

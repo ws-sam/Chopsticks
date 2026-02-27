@@ -452,14 +452,13 @@ header {
   width: 30px;
   height: 30px;
   border-radius: 8px;
-  background: linear-gradient(135deg, var(--accent), #0369a1, var(--violet));
+  background: rgba(56,189,248,0.07);
+  border: 1px solid rgba(56,189,248,0.15);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.72rem;
-  font-weight: 800;
-  color: #fff;
-  box-shadow: 0 0 16px rgba(56,189,248,0.25);
+  box-shadow: 0 0 16px rgba(56,189,248,0.2);
+  overflow: hidden;
 }
 nav { display: flex; align-items: center; gap: 0.125rem; }
 .nav-link {
@@ -815,15 +814,27 @@ footer {
 .nav-dropdown-wrapper {
   position: relative;
 }
+/* Invisible hover bridge — extends wrapper's hit area down to meet the dropdown.
+   Pointer events are always active on this element (it's on the wrapper, not the
+   hidden dropdown), so the :hover state is maintained while the mouse travels
+   through the gap between the button and the panel. */
+.nav-dropdown-wrapper::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: -16px;
+  right: -16px;
+  height: 14px;
+}
 .nav-dropdown-wrapper:hover .nav-dropdown,
 .nav-dropdown-wrapper:focus-within .nav-dropdown {
   opacity: 1;
   pointer-events: auto;
-  transform: translateY(0);
+  transform: translateX(-50%) translateY(0);
 }
 .nav-dropdown {
   position: absolute;
-  top: calc(100% + 8px);
+  top: calc(100% + 6px);
   left: 50%;
   transform: translateX(-50%) translateY(-6px);
   min-width: 200px;
@@ -838,6 +849,7 @@ footer {
   box-shadow: 0 16px 48px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.04);
   z-index: 200;
 }
+/* Decorative caret arrow */
 .nav-dropdown::before {
   content: '';
   position: absolute;
@@ -1535,10 +1547,9 @@ header {
 }
 .header-logo-mark {
   width: 30px; height: 30px; border-radius: 8px;
-  background: linear-gradient(135deg, var(--accent), #0369a1, var(--violet));
+  background: rgba(56,189,248,0.07); border: 1px solid rgba(56,189,248,0.15);
   display: flex; align-items: center; justify-content: center;
-  font-size: 0.72rem; font-weight: 800; color: #fff;
-  box-shadow: 0 0 16px rgba(56,189,248,0.25);
+  box-shadow: 0 0 16px rgba(56,189,248,0.2); overflow: hidden;
 }
 .desktop-nav { display: flex; align-items: center; gap: 0.125rem; }
 .nav-link {

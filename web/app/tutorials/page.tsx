@@ -148,6 +148,10 @@ export default function TutorialsPage() {
                 {t.preview && (
                   <div style={{ margin: '-1.25rem -1.25rem 1rem', borderRadius: '0.5rem 0.5rem 0 0', overflow: 'hidden', height: 120, position: 'relative' }}>
                     <Image src={t.preview} alt={t.title} fill style={{ objectFit: 'cover', objectPosition: 'top left' }} sizes="400px" />
+                    {/* Logo badge */}
+                    <div style={{ position: 'absolute', bottom: 8, right: 8, width: 26, height: 26, borderRadius: '50%', background: 'rgba(2,4,5,0.75)', border: '1px solid rgba(56,189,248,0.25)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <img src="/images/chopsticks.png" alt="Chopsticks" width={16} height={16} style={{ objectFit: 'contain', display: 'block' }} />
+                    </div>
                   </div>
                 )}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.25rem' }}>
@@ -172,6 +176,11 @@ export default function TutorialsPage() {
                 {t.preview && (
                   <div style={{ marginBottom: '2rem', borderRadius: '0.75rem', overflow: 'hidden', position: 'relative', height: 220, border: '1px solid var(--border)' }}>
                     <Image src={t.preview} alt={`${t.title} preview`} fill style={{ objectFit: 'cover', objectPosition: 'top left' }} sizes="(max-width:900px) 100vw, 900px" />
+                    {/* Logo badge */}
+                    <div style={{ position: 'absolute', bottom: 12, right: 12, display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'rgba(2,4,5,0.72)', border: '1px solid rgba(56,189,248,0.2)', borderRadius: 999, padding: '0.25rem 0.6rem 0.25rem 0.3rem', backdropFilter: 'blur(8px)' }}>
+                      <img src="/images/chopsticks.png" alt="Chopsticks" width={16} height={16} style={{ objectFit: 'contain', display: 'block' }} />
+                      <span style={{ fontSize: '0.68rem', fontWeight: 700, color: 'rgba(255,255,255,0.7)', fontFamily: 'var(--font-heading)', letterSpacing: '0.02em' }}>Chopsticks</span>
+                    </div>
                   </div>
                 )}
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1.25rem', marginBottom: '2rem', paddingBottom: '1.5rem', borderBottom: '1px solid var(--border)' }}>

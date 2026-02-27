@@ -1,0 +1,317 @@
+[
+  {
+    "name": "setup",
+    "category": "Config",
+    "summary": "Interactive server setup wizard",
+    "description": "Opens the full server configuration wizard. Walks you through mod log channel, welcome messages, economy settings, DJ roles, leveling, tickets, and the Agent Pool — all in one place. Run once on a fresh install or whenever you need to reconfigure.",
+    "subcommandsRich": [
+      {
+        "name": "wizard",
+        "desc": "Launch the full interactive setup wizard"
+      },
+      {
+        "name": "status",
+        "desc": "Show current setup status across all modules"
+      },
+      {
+        "name": "leveling",
+        "desc": "Configure XP, level-up messages and role rewards"
+      }
+    ],
+    "permissions": "Admin",
+    "examples": [
+      "/setup wizard",
+      "/setup status"
+    ]
+  },
+  {
+    "name": "dashboard",
+    "category": "Config",
+    "summary": "Live server dashboard with interactive controls",
+    "description": "Displays a real-time dashboard embed showing bot health, active agent sessions, economy stats, and quick-action buttons for common mod tasks. Only admins can trigger actions; everyone can view.",
+    "permissions": "Admin",
+    "examples": [
+      "/dashboard"
+    ]
+  },
+  {
+    "name": "prefix",
+    "category": "Config",
+    "summary": "View or change the command prefix",
+    "description": "With no argument, shows the current prefix. Pass a value (1–4 characters) to change it. Anyone can view; only members with Manage Server can change it.",
+    "permissions": "Admin",
+    "examples": [
+      "/prefix",
+      "/prefix value:!",
+      "/prefix value:;;"
+    ]
+  },
+  {
+    "name": "config",
+    "category": "Config",
+    "summary": "Fine-grained per-module configuration",
+    "description": "Per-module settings not covered by /setup. Covers AI provider selection, economy multipliers, XP rates, announcement channels, and timezone.",
+    "permissions": "Admin",
+    "examples": [
+      "/config",
+      "/config module:economy"
+    ]
+  },
+  {
+    "name": "help",
+    "category": "Utility",
+    "summary": "Browse all prefix commands and slash commands",
+    "description": "Interactive help browser. Browse by category, search by name, or look up a specific command. Shows usage, aliases, examples, and permission level.",
+    "subcommandsRich": [
+      {
+        "name": "browse",
+        "desc": "Browse commands by category"
+      },
+      {
+        "name": "search",
+        "desc": "Search for a command by keyword"
+      },
+      {
+        "name": "command",
+        "desc": "Get detailed info on a specific command"
+      },
+      {
+        "name": "prefix",
+        "desc": "List all prefix commands for a category"
+      }
+    ],
+    "permissions": "Everyone",
+    "examples": [
+      "/help browse",
+      "/help search query:ban",
+      "/help command name:play"
+    ]
+  },
+  {
+    "name": "automod",
+    "category": "Config",
+    "summary": "Configure automatic moderation rules",
+    "description": "Set up spam detection, bad-word filters, mention limits, link blocking, and raid-detection thresholds. Each rule has an action (warn, mute, kick, ban) and can be scoped to channels or roles.",
+    "permissions": "Admin",
+    "examples": [
+      "/automod",
+      "/automod rule:spam action:timeout"
+    ]
+  },
+  {
+    "name": "welcome",
+    "category": "Config",
+    "summary": "Set up welcome and farewell messages",
+    "description": "Configure the welcome channel, embed message, and farewell message. Supports {user}, {server}, {membercount} placeholders. Can also assign a welcome role on join.",
+    "permissions": "Admin",
+    "examples": [
+      "/welcome",
+      "/welcome channel:#welcome"
+    ]
+  },
+  {
+    "name": "autorole",
+    "category": "Config",
+    "summary": "Roles automatically assigned on member join",
+    "description": "Add or remove roles from the autorole list. Members receive all autorole roles the moment they join the server.",
+    "permissions": "Admin",
+    "examples": [
+      "/autorole",
+      "/autorole add role:@Member"
+    ]
+  },
+  {
+    "name": "roles",
+    "category": "Config",
+    "summary": "Reaction roles and self-assignable role menus",
+    "description": "Create role menus with dropdown selects or reaction-based assignment. Useful for colour roles, pronoun roles, or notification opt-ins.",
+    "permissions": "Admin",
+    "examples": [
+      "/roles",
+      "/roles create type:dropdown"
+    ]
+  },
+  {
+    "name": "tickets",
+    "category": "Config",
+    "summary": "Ticket system configuration",
+    "description": "Set up support ticket channels: create panel, define staff roles, configure transcript channel, and set ticket naming format. Members open tickets with a button.",
+    "permissions": "Admin",
+    "examples": [
+      "/tickets setup",
+      "/tickets panel channel:#support"
+    ]
+  },
+  {
+    "name": "mod",
+    "category": "Moderation",
+    "summary": "Slash-based moderation (ban, kick, warn…)",
+    "description": "Slash command equivalents of the prefix moderation commands. Useful when you want the Discord context-menu integration or ephemeral responses. Prefix equivalents also exist for every subcommand.",
+    "subcommandsRich": [
+      {
+        "name": "ban",
+        "desc": "Ban a member"
+      },
+      {
+        "name": "kick",
+        "desc": "Kick a member"
+      },
+      {
+        "name": "warn",
+        "desc": "Warn a member"
+      },
+      {
+        "name": "timeout",
+        "desc": "Temporarily mute a member"
+      },
+      {
+        "name": "purge",
+        "desc": "Bulk-delete messages"
+      },
+      {
+        "name": "case",
+        "desc": "Look up a moderation case"
+      }
+    ],
+    "permissions": "Moderator",
+    "examples": [
+      "/mod ban user:@user reason:spam",
+      "/mod purge amount:50"
+    ]
+  },
+  {
+    "name": "levels",
+    "category": "Utility",
+    "summary": "XP and leveling configuration",
+    "description": "Configure the leveling system: enable/disable, set XP per message, configure level-up announcement channel, and manage level role rewards.",
+    "permissions": "Admin",
+    "examples": [
+      "/levels",
+      "/levels preset:active"
+    ]
+  },
+  {
+    "name": "music",
+    "category": "Music",
+    "summary": "Music playback via slash command",
+    "description": "Slash command interface to the music system. All subcommands mirror their prefix equivalents. Most users prefer the prefix commands (!play, !skip etc.) but slash works too.",
+    "subcommandsRich": [
+      {
+        "name": "play",
+        "desc": "Play or queue a track — search or URL"
+      },
+      {
+        "name": "skip",
+        "desc": "Skip the current track"
+      },
+      {
+        "name": "pause",
+        "desc": "Pause playback"
+      },
+      {
+        "name": "resume",
+        "desc": "Resume playback"
+      },
+      {
+        "name": "stop",
+        "desc": "Stop and disconnect"
+      }
+    ],
+    "permissions": "Everyone",
+    "examples": [
+      "/music play query:lofi hip hop",
+      "/music skip"
+    ]
+  },
+  {
+    "name": "agents",
+    "category": "Agents",
+    "summary": "Manage and deploy community Agent Pool agents",
+    "description": "View available agents, deploy an agent to a voice channel, configure session limits and allowed actions, and check pool credit balance.",
+    "subcommandsRich": [
+      {
+        "name": "join",
+        "desc": "Deploy an agent to your current voice channel"
+      },
+      {
+        "name": "leave",
+        "desc": "End the active agent session"
+      },
+      {
+        "name": "list",
+        "desc": "List available agents in the community pool"
+      },
+      {
+        "name": "style",
+        "desc": "Set the persona and tone for the session"
+      }
+    ],
+    "permissions": "Everyone",
+    "examples": [
+      "/agents join",
+      "/agents list",
+      "/agents style tone:calm"
+    ]
+  },
+  {
+    "name": "ai",
+    "category": "AI",
+    "summary": "AI chat with slash command interface",
+    "description": "Chat with an AI model directly from a slash command. Creates a contextual conversation. Most users prefer !ask for quick messages; /ai is better for structured back-and-forth.",
+    "permissions": "Everyone",
+    "examples": [
+      "/ai chat message:Explain quantum entanglement"
+    ]
+  },
+  {
+    "name": "verify",
+    "category": "Config",
+    "summary": "Member verification gate",
+    "description": "Configure a verification step new members must complete before gaining access to the server. Supports button click, reaction, or CAPTCHA-style text entry.",
+    "permissions": "Admin",
+    "examples": [
+      "/verify setup",
+      "/verify channel:#verify"
+    ]
+  },
+  {
+    "name": "polls",
+    "category": "Utility",
+    "summary": "Create rich interactive polls",
+    "description": "Create polls with up to 10 options, set a duration, and optionally restrict voting to specific roles. Results posted when poll ends.",
+    "permissions": "Everyone",
+    "examples": [
+      "/poll question:Best bot? options:Chopsticks,Other"
+    ]
+  },
+  {
+    "name": "giveaway",
+    "category": "Utility",
+    "summary": "Launch and manage giveaways",
+    "description": "Start a timed giveaway, set winners count, require a role to enter, and re-roll if needed. Results are announced automatically.",
+    "permissions": "Moderator",
+    "examples": [
+      "/giveaway start prize:Nitro duration:24h winners:1"
+    ]
+  },
+  {
+    "name": "remind",
+    "category": "Utility",
+    "summary": "Set personal or channel reminders",
+    "description": "Schedule a reminder for yourself or a channel. Supports natural-language time parsing (e.g. 'in 2 hours', 'tomorrow at 9am').",
+    "permissions": "Everyone",
+    "examples": [
+      "/remind time:in 2 hours message:Check the queue"
+    ]
+  },
+  {
+    "name": "embed",
+    "category": "Utility",
+    "summary": "Build and send custom embeds",
+    "description": "Interactive embed builder — set title, description, color, fields, image, footer, and author. Send to any channel you have permission for.",
+    "permissions": "Moderator",
+    "examples": [
+      "/embed"
+    ]
+  }
+]

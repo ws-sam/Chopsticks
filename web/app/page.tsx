@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { MusicIcon, ShieldIcon, CoinIcon, SparkleIcon, GamepadIcon, ZapIcon, WrenchIcon, RadioIcon } from './icons';
 
 const BOT_INVITE = 'https://discord.com/api/oauth2/authorize?client_id=1466382874587431036&permissions=1099514858544&scope=bot%20applications.commands';
-const DISCORD_SERVER = 'https://discord.gg/chopsticks';
+const DISCORD_SERVER = 'https://discord.gg/QbS47HDdpf';
 const GITHUB_REPO = 'https://github.com/wokspec/chopsticks';
 
 // ─── Stat counter hook ────────────────────────────────────────────────────
@@ -63,7 +63,11 @@ function DiscordMockup() {
       <div style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', minHeight: 280 }}>
         {MESSAGES.map((m, i) => (
           <div key={i} style={{ display: 'flex', gap: '0.625rem', alignItems: 'flex-start', opacity: visible.includes(i) ? 1 : 0, transform: visible.includes(i) ? 'translateY(0)' : 'translateY(8px)', transition: 'opacity 0.4s ease, transform 0.4s ease' }}>
-            <div style={{ width: 32, height: 32, borderRadius: '50%', background: m.type === 'bot' ? 'rgba(88,101,242,0.2)' : 'rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', flexShrink: 0, border: m.type === 'bot' ? '1px solid rgba(88,101,242,0.4)' : '1px solid rgba(255,255,255,0.06)' }}>{m.avatar}</div>
+            <div style={{ width: 32, height: 32, borderRadius: '50%', background: m.type === 'bot' ? 'rgba(88,101,242,0.15)' : 'rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', flexShrink: 0, border: m.type === 'bot' ? '1px solid rgba(88,101,242,0.4)' : '1px solid rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+              {m.type === 'bot'
+                ? <img src="/images/chopsticks.png" alt="Chopsticks" width={22} height={22} style={{ objectFit: 'contain', display: 'block' }} />
+                : m.avatar}
+            </div>
             <div>
               <span style={{ fontSize: '0.78rem', fontWeight: 700, color: m.type === 'bot' ? '#7289da' : '#ffffff', fontFamily: 'var(--font-heading)' }}>{m.user}</span>
               {m.type === 'command' && <span style={{ fontSize: '0.65rem', background: 'rgba(88,101,242,0.2)', color: '#a5b4fc', border: '1px solid rgba(88,101,242,0.3)', borderRadius: 3, padding: '0 0.3rem', marginLeft: '0.4rem', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>prefix</span>}
@@ -83,8 +87,8 @@ const FEATURES = [
     color: '#f472b6',
     Icon: MusicIcon,
     headline: 'Voice & Music',
-    body: 'Lavalink-backed voice sessions for up to 49 simultaneous channels. YouTube, Spotify & SoundCloud — with queue, shuffle, EQ, lyrics, and DJ roles.',
-    chips: ['!play', '!queue', '!shuffle', '!eq', '!lyrics', '!np'],
+    body: 'Drop audio files into your own playlist channel — a drag-and-drop thread any member can build — then deploy an agent to play it in any VC. Or have an agent read you audiobooks, PDFs, and text files aloud in a human-like voice. These features are actively evolving. We urge contribution.',
+    chips: ['!playlist', '!queue', '!audiobook', '!agent read', '!play', '!np'],
   },
   {
     cat: 'Moderation',
@@ -108,7 +112,7 @@ const FEATURES = [
     Icon: SparkleIcon,
     headline: 'AI Integration',
     body: 'GPT-4o powered natural language in your server. Ask questions, summarise threads, translate, or let AI moderate your rules channel.',
-    chips: ['!ask', '!summarize', '!translate', '!aimodel', '/agents'],
+    chips: ['!ask', '!summarize', '!translate', '!aimodel', '/agents', '/ai'],
   },
   {
     cat: 'Fun & Games',
@@ -132,7 +136,7 @@ const FEATURES = [
     Icon: WrenchIcon,
     headline: 'Automation',
     body: 'Scheduled announcements, reaction roles, welcome messages, ticket system, and a full server setup dashboard — all in one place.',
-    chips: ['!reactionrole', '!welcome', '/tickets', '/dashboard'],
+    chips: ['!poll', '!giveaway', '!remind', '!autorole', '/tickets', '/setup'],
   },
 ];
 
@@ -165,7 +169,7 @@ function FeatureCard({ f }: { f: typeof FEATURES[0] }) {
 
 // ─── Agent role cards ─────────────────────────────────────────────────────
 const AGENT_ROLES = [
-  { id: 'radio',   label: 'Radio Agent',   color: '#f472b6', icon: '📻', desc: 'Hosts persistent voice sessions with zero downtime restarts.' },
+  { id: 'radio',   label: 'Radio Agent',   color: '#f472b6', icon: '📻', desc: 'Plays your personal playlist channel live in any VC — drag-and-drop audio, always yours.' },
   { id: 'dj',      label: 'DJ Agent',      color: '#a78bfa', icon: '🎧', desc: 'Manages per-guild music queues, EQ presets, and DJ locks.' },
   { id: 'guard',   label: 'Guard Agent',   color: '#fb923c', icon: '🛡️', desc: 'Monitors activity, enforces moderation rules in real time.' },
   { id: 'banker',  label: 'Banker Agent',  color: '#4ade80', icon: '🏦', desc: 'Processes economy transactions and bank interest cycles.' },
@@ -284,7 +288,7 @@ export default function HomePage() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
                 {[
                   ['Self-healing', 'Agents restart automatically on failure, no human needed.'],
-                  ['Zero-downtime deploys', 'Rolling restarts mean updates never kill an active voice session.'],
+                  ['Zero-downtime deploys', 'Rolling restarts mean updates never interrupt your playlist or audiobook session.'],
                   ['Per-guild isolation', 'Each guild state is scoped — one server\'s meltdown can\'t affect yours.'],
                 ].map(([t, d]) => (
                   <div key={t} style={{ display: 'flex', gap: '0.625rem', alignItems: 'flex-start' }}>
@@ -326,20 +330,51 @@ export default function HomePage() {
             <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>Open-source, community-driven, and actively developed.</p>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.25rem' }}>
-            {[
-              { icon: '⭐', title: 'Star on GitHub', body: 'Help us grow by starring the repo. See the source code, open issues, and contribute.', href: GITHUB_REPO, cta: 'View on GitHub', color: '#facc15' },
-              { icon: '💬', title: 'Join the Discord', body: 'Get support, report bugs, suggest features, and hang out with the Chopsticks community.', href: DISCORD_SERVER, cta: 'Join Server', color: '#7289da' },
-              { icon: '🛠️', title: 'Self-host it', body: 'Run your own instance. Full Docker support, Lavalink included, and a step-by-step guide.', href: '/self-host', cta: 'Self-host guide', color: '#4ade80' },
-            ].map(c => (
-              <div key={c.title} className="glass-card" style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                <div style={{ fontSize: '2rem' }}>{c.icon}</div>
-                <div style={{ fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: '1.05rem', color: 'var(--text)' }}>{c.title}</div>
-                <div style={{ fontSize: '0.83rem', color: 'var(--text-muted)', lineHeight: 1.7, flex: 1 }}>{c.body}</div>
-                <a href={c.href} target={c.href.startsWith('http') ? '_blank' : undefined} rel="noopener noreferrer" style={{ fontSize: '0.82rem', fontWeight: 700, color: c.color, fontFamily: 'var(--font-heading)', display: 'flex', alignItems: 'center', gap: '0.25rem', textDecoration: 'none' }}>
-                  {c.cta} →
-                </a>
+            {/* GitHub */}
+            <div className="glass-card" style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <div style={{ fontSize: '2rem' }}>⭐</div>
+              <div style={{ fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: '1.05rem', color: 'var(--text)' }}>Star on GitHub</div>
+              <div style={{ fontSize: '0.83rem', color: 'var(--text-muted)', lineHeight: 1.7, flex: 1 }}>Help us grow by starring the repo. See the source code, open issues, and contribute.</div>
+              <a href={GITHUB_REPO} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.82rem', fontWeight: 700, color: '#facc15', fontFamily: 'var(--font-heading)', display: 'flex', alignItems: 'center', gap: '0.25rem', textDecoration: 'none' }}>View on GitHub →</a>
+            </div>
+
+            {/* Discord — GIF card */}
+            <a
+              href={DISCORD_SERVER}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="glass-card"
+              style={{ display: 'flex', flexDirection: 'column', gap: 0, overflow: 'hidden', textDecoration: 'none', borderColor: 'rgba(114,137,218,0.25)', transition: 'border-color 0.2s, box-shadow 0.2s' }}
+              onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.borderColor = 'rgba(114,137,218,0.5)'; (e.currentTarget as HTMLAnchorElement).style.boxShadow = '0 0 32px rgba(114,137,218,0.12)'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.borderColor = 'rgba(114,137,218,0.25)'; (e.currentTarget as HTMLAnchorElement).style.boxShadow = ''; }}
+            >
+              {/* GIF hero */}
+              <div style={{ position: 'relative', width: '100%', aspectRatio: '1/1', overflow: 'hidden', background: '#0d1117' }}>
+                <img
+                  src="/images/fried_egg_fried_rice.gif"
+                  alt="Chopsticks community"
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                />
+                <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, transparent 50%, var(--surface) 100%)', pointerEvents: 'none' }} />
               </div>
-            ))}
+              {/* Text below */}
+              <div style={{ padding: '1.25rem 1.5rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="#7289da"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg>
+                  <span style={{ fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: '1.05rem', color: 'var(--text)' }}>Join the Discord</span>
+                </div>
+                <div style={{ fontSize: '0.83rem', color: 'var(--text-muted)', lineHeight: 1.7 }}>Get support, report bugs, suggest features, and hang out with the Chopsticks community.</div>
+                <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#7289da', fontFamily: 'var(--font-heading)', display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.25rem' }}>Join Server →</span>
+              </div>
+            </a>
+
+            {/* Self-host */}
+            <div className="glass-card" style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <div style={{ fontSize: '2rem' }}>🛠️</div>
+              <div style={{ fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: '1.05rem', color: 'var(--text)' }}>Self-host it</div>
+              <div style={{ fontSize: '0.83rem', color: 'var(--text-muted)', lineHeight: 1.7, flex: 1 }}>Run your own instance. Full Docker support, Lavalink included, and a step-by-step guide.</div>
+              <a href="/self-host" style={{ fontSize: '0.82rem', fontWeight: 700, color: '#4ade80', fontFamily: 'var(--font-heading)', display: 'flex', alignItems: 'center', gap: '0.25rem', textDecoration: 'none' }}>Self-host guide →</a>
+            </div>
           </div>
         </div>
       </section>

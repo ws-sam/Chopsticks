@@ -69,7 +69,7 @@ export function Header() {
     <header>
       <div className="header-inner">
         <Link href="/" className="header-logo">
-          <div className="header-logo-mark">CH</div>
+          <div className="header-logo-mark"><img src="/images/chopsticks.png" alt="Chopsticks" width={22} height={22} style={{ objectFit: 'contain', display: 'block' }} /></div>
           Chopsticks
         </Link>
 
@@ -137,7 +137,7 @@ export function Footer() {
         <div className="footer-grid">
           <div className="footer-brand">
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.125rem' }}>
-              <div style={{ width: 26, height: 26, borderRadius: 7, background: 'linear-gradient(135deg, #38bdf8, #0284c7)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', fontWeight: 800, color: '#03111e' }}>CH</div>
+              <div style={{ width: 26, height: 26, borderRadius: 7, background: 'rgba(56,189,248,0.08)', border: '1px solid rgba(56,189,248,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><img src="/images/chopsticks.png" alt="Chopsticks" width={18} height={18} style={{ objectFit: 'contain', display: 'block' }} /></div>
               <span style={{ fontWeight: 700, fontSize: '0.9rem', fontFamily: 'var(--font-heading)', letterSpacing: '-0.02em' }}>Chopsticks</span>
             </div>
             <p>An open source Discord bot built by goot27 and the WokSpec community. MIT licensed.</p>

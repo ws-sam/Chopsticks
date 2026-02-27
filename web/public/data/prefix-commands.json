@@ -1,162 +1,96 @@
 [
   {
-    "name": "bird",
+    "name": "aimodel",
     "aliases": [
-      "birb",
-      "tweet"
+      "aistatus",
+      "aiinfo"
     ],
-    "category": "Animals",
-    "usage": "!bird",
-    "description": "🐦 Random Bird — !bird",
-    "examples": [],
+    "category": "AI",
+    "usage": "!aimodel",
+    "description": "Show your active AI model — !aimodel",
     "permissions": "Everyone"
   },
   {
-    "name": "bite",
+    "name": "ask",
     "aliases": [
-      "nibble"
+      "ai",
+      "chat",
+      "gpt"
     ],
-    "category": "Animals",
-    "usage": "!bite",
-    "description": "😬 Bite! — !bite [@user]",
-    "examples": [],
+    "category": "AI",
+    "usage": "!ask",
+    "description": "Chat with AI (rolling context) — !ask <message>",
     "permissions": "Everyone"
   },
   {
-    "name": "cat",
+    "name": "summarize",
     "aliases": [
-      "kitty",
-      "meow"
+      "tldr",
+      "sum"
     ],
-    "category": "Animals",
-    "usage": "!cat",
-    "description": "🐱 Random Cat — !cat",
-    "examples": [],
+    "category": "AI",
+    "usage": "!summarize",
+    "description": "Summarize a block of text with AI — !summarize <text>",
     "permissions": "Everyone"
   },
   {
-    "name": "cuddle",
+    "name": "translate",
     "aliases": [
-      "snuggle"
+      "tr",
+      "tl"
     ],
-    "category": "Animals",
-    "usage": "!cuddle",
-    "description": "🫂 Cuddle! — !cuddle [@user]",
-    "examples": [],
+    "category": "AI",
+    "usage": "!translate",
+    "description": "Translate text to another language — !translate <lang> <text>",
     "permissions": "Everyone"
   },
   {
-    "name": "dog",
-    "aliases": [
-      "doggo",
-      "woof"
-    ],
-    "category": "Animals",
-    "usage": "!dog",
-    "description": "🐶 Random Dog — !dog",
-    "examples": [],
+    "name": "autorole",
+    "aliases": [],
+    "category": "Automation",
+    "usage": "!autorole",
+    "description": "Configure roles auto-assigned on join — !autorole [add/remove] [@role]",
+    "permissions": "Admin"
+  },
+  {
+    "name": "giveaway",
+    "aliases": [],
+    "category": "Automation",
+    "usage": "!giveaway",
+    "description": "Start a giveaway — !giveaway <duration> <prize>",
+    "permissions": "Moderator"
+  },
+  {
+    "name": "poll",
+    "aliases": [],
+    "category": "Automation",
+    "usage": "!poll",
+    "description": "Create a quick poll — !poll <question> | option1 | option2",
     "permissions": "Everyone"
   },
   {
-    "name": "duck",
-    "aliases": [
-      "quack"
-    ],
-    "category": "Animals",
-    "usage": "!duck",
-    "description": "🦆 Random Duck — !duck",
-    "examples": [],
+    "name": "prefix",
+    "aliases": [],
+    "category": "Automation",
+    "usage": "!prefix",
+    "description": "View or set the command prefix — !prefix [newprefix]",
+    "permissions": "Admin"
+  },
+  {
+    "name": "remind",
+    "aliases": [],
+    "category": "Automation",
+    "usage": "!remind",
+    "description": "Set a reminder — !remind <time> <message>",
     "permissions": "Everyone"
   },
   {
-    "name": "fox",
-    "aliases": [
-      "foxo"
-    ],
-    "category": "Animals",
-    "usage": "!fox",
-    "description": "🦊 Random Fox — !fox",
-    "examples": [],
-    "permissions": "Everyone"
-  },
-  {
-    "name": "hug",
-    "aliases": [
-      "squeeze"
-    ],
-    "category": "Animals",
-    "usage": "!hug",
-    "description": "🤗 Hug! — !hug [@user]",
-    "examples": [],
-    "permissions": "Everyone"
-  },
-  {
-    "name": "kiss",
-    "aliases": [
-      "smooch"
-    ],
-    "category": "Animals",
-    "usage": "!kiss",
-    "description": "💋 Kiss! — !kiss [@user]",
-    "examples": [],
-    "permissions": "Everyone"
-  },
-  {
-    "name": "pat",
-    "aliases": [
-      "headpat"
-    ],
-    "category": "Animals",
-    "usage": "!pat",
-    "description": "👋 Pat! — !pat [@user]",
-    "examples": [],
-    "permissions": "Everyone"
-  },
-  {
-    "name": "poke",
-    "aliases": [
-      "nudge"
-    ],
-    "category": "Animals",
-    "usage": "!poke",
-    "description": "👉 Poke! — !poke [@user]",
-    "examples": [],
-    "permissions": "Everyone"
-  },
-  {
-    "name": "shibe",
-    "aliases": [
-      "shiba",
-      "doge"
-    ],
-    "category": "Animals",
-    "usage": "!shibe",
-    "description": "🐕 Random Shibe — !shibe",
-    "examples": [],
-    "permissions": "Everyone"
-  },
-  {
-    "name": "slap",
-    "aliases": [
-      "smack"
-    ],
-    "category": "Animals",
-    "usage": "!slap",
-    "description": "👋 Slap! — !slap [@user]",
-    "examples": [],
-    "permissions": "Everyone"
-  },
-  {
-    "name": "wave",
-    "aliases": [
-      "hi",
-      "hey"
-    ],
-    "category": "Animals",
-    "usage": "!wave",
-    "description": "👋 Wave! — !wave [@user]",
-    "examples": [],
-    "permissions": "Everyone"
+    "name": "welcome",
+    "aliases": [],
+    "category": "Automation",
+    "usage": "!welcome",
+    "description": "Configure welcome messages — !welcome [channel] [message]",
+    "permissions": "Admin"
   },
   {
     "name": "balance",
@@ -166,8 +100,7 @@
     ],
     "category": "Economy",
     "usage": "!balance",
-    "description": "",
-    "examples": [],
+    "description": "Check your credit balance — !balance [@user]",
     "permissions": "Everyone"
   },
   {
@@ -175,8 +108,7 @@
     "aliases": [],
     "category": "Economy",
     "usage": "!compliment",
-    "description": "",
-    "examples": [],
+    "description": "!compliment",
     "permissions": "Everyone"
   },
   {
@@ -184,8 +116,7 @@
     "aliases": [],
     "category": "Economy",
     "usage": "!craft",
-    "description": "",
-    "examples": [],
+    "description": "Craft items from your inventory — !craft",
     "permissions": "Everyone"
   },
   {
@@ -196,8 +127,7 @@
     ],
     "category": "Economy",
     "usage": "!daily",
-    "description": "",
-    "examples": [],
+    "description": "Claim your daily credits — !daily",
     "permissions": "Everyone"
   },
   {
@@ -209,8 +139,7 @@
     ],
     "category": "Economy",
     "usage": "!inventory",
-    "description": "",
-    "examples": [],
+    "description": "View your inventory — !inventory",
     "permissions": "Everyone"
   },
   {
@@ -221,8 +150,7 @@
     ],
     "category": "Economy",
     "usage": "!leaderboard",
-    "description": "",
-    "examples": [],
+    "description": "Credits leaderboard — !leaderboard",
     "permissions": "Everyone"
   },
   {
@@ -234,8 +162,7 @@
     ],
     "category": "Economy",
     "usage": "!open",
-    "description": "Open a loot crate from your inventory — !open [crate name]",
-    "examples": [],
+    "description": "Open a loot crate — !open [crate name]",
     "permissions": "Everyone"
   },
   {
@@ -246,8 +173,7 @@
     ],
     "category": "Economy",
     "usage": "!prestige",
-    "description": "Prestige — reset to level 1 for exclusive perks — !prestige",
-    "examples": [],
+    "description": "Prestige — reset to level 1 for exclusive perks",
     "permissions": "Everyone"
   },
   {
@@ -257,8 +183,7 @@
     ],
     "category": "Economy",
     "usage": "!profile",
-    "description": "",
-    "examples": [],
+    "description": "View your server profile card — !profile [@user]",
     "permissions": "Everyone"
   },
   {
@@ -266,8 +191,7 @@
     "aliases": [],
     "category": "Economy",
     "usage": "!quests",
-    "description": "",
-    "examples": [],
+    "description": "View and track your active quests — !quests",
     "permissions": "Everyone"
   },
   {
@@ -275,8 +199,7 @@
     "aliases": [],
     "category": "Economy",
     "usage": "!riddle",
-    "description": "",
-    "examples": [],
+    "description": "Get a riddle for credits — !riddle",
     "permissions": "Everyone"
   },
   {
@@ -287,8 +210,7 @@
     ],
     "category": "Economy",
     "usage": "!shop",
-    "description": "",
-    "examples": [],
+    "description": "Browse the server shop — !shop",
     "permissions": "Everyone"
   },
   {
@@ -296,8 +218,7 @@
     "aliases": [],
     "category": "Economy",
     "usage": "!trivia",
-    "description": "",
-    "examples": [],
+    "description": "Start a trivia question for credits — !trivia",
     "permissions": "Everyone"
   },
   {
@@ -308,8 +229,7 @@
     ],
     "category": "Economy",
     "usage": "!work",
-    "description": "",
-    "examples": [],
+    "description": "Earn credits by working — !work",
     "permissions": "Everyone"
   },
   {
@@ -322,104 +242,7 @@
     ],
     "category": "Economy",
     "usage": "!xp",
-    "description": "",
-    "examples": [],
-    "permissions": "Everyone"
-  },
-  {
-    "name": "bored",
-    "aliases": [
-      "activity",
-      "whatdo"
-    ],
-    "category": "Entertainment",
-    "usage": "!bored",
-    "description": "Random activity suggestion — !bored",
-    "examples": [],
-    "permissions": "Everyone"
-  },
-  {
-    "name": "chuck",
-    "aliases": [
-      "chucknorris",
-      "norris"
-    ],
-    "category": "Entertainment",
-    "usage": "!chuck",
-    "description": "Random Chuck Norris fact — !chuck",
-    "examples": [],
-    "permissions": "Everyone"
-  },
-  {
-    "name": "cocktail",
-    "aliases": [
-      "drink",
-      "mixology"
-    ],
-    "category": "Entertainment",
-    "usage": "!cocktail",
-    "description": "Random cocktail recipe — !cocktail [name]",
-    "examples": [],
-    "permissions": "Everyone"
-  },
-  {
-    "name": "kanye",
-    "aliases": [
-      "kanyewest",
-      "ye"
-    ],
-    "category": "Entertainment",
-    "usage": "!kanye",
-    "description": "Random Kanye West quote — !kanye",
-    "examples": [],
-    "permissions": "Everyone"
-  },
-  {
-    "name": "meal",
-    "aliases": [
-      "recipe",
-      "food"
-    ],
-    "category": "Entertainment",
-    "usage": "!meal",
-    "description": "Random meal recipe — !meal [name]",
-    "examples": [],
-    "permissions": "Everyone"
-  },
-  {
-    "name": "pokemon",
-    "aliases": [
-      "poke",
-      "dex"
-    ],
-    "category": "Entertainment",
-    "usage": "!pokemon",
-    "description": "Pokémon info — !pokemon <name|id>",
-    "examples": [],
-    "permissions": "Everyone"
-  },
-  {
-    "name": "rickmorty",
-    "aliases": [
-      "rick",
-      "rm"
-    ],
-    "category": "Entertainment",
-    "usage": "!rickmorty",
-    "description": "Rick & Morty character — !rickmorty <name>",
-    "examples": [],
-    "permissions": "Everyone"
-  },
-  {
-    "name": "show",
-    "aliases": [
-      "tvshow",
-      "tv"
-    ],
-    "category": "Entertainment",
-    "usage": "!show",
-    "description": "TV show info — !show <title>",
-    "examples": [],
+    "description": "Check XP and level progress — !xp [@user]",
     "permissions": "Everyone"
   },
   {
@@ -432,7 +255,96 @@
     "category": "Fun",
     "usage": "!8ball",
     "description": "Ask the magic 8-ball — !8ball <question>",
-    "examples": [],
+    "permissions": "Everyone"
+  },
+  {
+    "name": "advice",
+    "aliases": [
+      "tip",
+      "wisdom"
+    ],
+    "category": "Fun",
+    "usage": "!advice",
+    "description": "Random advice — !advice",
+    "permissions": "Everyone"
+  },
+  {
+    "name": "anime",
+    "aliases": [
+      "ani",
+      "manga"
+    ],
+    "category": "Fun",
+    "usage": "!anime",
+    "description": "Anime info — !anime <title>",
+    "permissions": "Everyone"
+  },
+  {
+    "name": "apod",
+    "aliases": [
+      "nasa",
+      "space",
+      "astronomy"
+    ],
+    "category": "Fun",
+    "usage": "!apod",
+    "description": "NASA Astronomy Picture of the Day",
+    "permissions": "Everyone"
+  },
+  {
+    "name": "bible",
+    "aliases": [
+      "verse",
+      "scripture"
+    ],
+    "category": "Fun",
+    "usage": "!bible",
+    "description": "Bible verse lookup — !bible <book chapter:verse>",
+    "permissions": "Everyone"
+  },
+  {
+    "name": "book",
+    "aliases": [
+      "books",
+      "novel",
+      "read"
+    ],
+    "category": "Fun",
+    "usage": "!book",
+    "description": "Book info — !book <title or author>",
+    "permissions": "Everyone"
+  },
+  {
+    "name": "bored",
+    "aliases": [
+      "activity",
+      "whatdo"
+    ],
+    "category": "Fun",
+    "usage": "!bored",
+    "description": "Random activity suggestion — !bored",
+    "permissions": "Everyone"
+  },
+  {
+    "name": "chuck",
+    "aliases": [
+      "chucknorris",
+      "norris"
+    ],
+    "category": "Fun",
+    "usage": "!chuck",
+    "description": "Random Chuck Norris fact — !chuck",
+    "permissions": "Everyone"
+  },
+  {
+    "name": "cocktail",
+    "aliases": [
+      "drink",
+      "mixology"
+    ],
+    "category": "Fun",
+    "usage": "!cocktail",
+    "description": "Random cocktail recipe — !cocktail [name]",
     "permissions": "Everyone"
   },
   {
@@ -444,8 +356,65 @@
     ],
     "category": "Fun",
     "usage": "!coinflip",
-    "description": "Flip a coin",
-    "examples": [],
+    "description": "Flip a coin — !coinflip",
+    "permissions": "Everyone"
+  },
+  {
+    "name": "color",
+    "aliases": [
+      "colour",
+      "hex",
+      "clr"
+    ],
+    "category": "Fun",
+    "usage": "!color",
+    "description": "Color info from hex code. Usage: !color <#hex>",
+    "permissions": "Everyone"
+  },
+  {
+    "name": "country",
+    "aliases": [
+      "nation",
+      "flag"
+    ],
+    "category": "Fun",
+    "usage": "!country",
+    "description": "Country info — !country <name>",
+    "permissions": "Everyone"
+  },
+  {
+    "name": "dadjoke",
+    "aliases": [
+      "dj",
+      "dad",
+      "pun"
+    ],
+    "category": "Fun",
+    "usage": "!dadjoke",
+    "description": "Random dad joke — !dadjoke",
+    "permissions": "Everyone"
+  },
+  {
+    "name": "define",
+    "aliases": [
+      "def",
+      "dictionary",
+      "word"
+    ],
+    "category": "Fun",
+    "usage": "!define",
+    "description": "Dictionary definition — !define <word>",
+    "permissions": "Everyone"
+  },
+  {
+    "name": "fact",
+    "aliases": [
+      "facts",
+      "interesting"
+    ],
+    "category": "Fun",
+    "usage": "!fact",
+    "description": "Random interesting fact — !fact",
     "permissions": "Everyone"
   },
   {
@@ -454,7 +423,69 @@
     "category": "Fun",
     "usage": "!fun",
     "description": "Run fun variants (220 total)",
-    "examples": [],
+    "permissions": "Everyone"
+  },
+  {
+    "name": "github",
+    "aliases": [
+      "gh",
+      "git"
+    ],
+    "category": "Fun",
+    "usage": "!github",
+    "description": "GitHub profile info. Usage: !github <username>",
+    "permissions": "Everyone"
+  },
+  {
+    "name": "imagine",
+    "aliases": [],
+    "category": "Fun",
+    "usage": "!imagine",
+    "description": "AI image generation — !imagine <prompt>",
+    "permissions": "Everyone"
+  },
+  {
+    "name": "iss",
+    "aliases": [
+      "space",
+      "station"
+    ],
+    "category": "Fun",
+    "usage": "!iss",
+    "description": "ISS current location — !iss",
+    "permissions": "Everyone"
+  },
+  {
+    "name": "joke",
+    "aliases": [
+      "jokes",
+      "j"
+    ],
+    "category": "Fun",
+    "usage": "!joke",
+    "description": "Random joke — !joke [category]",
+    "permissions": "Everyone"
+  },
+  {
+    "name": "kanye",
+    "aliases": [
+      "kanyewest",
+      "ye"
+    ],
+    "category": "Fun",
+    "usage": "!kanye",
+    "description": "Random Kanye West quote — !kanye",
+    "permissions": "Everyone"
+  },
+  {
+    "name": "meal",
+    "aliases": [
+      "recipe",
+      "food"
+    ],
+    "category": "Fun",
+    "usage": "!meal",
+    "description": "Random meal recipe — !meal [name]",
     "permissions": "Everyone"
   },
   {
@@ -464,8 +495,39 @@
     ],
     "category": "Fun",
     "usage": "!meme",
-    "description": "Get a random meme — !meme [sub]",
-    "examples": [],
+    "description": "Random meme — !meme [subreddit]",
+    "permissions": "Everyone"
+  },
+  {
+    "name": "number",
+    "aliases": [
+      "numfact",
+      "nfact"
+    ],
+    "category": "Fun",
+    "usage": "!number",
+    "description": "Interesting fact about a number — !number <n>",
+    "permissions": "Everyone"
+  },
+  {
+    "name": "pokemon",
+    "aliases": [
+      "poke",
+      "dex"
+    ],
+    "category": "Fun",
+    "usage": "!pokemon",
+    "description": "Pokémon info — !pokemon <name|id>",
+    "permissions": "Everyone"
+  },
+  {
+    "name": "qr",
+    "aliases": [
+      "qrcode"
+    ],
+    "category": "Fun",
+    "usage": "!qr",
+    "description": "Generate a QR code — !qr <url or text>",
     "permissions": "Everyone"
   },
   {
@@ -477,19 +539,25 @@
     "category": "Fun",
     "usage": "!quote",
     "description": "Random quote — !quote [funny|programming]",
-    "examples": [],
     "permissions": "Everyone"
   },
   {
-    "name": "riddle",
+    "name": "rickmorty",
     "aliases": [
-      "brain",
-      "puzzle"
+      "rick",
+      "rm"
     ],
     "category": "Fun",
-    "usage": "!riddle",
-    "description": "Random riddle — !riddle [reveal]",
-    "examples": [],
+    "usage": "!rickmorty",
+    "description": "Rick & Morty character — !rickmorty <name>",
+    "permissions": "Everyone"
+  },
+  {
+    "name": "roast",
+    "aliases": [],
+    "category": "Fun",
+    "usage": "!roast",
+    "description": "Roast a user — !roast [@user]",
     "permissions": "Everyone"
   },
   {
@@ -500,8 +568,7 @@
     ],
     "category": "Fun",
     "usage": "!roll",
-    "description": "Roll a die — !roll [sides] e.g. !roll 20",
-    "examples": [],
+    "description": "Roll a die — !roll [sides]",
     "permissions": "Everyone"
   },
   {
@@ -512,8 +579,51 @@
     ],
     "category": "Fun",
     "usage": "!ship",
-    "description": "Ship two users — !ship @user1 [@user2]",
-    "examples": [],
+    "description": "Ship two users together — !ship @user1 [@user2]",
+    "permissions": "Everyone"
+  },
+  {
+    "name": "shorten",
+    "aliases": [
+      "short",
+      "url"
+    ],
+    "category": "Fun",
+    "usage": "!shorten",
+    "description": "Shorten a URL — !shorten <url>",
+    "permissions": "Everyone"
+  },
+  {
+    "name": "show",
+    "aliases": [
+      "tvshow",
+      "tv"
+    ],
+    "category": "Fun",
+    "usage": "!show",
+    "description": "TV show info — !show <title>",
+    "permissions": "Everyone"
+  },
+  {
+    "name": "spacex",
+    "aliases": [
+      "launch",
+      "rocket"
+    ],
+    "category": "Fun",
+    "usage": "!spacex",
+    "description": "Latest SpaceX launch info — !spacex",
+    "permissions": "Everyone"
+  },
+  {
+    "name": "steam",
+    "aliases": [
+      "st",
+      "steamprofile"
+    ],
+    "category": "Fun",
+    "usage": "!steam",
+    "description": "Steam profile lookup. Usage: !steam <vanity URL or steamid64>",
     "permissions": "Everyone"
   },
   {
@@ -525,19 +635,38 @@
     "category": "Fun",
     "usage": "!tod",
     "description": "Truth or dare — !tod [truth|dare] [spicy]",
-    "examples": [],
     "permissions": "Everyone"
   },
   {
-    "name": "trivia",
+    "name": "urban",
     "aliases": [
-      "quiz",
-      "q?"
+      "ud",
+      "define",
+      "slang"
     ],
     "category": "Fun",
-    "usage": "!trivia",
-    "description": "Quick trivia question — !trivia [easy|normal|hard]",
-    "examples": [],
+    "usage": "!urban",
+    "description": "Urban Dictionary — !urban <term>",
+    "permissions": "Everyone"
+  },
+  {
+    "name": "weather",
+    "aliases": [],
+    "category": "Fun",
+    "usage": "!weather",
+    "description": "Current weather — !weather <city>",
+    "permissions": "Everyone"
+  },
+  {
+    "name": "wiki",
+    "aliases": [
+      "wikipedia",
+      "w",
+      "search"
+    ],
+    "category": "Fun",
+    "usage": "!wiki",
+    "description": "Wikipedia summary — !wiki <query>",
     "permissions": "Everyone"
   },
   {
@@ -549,361 +678,17 @@
     "category": "Fun",
     "usage": "!wyr",
     "description": "Would you rather — !wyr",
-    "examples": [],
     "permissions": "Everyone"
   },
   {
-    "name": "avatar",
+    "name": "blackjack",
     "aliases": [
-      "av",
-      "pfp",
-      "icon"
+      "bj",
+      "21"
     ],
-    "category": "Info",
-    "usage": "!avatar",
-    "description": "",
-    "examples": [],
-    "permissions": "Everyone"
-  },
-  {
-    "name": "botinfo",
-    "aliases": [
-      "bi",
-      "about"
-    ],
-    "category": "Info",
-    "usage": "!botinfo",
-    "description": "",
-    "examples": [],
-    "permissions": "Everyone"
-  },
-  {
-    "name": "roleinfo",
-    "aliases": [
-      "ri",
-      "role"
-    ],
-    "category": "Info",
-    "usage": "!roleinfo",
-    "description": "",
-    "examples": [],
-    "permissions": "Everyone"
-  },
-  {
-    "name": "serverinfo",
-    "aliases": [
-      "si",
-      "server",
-      "guildinfo"
-    ],
-    "category": "Info",
-    "usage": "!serverinfo",
-    "description": "",
-    "examples": [],
-    "permissions": "Everyone"
-  },
-  {
-    "name": "userinfo",
-    "aliases": [
-      "ui",
-      "whois",
-      "user"
-    ],
-    "category": "Info",
-    "usage": "!userinfo",
-    "description": "",
-    "examples": [],
-    "permissions": "Everyone"
-  },
-  {
-    "name": "advice",
-    "aliases": [
-      "tip",
-      "wisdom"
-    ],
-    "category": "Knowledge",
-    "usage": "!advice",
-    "description": "Random advice — !advice",
-    "examples": [],
-    "permissions": "Everyone"
-  },
-  {
-    "name": "bible",
-    "aliases": [
-      "verse",
-      "scripture"
-    ],
-    "category": "Knowledge",
-    "usage": "!bible",
-    "description": "Bible verse lookup — !bible <book chapter:verse>",
-    "examples": [],
-    "permissions": "Everyone"
-  },
-  {
-    "name": "country",
-    "aliases": [
-      "nation",
-      "flag"
-    ],
-    "category": "Knowledge",
-    "usage": "!country",
-    "description": "Country info — !country <name>",
-    "examples": [],
-    "permissions": "Everyone"
-  },
-  {
-    "name": "define",
-    "aliases": [
-      "def",
-      "dictionary",
-      "word"
-    ],
-    "category": "Knowledge",
-    "usage": "!define",
-    "description": "Dictionary definition — !define <word>",
-    "examples": [],
-    "permissions": "Everyone"
-  },
-  {
-    "name": "iss",
-    "aliases": [
-      "space",
-      "station"
-    ],
-    "category": "Knowledge",
-    "usage": "!iss",
-    "description": "ISS current location — !iss",
-    "examples": [],
-    "permissions": "Everyone"
-  },
-  {
-    "name": "number",
-    "aliases": [
-      "numfact",
-      "nfact"
-    ],
-    "category": "Knowledge",
-    "usage": "!number",
-    "description": "Interesting fact about a number — !number <n>",
-    "examples": [],
-    "permissions": "Everyone"
-  },
-  {
-    "name": "qr",
-    "aliases": [
-      "qrcode"
-    ],
-    "category": "Knowledge",
-    "usage": "!qr",
-    "description": "Generate a QR code — !qr <url or text>",
-    "examples": [],
-    "permissions": "Everyone"
-  },
-  {
-    "name": "shorten",
-    "aliases": [
-      "short",
-      "url"
-    ],
-    "category": "Knowledge",
-    "usage": "!shorten",
-    "description": "Shorten a URL — !shorten <url>",
-    "examples": [],
-    "permissions": "Everyone"
-  },
-  {
-    "name": "spacex",
-    "aliases": [
-      "launch",
-      "rocket"
-    ],
-    "category": "Knowledge",
-    "usage": "!spacex",
-    "description": "Latest SpaceX launch info — !spacex",
-    "examples": [],
-    "permissions": "Everyone"
-  },
-  {
-    "name": "anime",
-    "aliases": [
-      "ani",
-      "manga"
-    ],
-    "category": "Media",
-    "usage": "!anime",
-    "description": "Search anime info. Usage: !anime <title>",
-    "examples": [],
-    "permissions": "Everyone"
-  },
-  {
-    "name": "apod",
-    "aliases": [
-      "nasa",
-      "space",
-      "astronomy"
-    ],
-    "category": "Media",
-    "usage": "!apod",
-    "description": "NASA Astronomy Picture of the Day",
-    "examples": [],
-    "permissions": "Everyone"
-  },
-  {
-    "name": "book",
-    "aliases": [
-      "books",
-      "novel",
-      "read"
-    ],
-    "category": "Media",
-    "usage": "!book",
-    "description": "Book info. Usage: !book <title or author>",
-    "examples": [],
-    "permissions": "Everyone"
-  },
-  {
-    "name": "color",
-    "aliases": [
-      "colour",
-      "hex",
-      "clr"
-    ],
-    "category": "Media",
-    "usage": "!color",
-    "description": "Color info from hex code. Usage: !color <#hex>",
-    "examples": [],
-    "permissions": "Everyone"
-  },
-  {
-    "name": "dadjoke",
-    "aliases": [
-      "dj",
-      "dad",
-      "pun"
-    ],
-    "category": "Media",
-    "usage": "!dadjoke",
-    "description": "Random dad joke 🥁",
-    "examples": [],
-    "permissions": "Everyone"
-  },
-  {
-    "name": "fact",
-    "aliases": [
-      "facts",
-      "interesting"
-    ],
-    "category": "Media",
-    "usage": "!fact",
-    "description": "Random interesting fact",
-    "examples": [],
-    "permissions": "Everyone"
-  },
-  {
-    "name": "github",
-    "aliases": [
-      "gh",
-      "git"
-    ],
-    "category": "Media",
-    "usage": "!github",
-    "description": "GitHub profile info. Usage: !github <username>",
-    "examples": [],
-    "permissions": "Everyone"
-  },
-  {
-    "name": "imagine",
-    "aliases": [],
-    "category": "Media",
-    "usage": "!imagine",
-    "description": "Generate an image from a prompt. Usage: !imagine <describe what you want to see>",
-    "examples": [],
-    "permissions": "Everyone"
-  },
-  {
-    "name": "joke",
-    "aliases": [
-      "jokes",
-      "j"
-    ],
-    "category": "Media",
-    "usage": "!joke",
-    "description": "Random joke. Usage: !joke [Programming|Misc|Dark|Pun|Spooky|Christmas]",
-    "examples": [],
-    "permissions": "Everyone"
-  },
-  {
-    "name": "roast",
-    "aliases": [],
-    "category": "Media",
-    "usage": "!roast",
-    "description": "Roast yourself or another user. Usage: !roast [@user]",
-    "examples": [],
-    "permissions": "Everyone"
-  },
-  {
-    "name": "steam",
-    "aliases": [
-      "st",
-      "steamprofile"
-    ],
-    "category": "Media",
-    "usage": "!steam",
-    "description": "Steam profile lookup. Usage: !steam <vanity URL or steamid64>",
-    "examples": [],
-    "permissions": "Everyone"
-  },
-  {
-    "name": "urban",
-    "aliases": [
-      "ud",
-      "define",
-      "slang"
-    ],
-    "category": "Media",
-    "usage": "!urban",
-    "description": "Urban Dictionary definition. Usage: !urban <term>",
-    "examples": [],
-    "permissions": "Everyone"
-  },
-  {
-    "name": "weather",
-    "aliases": [],
-    "category": "Media",
-    "usage": "!weather",
-    "description": "Current weather. Usage: !weather <city or location>",
-    "examples": [],
-    "permissions": "Everyone"
-  },
-  {
-    "name": "wiki",
-    "aliases": [
-      "wikipedia",
-      "w",
-      "search"
-    ],
-    "category": "Media",
-    "usage": "!wiki",
-    "description": "Wikipedia summary. Usage: !wiki <query>",
-    "examples": [],
-    "permissions": "Everyone"
-  },
-  {
-    "name": "agents",
-    "aliases": [],
-    "category": "Meta",
-    "usage": "!agents",
-    "description": "",
-    "examples": [],
-    "permissions": "Everyone"
-  },
-  {
-    "name": "aliases",
-    "aliases": [],
-    "category": "Meta",
-    "usage": "!aliases",
-    "description": "",
-    "examples": [],
+    "category": "Games",
+    "usage": "!blackjack",
+    "description": "Play blackjack for credits — !blackjack [bet]",
     "permissions": "Everyone"
   },
   {
@@ -912,10 +697,30 @@
       "fishing",
       "cast"
     ],
-    "category": "Minigames",
+    "category": "Games",
     "usage": "!fish",
-    "description": "Go fishing — !fish",
-    "examples": [],
+    "description": "Go fishing for items and credits — !fish",
+    "permissions": "Everyone"
+  },
+  {
+    "name": "guess",
+    "aliases": [
+      "highlow",
+      "number"
+    ],
+    "category": "Games",
+    "usage": "!guess",
+    "description": "Guess a number 1–100 for credits — !guess",
+    "permissions": "Everyone"
+  },
+  {
+    "name": "hangman",
+    "aliases": [
+      "hm"
+    ],
+    "category": "Games",
+    "usage": "!hangman",
+    "description": "Play a game of hangman — !hangman",
     "permissions": "Everyone"
   },
   {
@@ -924,10 +729,9 @@
       "forage",
       "scavenge"
     ],
-    "category": "Minigames",
+    "category": "Games",
     "usage": "!hunt",
-    "description": "Hunt for bounties — !hunt",
-    "examples": [],
+    "description": "Hunt for bounties and credits — !hunt",
     "permissions": "Everyone"
   },
   {
@@ -936,10 +740,32 @@
       "mining",
       "dig"
     ],
-    "category": "Minigames",
+    "category": "Games",
     "usage": "!mine",
     "description": "Mine for ore and gems — !mine",
-    "examples": [],
+    "permissions": "Everyone"
+  },
+  {
+    "name": "rank",
+    "aliases": [
+      "level",
+      "xp",
+      "lvl"
+    ],
+    "category": "Levels",
+    "usage": "!rank",
+    "description": "View your XP rank card — !rank [@user]",
+    "permissions": "Everyone"
+  },
+  {
+    "name": "top",
+    "aliases": [
+      "leaderboard",
+      "lb"
+    ],
+    "category": "Levels",
+    "usage": "!top",
+    "description": "XP leaderboard — !top [page]",
     "permissions": "Everyone"
   },
   {
@@ -947,179 +773,263 @@
     "aliases": [],
     "category": "Moderation",
     "usage": "!ban",
-    "description": "",
-    "examples": [],
-    "permissions": "Everyone"
+    "description": "Ban a member from the server — !ban @user [reason]",
+    "permissions": "Moderator"
   },
   {
     "name": "clearwarns",
     "aliases": [],
     "category": "Moderation",
     "usage": "!clearwarns",
-    "description": "",
-    "examples": [],
-    "permissions": "Everyone"
+    "description": "Clear all warnings for a user — !clearwarns @user",
+    "permissions": "Moderator"
   },
   {
     "name": "kick",
     "aliases": [],
     "category": "Moderation",
     "usage": "!kick",
-    "description": "",
-    "examples": [],
-    "permissions": "Everyone"
+    "description": "Kick a member — !kick @user [reason]",
+    "permissions": "Moderator"
   },
   {
     "name": "lock",
     "aliases": [],
     "category": "Moderation",
     "usage": "!lock",
-    "description": "",
-    "examples": [],
-    "permissions": "Everyone"
+    "description": "Lock your voice room — !lock",
+    "permissions": "Moderator"
   },
   {
     "name": "nick",
     "aliases": [],
     "category": "Moderation",
     "usage": "!nick",
-    "description": "",
-    "examples": [],
-    "permissions": "Everyone"
+    "description": "Change a member's nickname — !nick @user <new name>",
+    "permissions": "Moderator"
   },
   {
     "name": "purge",
     "aliases": [],
     "category": "Moderation",
     "usage": "!purge",
-    "description": "",
-    "examples": [],
-    "permissions": "Everyone"
+    "description": "Bulk-delete messages — !purge <amount> [@user]",
+    "permissions": "Moderator"
   },
   {
     "name": "role",
     "aliases": [],
     "category": "Moderation",
     "usage": "!role",
-    "description": "",
-    "examples": [],
-    "permissions": "Everyone"
+    "description": "Add or remove a role from a member — !role @user @role",
+    "permissions": "Moderator"
   },
   {
     "name": "slowmode",
     "aliases": [],
     "category": "Moderation",
     "usage": "!slowmode",
-    "description": "",
-    "examples": [],
-    "permissions": "Everyone"
+    "description": "Set channel slowmode — !slowmode <seconds>",
+    "permissions": "Moderator"
   },
   {
     "name": "softban",
     "aliases": [],
     "category": "Moderation",
     "usage": "!softban",
-    "description": "",
-    "examples": [],
-    "permissions": "Everyone"
+    "description": "Soft-ban (ban then unban) to clear messages — !softban @user",
+    "permissions": "Moderator"
   },
   {
     "name": "timeout",
     "aliases": [],
     "category": "Moderation",
     "usage": "!timeout",
-    "description": "",
-    "examples": [],
-    "permissions": "Everyone"
+    "description": "Mute a member temporarily — !timeout @user [duration] [reason]",
+    "permissions": "Moderator"
   },
   {
     "name": "unban",
     "aliases": [],
     "category": "Moderation",
     "usage": "!unban",
-    "description": "",
-    "examples": [],
-    "permissions": "Everyone"
+    "description": "Unban a user by ID — !unban <user_id> [reason]",
+    "permissions": "Moderator"
   },
   {
     "name": "unlock",
     "aliases": [],
     "category": "Moderation",
     "usage": "!unlock",
-    "description": "",
-    "examples": [],
-    "permissions": "Everyone"
+    "description": "Unlock your voice room — !unlock",
+    "permissions": "Moderator"
   },
   {
     "name": "warn",
     "aliases": [],
     "category": "Moderation",
     "usage": "!warn",
-    "description": "",
-    "examples": [],
-    "permissions": "Everyone"
+    "description": "Warn a member — !warn @user [reason]",
+    "permissions": "Moderator"
   },
   {
     "name": "warnings",
     "aliases": [],
     "category": "Moderation",
     "usage": "!warnings",
-    "description": "",
-    "examples": [],
+    "description": "View warnings for a user — !warnings [@user]",
     "permissions": "Everyone"
   },
   {
-    "name": "autorole",
-    "aliases": [],
-    "category": "Server",
-    "usage": "!autorole",
-    "description": "",
-    "examples": [],
+    "name": "clearqueue",
+    "aliases": [
+      "cq",
+      "emptyqueue"
+    ],
+    "category": "Music",
+    "usage": "!clearqueue",
+    "description": "Clear the entire queue — !clearqueue",
     "permissions": "Everyone"
   },
   {
-    "name": "giveaway",
-    "aliases": [],
-    "category": "Server",
-    "usage": "!giveaway",
-    "description": "",
-    "examples": [],
+    "name": "loop",
+    "aliases": [
+      "repeat",
+      "lp"
+    ],
+    "category": "Music",
+    "usage": "!loop",
+    "description": "Set loop mode — !loop <off|track|queue>",
     "permissions": "Everyone"
   },
   {
-    "name": "poll",
-    "aliases": [],
-    "category": "Server",
-    "usage": "!poll",
-    "description": "",
-    "examples": [],
+    "name": "move",
+    "aliases": [
+      "mv"
+    ],
+    "category": "Music",
+    "usage": "!move",
+    "description": "Move a track to a new position — !move <from> <to>",
     "permissions": "Everyone"
   },
   {
-    "name": "prefix",
-    "aliases": [],
-    "category": "Server",
-    "usage": "!prefix",
-    "description": "",
-    "examples": [],
+    "name": "nowplaying",
+    "aliases": [
+      "np",
+      "current",
+      "song"
+    ],
+    "category": "Music",
+    "usage": "!nowplaying",
+    "description": "Show the current track — !np",
     "permissions": "Everyone"
   },
   {
-    "name": "remind",
-    "aliases": [],
-    "category": "Server",
-    "usage": "!remind",
-    "description": "",
-    "examples": [],
+    "name": "pause",
+    "aliases": [
+      "pa"
+    ],
+    "category": "Music",
+    "usage": "!pause",
+    "description": "Pause playback — !pause",
     "permissions": "Everyone"
   },
   {
-    "name": "welcome",
-    "aliases": [],
-    "category": "Server",
-    "usage": "!welcome",
-    "description": "",
-    "examples": [],
+    "name": "play",
+    "aliases": [
+      "p",
+      "music"
+    ],
+    "category": "Music",
+    "usage": "!play",
+    "description": "Play or queue a track — !play <search | URL>",
+    "permissions": "Everyone"
+  },
+  {
+    "name": "queue",
+    "aliases": [
+      "q",
+      "playlist"
+    ],
+    "category": "Music",
+    "usage": "!queue",
+    "description": "Show the track queue — !queue [page]",
+    "permissions": "Everyone"
+  },
+  {
+    "name": "remove",
+    "aliases": [
+      "rm",
+      "dequeue"
+    ],
+    "category": "Music",
+    "usage": "!remove",
+    "description": "Remove a track by position — !remove <#>",
+    "permissions": "Everyone"
+  },
+  {
+    "name": "resume",
+    "aliases": [
+      "r",
+      "unpause"
+    ],
+    "category": "Music",
+    "usage": "!resume",
+    "description": "Resume playback — !resume",
+    "permissions": "Everyone"
+  },
+  {
+    "name": "search",
+    "aliases": [
+      "find"
+    ],
+    "category": "Music",
+    "usage": "!search",
+    "description": "Search for tracks — !search <query>",
+    "permissions": "Everyone"
+  },
+  {
+    "name": "shuffle",
+    "aliases": [
+      "mix"
+    ],
+    "category": "Music",
+    "usage": "!shuffle",
+    "description": "Shuffle the queue — !shuffle",
+    "permissions": "Everyone"
+  },
+  {
+    "name": "skip",
+    "aliases": [
+      "s",
+      "next"
+    ],
+    "category": "Music",
+    "usage": "!skip",
+    "description": "Skip the current track — !skip",
+    "permissions": "Everyone"
+  },
+  {
+    "name": "stop",
+    "aliases": [
+      "disconnect",
+      "dc",
+      "leave"
+    ],
+    "category": "Music",
+    "usage": "!stop",
+    "description": "Stop playback and disconnect — !stop",
+    "permissions": "Everyone"
+  },
+  {
+    "name": "volume",
+    "aliases": [
+      "vol",
+      "v"
+    ],
+    "category": "Music",
+    "usage": "!volume",
+    "description": "Set playback volume 0–200 — !volume <n>",
     "permissions": "Everyone"
   },
   {
@@ -1131,20 +1041,100 @@
     ],
     "category": "Social",
     "usage": "!battle",
-    "description": "PvP battle — !battle @user [wager]",
-    "examples": [],
+    "description": "PvP battle another member — !battle @user [wager]",
     "permissions": "Everyone"
   },
   {
-    "name": "compliment",
+    "name": "bio",
     "aliases": [
-      "comp",
-      "nice"
+      "setbio",
+      "about"
     ],
     "category": "Social",
-    "usage": "!compliment",
-    "description": "Compliment a user — !compliment [@user]",
-    "examples": [],
+    "usage": "!bio",
+    "description": "Set or view your bio — !bio [text] | !bio @user",
+    "permissions": "Everyone"
+  },
+  {
+    "name": "checkrep",
+    "aliases": [
+      "getrep",
+      "myreq"
+    ],
+    "category": "Social",
+    "usage": "!checkrep",
+    "description": "Check a member's reputation — !checkrep @user",
+    "permissions": "Everyone"
+  },
+  {
+    "name": "divorce",
+    "aliases": [
+      "unmarry",
+      "splitup"
+    ],
+    "category": "Social",
+    "usage": "!divorce",
+    "description": "End your in-bot marriage — !divorce",
+    "permissions": "Everyone"
+  },
+  {
+    "name": "marry",
+    "aliases": [
+      "propose",
+      "wed"
+    ],
+    "category": "Social",
+    "usage": "!marry",
+    "description": "Propose marriage — !marry @user",
+    "permissions": "Everyone"
+  },
+  {
+    "name": "rep",
+    "aliases": [
+      "reputation",
+      "+rep"
+    ],
+    "category": "Social",
+    "usage": "!rep",
+    "description": "Give reputation to a member — !rep @user",
+    "permissions": "Everyone"
+  },
+  {
+    "name": "socialprofile",
+    "aliases": [
+      "sp",
+      "card"
+    ],
+    "category": "Social",
+    "usage": "!socialprofile",
+    "description": "View your full social profile — !socialprofile [@user]",
+    "permissions": "Everyone"
+  },
+  {
+    "name": "spouse",
+    "aliases": [
+      "married",
+      "partner"
+    ],
+    "category": "Social",
+    "usage": "!spouse",
+    "description": "See who you're married to — !spouse",
+    "permissions": "Everyone"
+  },
+  {
+    "name": "agents",
+    "aliases": [],
+    "category": "Utility",
+    "usage": "!agents",
+    "description": "!agents",
+    "permissions": "Everyone"
+  },
+  {
+    "name": "aliases",
+    "aliases": [],
+    "category": "Utility",
+    "usage": "!aliases",
+    "description": "!aliases",
     "permissions": "Everyone"
   },
   {
@@ -1156,7 +1146,29 @@
     "category": "Utility",
     "usage": "!ascii",
     "description": "Big ASCII banner — !ascii <text> (max 10 chars)",
-    "examples": [],
+    "permissions": "Everyone"
+  },
+  {
+    "name": "avatar",
+    "aliases": [
+      "av",
+      "pfp",
+      "icon"
+    ],
+    "category": "Utility",
+    "usage": "!avatar",
+    "description": "Get a user's avatar — !avatar [@user]",
+    "permissions": "Everyone"
+  },
+  {
+    "name": "botinfo",
+    "aliases": [
+      "bi",
+      "about"
+    ],
+    "category": "Utility",
+    "usage": "!botinfo",
+    "description": "Show Chopsticks version and stats — !botinfo",
     "permissions": "Everyone"
   },
   {
@@ -1168,8 +1180,7 @@
     ],
     "category": "Utility",
     "usage": "!calc",
-    "description": "Evaluate a math expression — !calc <expr>",
-    "examples": [],
+    "description": "Math expression evaluator — !calc <expr>",
     "permissions": "Everyone"
   },
   {
@@ -1180,8 +1191,7 @@
     ],
     "category": "Utility",
     "usage": "!choose",
-    "description": "Pick one option — !choose a, b, c OR !choose a|b|c",
-    "examples": [],
+    "description": "Pick from options — !choose a, b, c",
     "permissions": "Everyone"
   },
   {
@@ -1192,7 +1202,6 @@
     "category": "Utility",
     "usage": "!clap",
     "description": "Add 👏 between 👏 words — !clap <text>",
-    "examples": [],
     "permissions": "Everyone"
   },
   {
@@ -1204,7 +1213,6 @@
     "category": "Utility",
     "usage": "!decode",
     "description": "Base64 decode — !decode <base64>",
-    "examples": [],
     "permissions": "Everyone"
   },
   {
@@ -1215,7 +1223,6 @@
     "category": "Utility",
     "usage": "!echo",
     "description": "Echo text back",
-    "examples": [],
     "permissions": "Everyone"
   },
   {
@@ -1227,7 +1234,6 @@
     "category": "Utility",
     "usage": "!emojify",
     "description": "Turn text into letter emoji — !emojify <text>",
-    "examples": [],
     "permissions": "Everyone"
   },
   {
@@ -1239,7 +1245,6 @@
     "category": "Utility",
     "usage": "!encode",
     "description": "Base64 encode — !encode <text>",
-    "examples": [],
     "permissions": "Everyone"
   },
   {
@@ -1250,8 +1255,7 @@
     ],
     "category": "Utility",
     "usage": "!hash",
-    "description": "SHA-256 hash of text — !hash <text>",
-    "examples": [],
+    "description": "SHA-256 hash — !hash <text>",
     "permissions": "Everyone"
   },
   {
@@ -1263,8 +1267,7 @@
     ],
     "category": "Utility",
     "usage": "!help",
-    "description": "List prefix commands — !help [category|command]",
-    "examples": [],
+    "description": "List all prefix commands — !help [category|command]",
     "permissions": "Everyone"
   },
   {
@@ -1275,8 +1278,7 @@
     ],
     "category": "Utility",
     "usage": "!invite",
-    "description": "Get the bot invite link",
-    "examples": [],
+    "description": "Get the bot invite link — !invite",
     "permissions": "Everyone"
   },
   {
@@ -1288,7 +1290,6 @@
     "category": "Utility",
     "usage": "!mock",
     "description": "mOcK tExT — !mock <text>",
-    "examples": [],
     "permissions": "Everyone"
   },
   {
@@ -1299,8 +1300,7 @@
     ],
     "category": "Utility",
     "usage": "!ping",
-    "description": "Show bot latency",
-    "examples": [],
+    "description": "Check bot latency — !ping",
     "permissions": "Everyone"
   },
   {
@@ -1312,7 +1312,6 @@
     "category": "Utility",
     "usage": "!pp",
     "description": "Measure the pp — !pp [@user]",
-    "examples": [],
     "permissions": "Everyone"
   },
   {
@@ -1324,7 +1323,6 @@
     "category": "Utility",
     "usage": "!rate",
     "description": "Rate anything out of 10 — !rate <thing>",
-    "examples": [],
     "permissions": "Everyone"
   },
   {
@@ -1336,7 +1334,17 @@
     "category": "Utility",
     "usage": "!reverse",
     "description": "Reverse text — !reverse <text>",
-    "examples": [],
+    "permissions": "Everyone"
+  },
+  {
+    "name": "roleinfo",
+    "aliases": [
+      "ri",
+      "role"
+    ],
+    "category": "Utility",
+    "usage": "!roleinfo",
+    "description": "Show details about a role — !roleinfo @role",
     "permissions": "Everyone"
   },
   {
@@ -1348,7 +1356,18 @@
     "category": "Utility",
     "usage": "!rps",
     "description": "Rock paper scissors — !rps <rock|paper|scissors>",
-    "examples": [],
+    "permissions": "Everyone"
+  },
+  {
+    "name": "serverinfo",
+    "aliases": [
+      "si",
+      "server",
+      "guildinfo"
+    ],
+    "category": "Utility",
+    "usage": "!serverinfo",
+    "description": "Show server information — !serverinfo",
     "permissions": "Everyone"
   },
   {
@@ -1359,8 +1378,7 @@
     ],
     "category": "Utility",
     "usage": "!slots",
-    "description": "Spin the slots — !slots",
-    "examples": [],
+    "description": "Spin the slot machine — !slots [bet]",
     "permissions": "Everyone"
   },
   {
@@ -1372,8 +1390,7 @@
     ],
     "category": "Utility",
     "usage": "!timestamp",
-    "description": "Convert a date to Discord timestamps — !timestamp <date>",
-    "examples": [],
+    "description": "Convert date to Discord timestamps — !timestamp <date>",
     "permissions": "Everyone"
   },
   {
@@ -1383,8 +1400,19 @@
     ],
     "category": "Utility",
     "usage": "!uptime",
-    "description": "Bot uptime",
-    "examples": [],
+    "description": "Show how long the bot has been online — !uptime",
+    "permissions": "Everyone"
+  },
+  {
+    "name": "userinfo",
+    "aliases": [
+      "ui",
+      "whois",
+      "user"
+    ],
+    "category": "Utility",
+    "usage": "!userinfo",
+    "description": "Show user information — !userinfo @user",
     "permissions": "Everyone"
   },
   {
@@ -1395,10 +1423,9 @@
       "vcquality"
     ],
     "category": "Voice",
-    "usage": "!bitrate <kbps>",
-    "description": "Set your room's audio bitrate in kbps — !bitrate <8-384>",
-    "examples": [],
-    "permissions": "Everyone"
+    "usage": "!bitrate",
+    "description": "Set your room's bitrate — !bitrate <kbps>",
+    "permissions": "Admin"
   },
   {
     "name": "claim",
@@ -1408,8 +1435,7 @@
     ],
     "category": "Voice",
     "usage": "!claim",
-    "description": "Claim an ownerless room you are currently in",
-    "examples": [],
+    "description": "Claim an ownerless voice room you're in — !claim",
     "permissions": "Everyone"
   },
   {
@@ -1421,8 +1447,7 @@
     ],
     "category": "Voice",
     "usage": "!hide",
-    "description": "Hide your voice room from the channel list",
-    "examples": [],
+    "description": "Hide your voice room from the channel list — !hide",
     "permissions": "Everyone"
   },
   {
@@ -1433,10 +1458,9 @@
       "remove-vc"
     ],
     "category": "Voice",
-    "usage": "!kick-vc <@user>",
+    "usage": "!kick-vc",
     "description": "Disconnect a user from your voice room — !kick-vc @user",
-    "examples": [],
-    "permissions": "Everyone"
+    "permissions": "Moderator"
   },
   {
     "name": "limit",
@@ -1447,22 +1471,8 @@
       "cap"
     ],
     "category": "Voice",
-    "usage": "!limit <number>",
-    "description": "Set the user limit for your voice room — !limit <0-99> (0 = unlimited)",
-    "examples": [],
-    "permissions": "Everyone"
-  },
-  {
-    "name": "lock",
-    "aliases": [
-      "vc-lock",
-      "closeroom",
-      "close"
-    ],
-    "category": "Voice",
-    "usage": "!lock",
-    "description": "Lock your voice room so no one else can join",
-    "examples": [],
+    "usage": "!limit",
+    "description": "Set user limit for your voice room — !limit <0-99>",
     "permissions": "Everyone"
   },
   {
@@ -1474,9 +1484,8 @@
       "letjoin"
     ],
     "category": "Voice",
-    "usage": "!permit <@user>",
-    "description": "Allow a specific user to join your locked room — !permit @user",
-    "examples": [],
+    "usage": "!permit",
+    "description": "Allow a user into your locked room — !permit @user",
     "permissions": "Everyone"
   },
   {
@@ -1488,9 +1497,8 @@
       "noentry"
     ],
     "category": "Voice",
-    "usage": "!reject <@user>",
-    "description": "Block a specific user from joining your room — !reject @user",
-    "examples": [],
+    "usage": "!reject",
+    "description": "Block a user from your room — !reject @user",
     "permissions": "Everyone"
   },
   {
@@ -1501,9 +1509,8 @@
       "vcname"
     ],
     "category": "Voice",
-    "usage": "!rename <name>",
+    "usage": "!rename",
     "description": "Rename your voice room — !rename <new name>",
-    "examples": [],
     "permissions": "Everyone"
   },
   {
@@ -1516,8 +1523,7 @@
     ],
     "category": "Voice",
     "usage": "!roominfo",
-    "description": "Show details about your current voice room",
-    "examples": [],
+    "description": "Show details about your current room — !roominfo",
     "permissions": "Everyone"
   },
   {
@@ -1528,9 +1534,8 @@
       "vcowner"
     ],
     "category": "Voice",
-    "usage": "!transfer <@user>",
-    "description": "Transfer ownership of your room to another member — !transfer @user",
-    "examples": [],
+    "usage": "!transfer",
+    "description": "Transfer room ownership — !transfer @user",
     "permissions": "Everyone"
   },
   {
@@ -1542,21 +1547,7 @@
     ],
     "category": "Voice",
     "usage": "!unhide",
-    "description": "Make your voice room visible in the channel list",
-    "examples": [],
-    "permissions": "Everyone"
-  },
-  {
-    "name": "unlock",
-    "aliases": [
-      "vc-unlock",
-      "openroom",
-      "open"
-    ],
-    "category": "Voice",
-    "usage": "!unlock",
-    "description": "Unlock your voice room so anyone can join",
-    "examples": [],
+    "description": "Make your voice room visible again — !unhide",
     "permissions": "Everyone"
   },
   {
@@ -1567,8 +1558,7 @@
     ],
     "category": "Voice",
     "usage": "!vcreset",
-    "description": "Reset your room to default settings (unlock, unhide, remove limit)",
-    "examples": [],
-    "permissions": "Everyone"
+    "description": "Reset your room to default settings — !vcreset",
+    "permissions": "Moderator"
   }
 ]

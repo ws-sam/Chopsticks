@@ -30,7 +30,7 @@ export default function TutorialsPage() {
             {/* Stats row */}
             <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
               {[
-                { v: '7',    l: 'tutorials' },
+                { v: '6',    l: 'tutorials' },
                 { v: '162+', l: 'commands covered' },
                 { v: 'All',  l: 'skill levels' },
               ].map(({ v, l }) => (

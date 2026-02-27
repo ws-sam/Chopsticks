@@ -139,18 +139,6 @@ const TUTORIALS: Tutorial[] = [
       { heading: '6. Preview and test', body: <span>Run <code style={cs}>/welcome preview</code> to trigger a test welcome message without leaving and rejoining.</span> },
     ],
   },
-  {
-    slug: 'self-host',
-    icon: ServerIcon,
-    title: 'Self-hosting',
-    preview: '/images/preview-selfhost.svg?v=9',
-    desc: 'Run your own Chopsticks instance with Docker. Full stack: bot, database, Redis. From clone to online in under 15 minutes.',
-    difficulty: 'advanced',
-    time: '30 min',
-    steps: [
-      { heading: 'Full guide on the Self-host page', body: <span>The complete self-hosting walkthrough lives on its own dedicated page. <a href="/self-host" style={{ color: 'var(--accent)' }}>Go to the Self-hosting guide →</a></span> },
-    ],
-  },
 ];
 
 export default function TutorialsUI() {
@@ -236,9 +224,12 @@ export default function TutorialsUI() {
             </div>
           </a>
 
-          {/* Sidebar CTA */}
+          {/* Sidebar CTAs */}
           <a href={BOT_INVITE} target="_blank" rel="noopener noreferrer" className="tut-sidebar-cta">
             Add to Discord <ArrowRightIcon size={12} />
+          </a>
+          <a href={GITHUB} target="_blank" rel="noopener noreferrer" className="tut-sidebar-cta tut-sidebar-star">
+            ⭐ Star on GitHub
           </a>
         </aside>
 

@@ -94,20 +94,25 @@ verify-clean-boot:
 
 # Rebuild bot + agents images and restart
 rebuild:
-	@docker compose -f docker-compose.laptop.yml build bot agents
-	@docker compose -f docker-compose.laptop.yml up -d bot agents
+	@docker compose -f $${COMPOSE_FILE:-docker-compose.laptop.yml} build bot agents
+	@docker compose -f $${COMPOSE_FILE:-docker-compose.laptop.yml} up -d bot agents
 	@echo "✅ Bot and agents rebuilt and restarted"
 
 # Rebuild all images and restart
 rebuild-all:
-	@docker compose -f docker-compose.laptop.yml build
-	@docker compose -f docker-compose.laptop.yml up -d
+	@docker compose -f $${COMPOSE_FILE:-docker-compose.laptop.yml} build
+	@docker compose -f $${COMPOSE_FILE:-docker-compose.laptop.yml} up -d
 	@echo "✅ All images rebuilt and restarted"
 
-# Deploy slash commands
+# Deploy slash commands (global + guild)
 deploy-commands:
-	@node src/deploy-commands.js
-	@echo "✅ Commands deployed"
+	@DEPLOY_MODE=global node scripts/deployCommands.js
+	@echo "✅ Commands deployed globally"
+
+# Deploy slash commands to dev guild only (instant, for testing)
+deploy-commands-guild:
+	@DEPLOY_MODE=guild node scripts/deployCommands.js
+	@echo "✅ Commands deployed to dev guild"
 
 # Check current maturity level
 maturity:

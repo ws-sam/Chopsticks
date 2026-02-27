@@ -235,7 +235,6 @@ export default [
       await message.reply({ embeds: [embed] });
     }
   },
-,
 
   // ── guess (higher/lower) ──────────────────────────────────────────────────
   {

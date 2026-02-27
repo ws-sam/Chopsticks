@@ -160,7 +160,6 @@ export default [
       await message.reply({ embeds: [embed] });
     }
   },
-,
 // ── marry ───────────────────────────────────────────────────────────────────
   {
     name: "marry",

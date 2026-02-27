@@ -76,7 +76,7 @@ export default [
         meta: "⚙️", music: "🎵", ai: "🤖", utility: "🔧", fun: "🎉",
         social: "💬", info: "ℹ️", mod: "🔨", server: "🏰", media: "🎬",
         economy: "💰", animals: "🐾", entertainment: "🎭", knowledge: "📚",
-        minigames: "🎮", voice: "🔊", other: "📦",
+        minigames: "🎮", voice: "🔊", levels: "⭐", other: "📦",
       };
 
       // ── Command detail lookup ──────────────────────────────────────────────
@@ -127,7 +127,7 @@ export default [
         .setFooter({ text: "Chopsticks • Slash commands: /help" });
 
       // Build up to 5 buttons per row (max 25 total = 5 rows)
-      const PRIORITY_CATS = ["music", "ai", "fun", "economy", "social", "minigames", "mod", "utility", "info", "animals", "entertainment", "knowledge", "voice", "server", "meta"];
+      const PRIORITY_CATS = ["music", "ai", "fun", "economy", "social", "levels", "minigames", "mod", "utility", "info", "animals", "entertainment", "knowledge", "voice", "server", "meta"];
       const orderedCats = [...new Set([...PRIORITY_CATS, ...cats])].filter(c => catMap.has(c));
       const rows = [];
       for (let i = 0; i < Math.min(orderedCats.length, 25); i += 5) {

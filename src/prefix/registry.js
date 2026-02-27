@@ -21,6 +21,7 @@ import entertainmentCommands from "./commands/entertainment.js";
 import knowledgeCommands from "./commands/knowledge.js";
 import minigameCommands from "./commands/minigames.js";
 import voiceRoomCommands from "./commands/voiceroom.js";
+import levelCommands from "./commands/levels.js";
 
 const CATEGORY_GROUPS = [
   { category: "meta",          commands: metaCommands,          emoji: "⚙️" },
@@ -39,6 +40,7 @@ const CATEGORY_GROUPS = [
   { category: "knowledge",     commands: knowledgeCommands,     emoji: "📚" },
   { category: "minigames",     commands: minigameCommands,      emoji: "🎮" },
   { category: "voice",         commands: voiceRoomCommands,     emoji: "🔊" },
+  { category: "levels",        commands: levelCommands,         emoji: "⭐" },
 ];
 
 export const CATEGORIES = CATEGORY_GROUPS.map(g => ({ category: g.category, emoji: g.emoji }));

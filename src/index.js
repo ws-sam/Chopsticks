@@ -59,6 +59,7 @@ import { handleButton as handleQuestsButton } from "./commands/quests.js";
 import { handleButton as handleCraftButton, handleSelect as handleCraftSelect } from "./commands/craft.js";
 import { handleButton as handleTriviaButton, handleSelect as handleTriviaSelect } from "./commands/trivia.js";
 import { handleButton as handleSetupButton, handleSelect as handleSetupSelect } from "./commands/setup.js";
+import { handleButton as handleDashButton, handleSelect as handleDashSelect, handleModal as handleDashModal } from "./commands/dashboard.js";
 import { handleButton as handleTicketsButton, handleSelect as handleTicketsSelect } from "./commands/tickets.js";
 import { handleButton as handleTutorialsButton, handleSelect as handleTutorialsSelect } from "./commands/tutorials.js";
 import {
@@ -428,31 +429,43 @@ client.once(Events.ClientReady, async () => {
     botLogger.warn({ err }, `⚠️  Help registry initialization failed`);
   }
 
-  // Rotating bot presence — cycles every 30s with live stats
+  // Rotating bot presence — cycles every 20s, prefix-command focused with live stats
   let presenceTimer = null;
+  let _presenceTick = 0;
   try {
     const enabled = String(process.env.BOT_PRESENCE_ENABLED ?? "true").toLowerCase() !== "false";
     if (enabled && client.user) {
-      const status = String(process.env.BOT_PRESENCE_STATUS || "online");
+      const botStatus = String(process.env.BOT_PRESENCE_STATUS || "online");
 
-      async function rotatePresence() {
+      function buildActivities() {
+        const guilds  = client.guilds.cache.size;
+        const agents  = global.agentManager?.liveAgents?.size ?? 0;
+        const cmdCount = 162; // prefix command count (static — avoids async in timer)
+        return [
+          { name: `!help — ${cmdCount} prefix commands`,      type: ActivityType.Playing   },
+          { name: `!play <song> — queue music`,               type: ActivityType.Listening },
+          { name: `!ask <question> — AI assistant`,           type: ActivityType.Playing   },
+          { name: `${guilds} server${guilds !== 1 ? "s" : ""} | !help`, type: ActivityType.Watching },
+          { name: `!rank — check your XP & level`,            type: ActivityType.Playing   },
+          { name: `${agents} agent${agents !== 1 ? "s" : ""} live | /agents`, type: ActivityType.Watching },
+          { name: `!top — XP leaderboard`,                    type: ActivityType.Competing },
+          { name: `!blackjack — wager credits`,               type: ActivityType.Playing   },
+          { name: `!np — now playing`,                        type: ActivityType.Listening },
+          { name: `/dashboard — server setup`,                type: ActivityType.Playing   },
+        ];
+      }
+
+      function rotatePresence() {
         if (!client.isReady()) return;
         try {
-          const guildCount = client.guilds.cache.size;
-          const agentCount = global.agentManager?.liveAgents?.size ?? 0;
-          const tick = Math.floor(Date.now() / 30_000) % 4;
-          const activities = [
-            { name: `🏠 ${guildCount} guild${guildCount !== 1 ? "s" : ""}`, type: ActivityType.Watching },
-            { name: `🤖 ${agentCount} agent${agentCount !== 1 ? "s" : ""} online`, type: ActivityType.Watching },
-            { name: `🎵 music with /play`, type: ActivityType.Listening },
-            { name: `🥢 /help`, type: ActivityType.Playing }
-          ];
-          client.user.setPresence({ activities: [activities[tick]], status });
+          const acts = buildActivities();
+          _presenceTick = (_presenceTick + 1) % acts.length;
+          client.user.setPresence({ activities: [acts[_presenceTick]], status: botStatus });
         } catch {}
       }
 
       rotatePresence();
-      presenceTimer = setInterval(rotatePresence, 30_000);
+      presenceTimer = setInterval(rotatePresence, 20_000);
       presenceTimer.unref();
     }
   } catch {}
@@ -1160,6 +1173,7 @@ client.on(Events.InteractionCreate, async interaction => {
       if (await handleAudiobookSelect(interaction)) return;
       if (await handleTicketsSelect(interaction)) return;
       if (await handleSetupSelect(interaction)) return;
+      if (await handleDashSelect(interaction)) return;
       if (await handleTriviaSelect(interaction)) return;
       if (await handleGameSelect(interaction)) return;
       if (await handleCraftSelect(interaction)) return;
@@ -1192,6 +1206,7 @@ client.on(Events.InteractionCreate, async interaction => {
       if (await handleAudiobookButton(interaction)) return;
       if (await handleTicketsButton(interaction)) return;
       if (await handleSetupButton(interaction)) return;
+      if (await handleDashButton(interaction)) return;
       if (await handleTriviaButton(interaction)) return;
       if (await handleGameButton(interaction)) return;
       if (await handleQuestsButton(interaction)) return;
@@ -1235,6 +1250,7 @@ client.on(Events.InteractionCreate, async interaction => {
       if (await handleVoiceModal(interaction)) return;
       if (await handleModelModal(interaction)) return;
       if (await handleAiModal(interaction)) return;
+      if (await handleDashModal(interaction)) return;
     } catch (err) {
       botLogger.error({ err }, "[modal] interaction handler threw");
       try {

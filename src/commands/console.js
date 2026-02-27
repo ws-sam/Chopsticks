@@ -68,8 +68,8 @@ function buildHealthSnapshot(guildId) {
 export const meta = { category: "admin", deployGlobal: false };
 
 export const data = new SlashCommandBuilder()
-  .setName("dashboard")
-  .setDescription("Open your server's Chopsticks dashboard — ephemeral single-use link")
+  .setName("console")
+  .setDescription("Open your server's Chopsticks web dashboard — ephemeral single-use link")
   .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild);
 
 export async function execute(interaction) {

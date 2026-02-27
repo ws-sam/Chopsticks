@@ -53,10 +53,14 @@ for (const file of commandFiles) {
 
   if (!cmd?.data?.toJSON) continue;
 
-  // Skip commands marked deployGlobal: false when doing global deploy
+  // Global deploy: only include commands explicitly opted in with deployGlobal: true.
+  // Discord enforces a hard 100-command limit; this keeps the global set intentional.
   const cmdMeta = mod.meta ?? mod.default?.meta ?? null;
-  if (DEPLOY_MODE === "global" && cmdMeta?.deployGlobal === false) {
-    console.log(`⏭️  Skipping global deploy: ${cmd.data.name} (deployGlobal: false)`);
+  if (DEPLOY_MODE === "global" && cmdMeta?.deployGlobal !== true) {
+    continue;
+  }
+  // Guild deploy: same constraint — only explicitly tagged commands to stay under 100.
+  if (DEPLOY_MODE === "guild" && cmdMeta?.deployGlobal !== true) {
     continue;
   }
 

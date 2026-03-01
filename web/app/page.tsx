@@ -35,36 +35,54 @@ function useCounter(target: number, duration = 1600): number {
 
 // ─── Animated Discord mockup ──────────────────────────────────────────────
 const CHANNELS = ['general', 'music', 'commands', 'bot-log'];
-type Msg = {
-  user: string; avatar: string; color: string; type: 'user' | 'bot';
-  content?: string; embed?: { color: string; title: string; fields: { k: string; v: string }[] };
-};
+type Embed = { color: string; title: string; desc?: string; fields?: { k: string; v: string }[] };
+type Msg = { user: string; avatar: string; color: string; type: 'user' | 'bot'; content?: string; embed?: Embed };
+
 const CHANNEL_MSGS: Record<number, Msg[]> = {
-  // general — !balance then /gather
+  // general — !balance → balance embed, /gather → gather embed
   0: [
     { user: 'Mikel',      avatar: '/images/avatar-mousememe.jpg',   color: '#22d3ee', type: 'user', content: '!balance' },
-    { user: 'Chopsticks', avatar: '/images/chopsticks.png',         color: '#5865f2', type: 'bot',  embed: { color: '#ffd700', title: '💰 Balance', fields: [{ k: 'Wallet', v: '1,250' }, { k: 'Bank', v: '8,900' }, { k: 'Bank Cap', v: '5,000' }] } },
+    { user: 'Chopsticks', avatar: '/images/chopsticks.png',         color: '#5865f2', type: 'bot',
+      embed: { color: '#ffd700', title: '💰 Balance — Mikel',
+        fields: [{ k: 'Wallet', v: '1,250 💵' }, { k: 'Bank', v: '8,900 🏦' }, { k: 'Bank Cap', v: '5,000' }] } },
     { user: 'Nakari',     avatar: '/images/avatar-patrickstar.jpg', color: '#a78bfa', type: 'user', content: '/gather tool:basic_scanner' },
-    { user: 'Chopsticks', avatar: '/images/chopsticks.png',         color: '#5865f2', type: 'bot',  embed: { color: '#57f287', title: '⚡ Gather Run Complete', fields: [{ k: 'Items Found', v: '2' }, { k: 'Drops', v: '🔮 Quantum Crystal [EPIC] · ⚪ Iron Ore ×2 [COMMON]' }, { k: 'XP', v: '44 XP' }] } },
+    { user: 'Chopsticks', avatar: '/images/chopsticks.png',         color: '#5865f2', type: 'bot',
+      embed: { color: '#57f287', title: '⚡ Gather Run Complete',
+        desc: '🔮 Quantum Crystal  [EPIC]\n⚪ Iron Ore ×2  [COMMON]',
+        fields: [{ k: 'Items Found', v: '2' }, { k: 'Zone', v: 'Any' }, { k: 'XP', v: '+44 XP' }] } },
   ],
-  // music — !play then !queue
+  // music — !play → now playing, !queue → queue
   1: [
     { user: 'Nakari',     avatar: '/images/avatar-patrickstar.jpg', color: '#a78bfa', type: 'user', content: '!play lo-fi hip hop radio' },
-    { user: 'Chopsticks', avatar: '/images/chopsticks.png',         color: '#5865f2', type: 'bot',  embed: { color: '#1db954', title: '🎵 Now Playing', fields: [{ k: 'Duration', v: '3:45' }, { k: 'Author', v: 'ChilledCow' }, { k: 'Source', v: 'youtube' }] } },
+    { user: 'Chopsticks', avatar: '/images/chopsticks.png',         color: '#5865f2', type: 'bot',
+      embed: { color: '#1db954', title: '🎵 Now Playing',
+        desc: 'Lo-Fi Hip Hop Radio\n1:23 ▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 3:45',
+        fields: [{ k: 'Duration', v: '3:45' }, { k: 'Author', v: 'ChilledCow' }, { k: 'Source', v: 'YouTube' }] } },
     { user: 'Euxine',     avatar: '/images/avatar-hellokitty.png',  color: '#f472b6', type: 'user', content: '!queue' },
-    { user: 'Chopsticks', avatar: '/images/chopsticks.png',         color: '#5865f2', type: 'bot',  embed: { color: '#1db954', title: '📋 Music Queue', fields: [{ k: 'Now', v: 'Lo-Fi Hip Hop Radio — 3:45' }, { k: 'Up Next', v: '1. Synthwave Drive — 47:22' }, { k: 'Total', v: '2 tracks' }] } },
+    { user: 'Chopsticks', avatar: '/images/chopsticks.png',         color: '#5865f2', type: 'bot',
+      embed: { color: '#1db954', title: '📋 Music Queue',
+        desc: '🎵 Now: Lo-Fi Hip Hop Radio — 3:45\n`1.` Synthwave Drive — 47:22',
+        fields: [{ k: 'Total', v: '2 tracks · 51:07' }] } },
   ],
-  // commands — !work then !daily (exact source output format)
+  // commands — !work → desc-only embed, !daily → desc-only embed (no field wrapping)
   2: [
     { user: 'Mikel',      avatar: '/images/avatar-mousememe.jpg',   color: '#22d3ee', type: 'user', content: '!work' },
-    { user: 'Chopsticks', avatar: '/images/chopsticks.png',         color: '#5865f2', type: 'bot',  embed: { color: '#57f287', title: '💼 Work Complete', fields: [{ k: 'Result', v: 'You worked as a Chef and earned 248 credits!' }] } },
+    { user: 'Chopsticks', avatar: '/images/chopsticks.png',         color: '#5865f2', type: 'bot',
+      embed: { color: '#57f287', title: '💼 Work Complete',
+        desc: 'You worked as a **Chef** 👨‍🍳 and earned **248** credits!' } },
     { user: 'Euxine',     avatar: '/images/avatar-hellokitty.png',  color: '#f472b6', type: 'user', content: '!daily' },
-    { user: 'Chopsticks', avatar: '/images/chopsticks.png',         color: '#5865f2', type: 'bot',  embed: { color: '#57f287', title: '🎁 Daily Reward', fields: [{ k: 'Result', v: 'You claimed 500 credits! Streak: 7 days' }] } },
+    { user: 'Chopsticks', avatar: '/images/chopsticks.png',         color: '#5865f2', type: 'bot',
+      embed: { color: '#57f287', title: '🎁 Daily Reward',
+        desc: 'You claimed **500** credits!\nStreak: **7** days 🔥' } },
   ],
-  // bot-log — automated bot events only
+  // bot-log — automated mod events
   3: [
-    { user: 'Chopsticks', avatar: '/images/chopsticks.png',         color: '#5865f2', type: 'bot',  embed: { color: '#f0b232', title: 'Member Joined', fields: [{ k: 'User', v: 'spammer123#4421' }, { k: 'Account Age', v: '3 days ⚠️ New' }, { k: 'Action', v: 'Flagged for review' }] } },
-    { user: 'Chopsticks', avatar: '/images/chopsticks.png',         color: '#5865f2', type: 'bot',  embed: { color: '#ed4245', title: '🔨 Member Banned', fields: [{ k: 'User', v: 'spammer123#4421' }, { k: 'Moderator', v: 'Admin' }, { k: 'Reason', v: 'Spam + raid invite links · Case #048' }] } },
+    { user: 'Chopsticks', avatar: '/images/chopsticks.png', color: '#5865f2', type: 'bot',
+      embed: { color: '#f0b232', title: '📥 Member Joined',
+        fields: [{ k: 'User', v: 'spammer123#4421' }, { k: 'Account Age', v: '3 days ⚠️' }, { k: 'Action', v: 'Flagged for review' }] } },
+    { user: 'Chopsticks', avatar: '/images/chopsticks.png', color: '#5865f2', type: 'bot',
+      embed: { color: '#ed4245', title: '🔨 Member Banned',
+        fields: [{ k: 'User', v: 'spammer123#4421' }, { k: 'Moderator', v: 'Admin' }, { k: 'Reason', v: 'Spam + raid links · Case #048' }] } },
   ],
 };
 
@@ -83,16 +101,21 @@ function Avatar({ src, size = 36, bot = false }: { src: string; size?: number; b
   );
 }
 
-function EmbedCard({ embed }: { embed: { color: string; title: string; fields: { k: string; v: string }[] } }) {
+function EmbedCard({ embed }: { embed: Embed }) {
   return (
     <div style={{ borderLeft: `3px solid ${embed.color}`, background: 'rgba(255,255,255,0.04)',
-      borderRadius: '0 6px 6px 0', padding: '0.55rem 0.75rem', marginTop: '0.3rem', maxWidth: 300 }}>
-      <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#fff', marginBottom: '0.35rem',
+      borderRadius: '0 6px 6px 0', padding: '0.6rem 0.85rem', marginTop: '0.3rem', maxWidth: 380 }}>
+      <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#fff', marginBottom: embed.desc || embed.fields?.length ? '0.4rem' : 0,
         fontFamily: 'var(--font-heading)' }}>{embed.title}</div>
-      {embed.fields.map(f => (
-        <div key={f.k} style={{ marginBottom: '0.2rem' }}>
+      {embed.desc && (
+        <div style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.82)', lineHeight: 1.55, marginBottom: embed.fields?.length ? '0.5rem' : 0, whiteSpace: 'pre-line' }}>
+          {embed.desc.replace(/\*\*([^*]+)\*\*/g, '$1')}
+        </div>
+      )}
+      {embed.fields && embed.fields.map(f => (
+        <div key={f.k} style={{ marginBottom: '0.25rem' }}>
           <div style={{ fontSize: '0.67rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.04em', fontFamily: 'var(--font-heading)' }}>{f.k}</div>
-          <div style={{ fontSize: '0.77rem', color: 'rgba(255,255,255,0.87)', lineHeight: 1.45 }}>{f.v}</div>
+          <div style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.87)', lineHeight: 1.45 }}>{f.v}</div>
         </div>
       ))}
     </div>
@@ -121,7 +144,7 @@ function DiscordMockup() {
   return (
     <div style={{ background: '#313338', borderRadius: '0.875rem', overflow: 'hidden',
       boxShadow: '0 40px 100px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.06)',
-      width: '100%', maxWidth: 600, fontFamily: "'gg sans', 'Noto Sans', sans-serif",
+      width: '100%', maxWidth: 780, fontFamily: "'gg sans', 'Noto Sans', sans-serif",
       display: 'flex', flexDirection: 'column' }}>
 
       {/* macOS chrome bar */}
@@ -136,7 +159,7 @@ function DiscordMockup() {
       </div>
 
       {/* App body */}
-      <div className="discord-mock-body" style={{ display: 'flex', height: 460 }}>
+      <div className="discord-mock-body" style={{ display: 'flex', height: 540 }}>
 
         {/* Server rail */}
         <div className="discord-mock-rail" style={{ width: 72, background: '#1e1f22', display: 'flex', flexDirection: 'column',
@@ -428,7 +451,7 @@ export default function HomePage() {
         <div className="orb orb-violet" style={{ width: 500, height: 500, bottom: -200, right: -150, opacity: 0.35 }} />
         <div className="orb"            style={{ width: 300, height: 300, top: '30%', left: '55%', background: 'radial-gradient(circle, rgba(244,114,182,0.25), transparent 70%)', opacity: 0.5 }} />
 
-        <div className="container hero-grid" style={{ position: 'relative', zIndex: 1, display: 'grid', gridTemplateColumns: '1.1fr 0.9fr', gap: '3rem', alignItems: 'center', padding: '5rem 1.5rem' }}>
+        <div className="container hero-grid" style={{ position: 'relative', zIndex: 1, display: 'grid', gridTemplateColumns: '1fr 1.3fr', gap: '3rem', alignItems: 'center', padding: '5rem 1.5rem' }}>
           {/* Left */}
           <div>
             <a href="https://wokspec.org" target="_blank" rel="noopener noreferrer" className="badge" style={{ marginBottom: '1.5rem', background: 'rgba(30,30,30,0.7)', border: '1px solid rgba(180,100,30,0.35)', color: '#c8c8c8', gap: '0.5rem', textDecoration: 'none', cursor: 'pointer' }}>

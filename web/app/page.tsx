@@ -39,7 +39,7 @@ type Embed = { color: string; title: string; desc?: string; fields?: { k: string
 type Msg = { user: string; avatar: string; color: string; type: 'user' | 'bot'; content?: string; embed?: Embed };
 
 const CHANNEL_MSGS: Record<number, Msg[]> = {
-  // general — !balance → balance embed, /gather → gather embed
+  // general — !balance, /gather, !shop, !inventory
   0: [
     { user: 'Mikel',      avatar: '/images/avatar-mousememe.jpg',   color: '#22d3ee', type: 'user', content: '!balance' },
     { user: 'Chopsticks', avatar: '/images/chopsticks.png',         color: '#5865f2', type: 'bot',
@@ -50,8 +50,16 @@ const CHANNEL_MSGS: Record<number, Msg[]> = {
       embed: { color: '#57f287', title: '⚡ Gather Run Complete',
         desc: '🔮 Quantum Crystal  [EPIC]\n⚪ Iron Ore ×2  [COMMON]',
         fields: [{ k: 'Items Found', v: '2' }, { k: 'Zone', v: 'Any' }, { k: 'XP', v: '+44 XP' }] } },
+    { user: 'Euxine',     avatar: '/images/avatar-hellokitty.png',  color: '#f472b6', type: 'user', content: '!shop' },
+    { user: 'Chopsticks', avatar: '/images/chopsticks.png',         color: '#5865f2', type: 'bot',
+      embed: { color: '#f0b232', title: '🛒 Shop — Page 1/3',
+        fields: [{ k: 'Basic Scanner', v: '500 💵 · Gather tool, 50 dur' }, { k: 'Fishing Rod', v: '800 💵 · Used with !fish' }, { k: 'Loot Crate', v: '1,200 💵 · Random rare drop' }] } },
+    { user: 'Mikel',      avatar: '/images/avatar-mousememe.jpg',   color: '#22d3ee', type: 'user', content: '!inventory' },
+    { user: 'Chopsticks', avatar: '/images/chopsticks.png',         color: '#5865f2', type: 'bot',
+      embed: { color: '#f0b232', title: '🎒 Inventory — Mikel',
+        fields: [{ k: 'Tools', v: '🔍 Basic Scanner ×1' }, { k: 'Materials', v: '⚪ Iron Ore ×6  ·  🔮 Quantum Crystal ×1' }, { k: 'Consumables', v: '🧪 XP Boost ×2' }] } },
   ],
-  // music — !play → now playing, !queue → queue
+  // music — !play, !queue, !np, !skip
   1: [
     { user: 'Nakari',     avatar: '/images/avatar-patrickstar.jpg', color: '#a78bfa', type: 'user', content: '!play lo-fi hip hop radio' },
     { user: 'Chopsticks', avatar: '/images/chopsticks.png',         color: '#5865f2', type: 'bot',
@@ -61,10 +69,20 @@ const CHANNEL_MSGS: Record<number, Msg[]> = {
     { user: 'Euxine',     avatar: '/images/avatar-hellokitty.png',  color: '#f472b6', type: 'user', content: '!queue' },
     { user: 'Chopsticks', avatar: '/images/chopsticks.png',         color: '#5865f2', type: 'bot',
       embed: { color: '#1db954', title: '📋 Music Queue',
-        desc: '🎵 Now: Lo-Fi Hip Hop Radio — 3:45\n`1.` Synthwave Drive — 47:22',
-        fields: [{ k: 'Total', v: '2 tracks · 51:07' }] } },
+        desc: '🎵 Now: Lo-Fi Hip Hop Radio — 3:45\n`1.` Synthwave Drive — 47:22\n`2.` Study Session Lounge — 58:10',
+        fields: [{ k: 'Total', v: '3 tracks · 1:49:17' }] } },
+    { user: 'Mikel',      avatar: '/images/avatar-mousememe.jpg',   color: '#22d3ee', type: 'user', content: '!np' },
+    { user: 'Chopsticks', avatar: '/images/chopsticks.png',         color: '#5865f2', type: 'bot',
+      embed: { color: '#1db954', title: '🎵 Now Playing',
+        desc: 'Lo-Fi Hip Hop Radio\n2:10 ▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱ 3:45',
+        fields: [{ k: 'Requested by', v: 'Nakari' }] } },
+    { user: 'Euxine',     avatar: '/images/avatar-hellokitty.png',  color: '#f472b6', type: 'user', content: '!skip' },
+    { user: 'Chopsticks', avatar: '/images/chopsticks.png',         color: '#5865f2', type: 'bot',
+      embed: { color: '#1db954', title: '⏭ Skipped',
+        desc: 'Skipped Lo-Fi Hip Hop Radio.',
+        fields: [{ k: 'Now Playing', v: 'Synthwave Drive — 47:22' }] } },
   ],
-  // commands — !work → desc-only embed, !daily → desc-only embed (no field wrapping)
+  // commands — !work, !daily, !rank, !trivia
   2: [
     { user: 'Mikel',      avatar: '/images/avatar-mousememe.jpg',   color: '#22d3ee', type: 'user', content: '!work' },
     { user: 'Chopsticks', avatar: '/images/chopsticks.png',         color: '#5865f2', type: 'bot',
@@ -74,15 +92,32 @@ const CHANNEL_MSGS: Record<number, Msg[]> = {
     { user: 'Chopsticks', avatar: '/images/chopsticks.png',         color: '#5865f2', type: 'bot',
       embed: { color: '#57f287', title: '🎁 Daily Reward',
         desc: 'You claimed **500** credits!\nStreak: **7** days 🔥' } },
+    { user: 'Nakari',     avatar: '/images/avatar-patrickstar.jpg', color: '#a78bfa', type: 'user', content: '!rank' },
+    { user: 'Chopsticks', avatar: '/images/chopsticks.png',         color: '#5865f2', type: 'bot',
+      embed: { color: '#5865f2', title: '⭐ Rank — Nakari',
+        fields: [{ k: 'Level', v: '14' }, { k: 'XP', v: '3,420 / 4,000' }, { k: 'Server Rank', v: '#3' }] } },
+    { user: 'Mikel',      avatar: '/images/avatar-mousememe.jpg',   color: '#22d3ee', type: 'user', content: '!8ball am I going to win today?' },
+    { user: 'Chopsticks', avatar: '/images/chopsticks.png',         color: '#5865f2', type: 'bot',
+      embed: { color: '#57f287', title: '🎱 Magic 8-Ball',
+        desc: 'Q: am I going to win today?\n\n🟢 Signs point to yes.' } },
   ],
   // bot-log — automated mod events
   3: [
+    { user: 'Chopsticks', avatar: '/images/chopsticks.png', color: '#5865f2', type: 'bot',
+      embed: { color: '#5865f2', title: '📥 Member Joined',
+        fields: [{ k: 'User', v: 'Euxine#0042' }, { k: 'Account Age', v: '2 years' }, { k: 'Action', v: 'Auto-role: Member applied' }] } },
+    { user: 'Chopsticks', avatar: '/images/chopsticks.png', color: '#5865f2', type: 'bot',
+      embed: { color: '#f0b232', title: '⚠️ AutoMod Triggered',
+        fields: [{ k: 'User', v: 'spammer123#4421' }, { k: 'Rule', v: 'Invite links' }, { k: 'Action', v: 'Message deleted · 1st offence' }] } },
     { user: 'Chopsticks', avatar: '/images/chopsticks.png', color: '#5865f2', type: 'bot',
       embed: { color: '#f0b232', title: '📥 Member Joined',
         fields: [{ k: 'User', v: 'spammer123#4421' }, { k: 'Account Age', v: '3 days ⚠️' }, { k: 'Action', v: 'Flagged for review' }] } },
     { user: 'Chopsticks', avatar: '/images/chopsticks.png', color: '#5865f2', type: 'bot',
       embed: { color: '#ed4245', title: '🔨 Member Banned',
         fields: [{ k: 'User', v: 'spammer123#4421' }, { k: 'Moderator', v: 'Admin' }, { k: 'Reason', v: 'Spam + raid links · Case #048' }] } },
+    { user: 'Chopsticks', avatar: '/images/chopsticks.png', color: '#5865f2', type: 'bot',
+      embed: { color: '#57f287', title: '🔓 Channel Unlocked',
+        fields: [{ k: 'Channel', v: '#general' }, { k: 'Moderator', v: 'Admin' }, { k: 'Duration', v: 'Lockdown lifted' }] } },
   ],
 };
 
@@ -159,7 +194,7 @@ function DiscordMockup() {
       </div>
 
       {/* App body */}
-      <div className="discord-mock-body" style={{ display: 'flex', height: 540 }}>
+      <div className="discord-mock-body" style={{ display: 'flex', height: 680 }}>
 
         {/* Server rail */}
         <div className="discord-mock-rail" style={{ width: 72, background: '#1e1f22', display: 'flex', flexDirection: 'column',
@@ -287,9 +322,9 @@ function DiscordMockup() {
           </div>
 
           {/* Messages */}
-          <div ref={messagesRef} style={{ flex: 1, overflowY: 'auto', padding: '0.75rem 0.875rem',
-            display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', gap: '0.5rem',
-            scrollbarWidth: 'none' }}>
+          <div ref={messagesRef} className="msg-scroll" style={{ flex: 1, overflowY: 'auto', padding: '0.75rem 0.875rem',
+            display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <div style={{ flex: 1 }} />
             {msgs.map((m, i) => visible.includes(i) ? (
               <div key={i} style={{ display: 'flex', gap: '0.625rem', alignItems: 'flex-start',
                 animation: 'msgFadeIn 0.35s ease both' }}>

@@ -9,7 +9,11 @@ import { logger } from "./logger.js";
 const ALGORITHM = "aes-256-gcm";
 const IV_LENGTH = 16;
 
-export const AI_PROVIDERS = ["none", "ollama", "anthropic", "openai", "groq"];
+export const AI_PROVIDERS = ["eral", "none", "ollama", "anthropic", "openai", "groq"];
+
+export const ERAL_API_URL = 'https://eral.wokspec.org/api';
+
+export function resolveEralKey(env) { return env.ERAL_BOT_KEY ?? null; }
 
 const KEY = process.env.AGENT_TOKEN_KEY;
 const KEY_READY = KEY && KEY.length === 64;
@@ -64,7 +68,7 @@ export async function getGuildAiConfig(guildId) {
 
   const ai = res.rows[0]?.data?.ai || {};
   return {
-    provider: AI_PROVIDERS.includes(ai.provider) ? ai.provider : "none",
+    provider: AI_PROVIDERS.includes(ai.provider) ? ai.provider : "eral",
     ollamaUrl: ai.ollama_url || null,
     persona:   ai.persona   || null,
   };

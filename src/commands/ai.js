@@ -68,13 +68,15 @@ export function moderateWithKeywords(text) {
 }
 
 const PROVIDER_CHOICES = [
-  { name: "None — disable AI (default)", value: "none" },
+  { name: "Eral — WokSpec AI (default)", value: "eral" },
+  { name: "None — disable AI", value: "none" },
   { name: "Ollama — self-hosted", value: "ollama" },
   { name: "Anthropic / Claude", value: "anthropic" },
   { name: "OpenAI / GPT", value: "openai" },
 ];
 
 const TOKEN_PROVIDER_CHOICES = [
+  { name: "Eral — WokSpec AI", value: "eral" },
   { name: "Anthropic / Claude", value: "anthropic" },
   { name: "OpenAI / GPT", value: "openai" },
   { name: "Ollama — set custom URL", value: "ollama" },
@@ -320,7 +322,7 @@ async function handleChat(interaction) {
 
   if (!resolved.provider) {
     return interaction.reply({
-      content: "🤖 No AI provider configured. An admin can run `/ai set-provider` or you can link your own key with `/ai token link`.",
+      content: "🤖 No AI provider configured. An admin can run `/ai set-provider eral` to enable Eral AI (default), or `/ai set-provider` for other options. You can also link your own key with `/ai token link`.",
       ephemeral: true,
     });
   }
@@ -356,6 +358,57 @@ async function handleChat(interaction) {
 
   let reply;
   try {
+    // ── Eral provider ─────────────────────────────────────────────────────────
+    if (resolved.provider === 'eral') {
+      const eralKey = process.env.ERAL_BOT_KEY;
+      if (!eralKey) {
+        await interaction.editReply({
+          embeds: [new EmbedBuilder()
+            .setColor(0x7c3aed)
+            .setTitle('Eral not configured')
+            .setDescription('Set `ERAL_BOT_KEY` in the bot environment to enable Eral AI.')
+          ],
+        });
+        return;
+      }
+
+      try {
+        const res = await fetch('https://eral.wokspec.org/api/v1/chat', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${eralKey}`,
+            'X-Eral-Source': 'chopsticks',
+          },
+          body: JSON.stringify({
+            message,
+            sessionId: `discord_${interaction.user.id}`,
+            context: guildConfig.persona ? `Guild persona: ${guildConfig.persona}` : undefined,
+          }),
+        });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          await interaction.editReply({ content: `Eral error: ${errData.error?.message ?? 'Unknown error'}` });
+          return;
+        }
+
+        const data = await res.json();
+        const response = data.data?.response ?? 'No response.';
+
+        const embed = new EmbedBuilder()
+          .setColor(0x7c3aed)
+          .setAuthor({ name: 'Eral', iconURL: 'https://eral.wokspec.org/icon.png' })
+          .setDescription(response.slice(0, 4096))
+          .setFooter({ text: 'Powered by Eral · WokSpec AI' });
+
+        await interaction.editReply({ embeds: [embed] });
+      } catch (err) {
+        await interaction.editReply({ content: `❌ Eral request failed: \`${err?.message?.slice(0, 100)}\`` });
+      }
+      return;
+    }
+
     reply = await callAiLlm({
       prompt: message,
       system,

@@ -17,8 +17,11 @@
 <text x="18" y="224" font-size="13" font-weight="400" fill="#cdd6f4" text-anchor="start" font-family="'UbuntuMono','Ubuntu Sans Mono','Consolas',monospace">  [+] chopsticks-redis    Started</text>
 <text x="18" y="251" font-size="13" font-weight="400" fill="#cdd6f4" text-anchor="start" font-family="'UbuntuMono','Ubuntu Sans Mono','Consolas',monospace">  [+] mongodb             Started</text>
 <text x="18" y="278" font-size="14" font-weight="700" fill="#f38ba8" text-anchor="start" font-family="'UbuntuMono','Ubuntu Sans Mono','Consolas',monospace">$</text>
-<text x="34" y="278" font-size="13" font-weight="400" fill="#89b4fa" text-anchor="start" font-family="'UbuntuMono','Ubuntu Sans Mono','Consolas',monospace">docker logs chopsticks-bot --tail 4</text>
+<text x="34" y="278" font-size="13" font-weight="400" fill="#89b4fa" text-anchor="start" font-family="'UbuntuMono','Ubuntu Sans Mono','Consolas',monospace">docker logs chopsticks-bot --tail 6</text>
 <text x="18" y="305" font-size="13" font-weight="400" fill="#cdd6f4" text-anchor="start" font-family="'UbuntuMono','Ubuntu Sans Mono','Consolas',monospace">  Connected as Chopsticks#0001</text>
-<text x="18" y="332" font-size="13" font-weight="400" fill="#cdd6f4" text-anchor="start" font-family="'UbuntuMono','Ubuntu Sans Mono','Consolas',monospace">  162 prefix commands loaded</text>
-<text x="18" y="359" font-size="13" font-weight="400" fill="#cdd6f4" text-anchor="start" font-family="'UbuntuMono','Ubuntu Sans Mono','Consolas',monospace">  20 slash commands registered</text>
-<text x="18" y="386" font-size="13" font-weight="400" fill="#cdd6f4" text-anchor="start" font-family="'UbuntuMono','Ubuntu Sans Mono','Consolas',monospace">  Ready — serving 1 guild</text></svg>
+<text x="18" y="332" font-size="13" font-weight="400" fill="#cdd6f4" text-anchor="start" font-family="'UbuntuMono','Ubuntu Sans Mono','Consolas',monospace">  148 prefix commands loaded</text>
+<text x="18" y="359" font-size="13" font-weight="400" fill="#cdd6f4" text-anchor="start" font-family="'UbuntuMono','Ubuntu Sans Mono','Consolas',monospace">  101 slash commands registered</text>
+<text x="18" y="386" font-size="13" font-weight="400" fill="#cdd6f4" text-anchor="start" font-family="'UbuntuMono','Ubuntu Sans Mono','Consolas',monospace">  Ready — serving 1 guild</text>
+<text x="18" y="413" font-size="13" font-weight="400" fill="#cdd6f4" text-anchor="start" font-family="'UbuntuMono','Ubuntu Sans Mono','Consolas',monospace">  Scheduler started — birthday/reminder jobs</text>
+<text x="18" y="440" font-size="13" font-weight="400" fill="#cdd6f4" text-anchor="start" font-family="'UbuntuMono','Ubuntu Sans Mono','Consolas',monospace">  Agent runner online — 0 agents registered</text>
+</svg>

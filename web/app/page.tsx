@@ -14,7 +14,7 @@ function useCounter(target: number, duration = 1600): number {
   useEffect(() => {
     const el = (ref as any).el;
     const io = new IntersectionObserver(([e]) => {
-      if (e.isIntersecting && !started.current) {
+      if (e?.isIntersecting && !started.current) {
         started.current = true;
         const start = performance.now();
         const tick = (now: number) => {

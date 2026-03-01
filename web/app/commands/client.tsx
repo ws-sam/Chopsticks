@@ -56,7 +56,7 @@ const PERM_META: Record<string, { bg: string; color: string; icon: string }> = {
 };
 
 function PermBadge({ perm }: { perm: string }) {
-  const s = PERM_META[perm] ?? PERM_META['@everyone'];
+  const s = PERM_META[perm] ?? PERM_META['@everyone'] ?? { bg: 'transparent', color: '#888', icon: '•' };
   return (
     <span title={perm} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.68rem', fontWeight: 700, fontFamily: 'var(--font-heading)', padding: '0.15rem 0.5rem 0.15rem 0.35rem', borderRadius: 999, background: s.bg, color: s.color, border: `1px solid ${s.color}28`, flexShrink: 0, whiteSpace: 'nowrap' }}>
       <span style={{ fontSize: '0.7rem', lineHeight: 1 }}>{s.icon}</span>
@@ -68,7 +68,7 @@ function PermBadge({ perm }: { perm: string }) {
 function PrefixCard({ cmd }: { cmd: PrefixCmd }) {
   const [open, setOpen] = useState(false);
   const bodyRef = useRef<HTMLDivElement>(null);
-  const cat = PREFIX_CAT_META[cmd.category] ?? PREFIX_CAT_META.Utility;
+  const cat = (PREFIX_CAT_META[cmd.category] ?? PREFIX_CAT_META['Utility'])!
 
   return (
     <div className="cmd-card" style={{ borderColor: open ? `rgba(${hexToRgb(cat.color)},0.3)` : undefined }}>
@@ -121,7 +121,7 @@ function PrefixCard({ cmd }: { cmd: PrefixCmd }) {
 function SlashCard({ cmd }: { cmd: SlashCmd }) {
   const [open, setOpen] = useState(false);
   const bodyRef = useRef<HTMLDivElement>(null);
-  const cat = SLASH_CAT_META[cmd.category] ?? SLASH_CAT_META.Utility;
+  const cat = (SLASH_CAT_META[cmd.category] ?? SLASH_CAT_META['Utility'])!
 
   return (
     <div className="cmd-card" style={{ borderColor: open ? `rgba(${hexToRgb(cat.color)},0.3)` : undefined }}>
@@ -320,7 +320,7 @@ export default function CommandsClient() {
               <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-faint)' }}>No commands match your search.</div>
             ) : (
               Object.entries(prefixGrouped).map(([cat, cmds]) => {
-                const meta = PREFIX_CAT_META[cat] ?? PREFIX_CAT_META.Utility;
+                const meta = (PREFIX_CAT_META[cat] ?? PREFIX_CAT_META['Utility'])!
                 return (
                   <div key={cat} style={{ marginBottom: '2.5rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', marginBottom: '1rem', paddingBottom: '0.625rem', borderBottom: '1px solid var(--border)' }}>

@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import {
   ArrowRightIcon, ShieldIcon, CoinIcon, RadioIcon,
   ServerIcon, PaletteIcon, BookOpenIcon, UsersIcon,
+  MusicIcon, GamepadIcon,
 } from '../icons';
 
 const GITHUB     = 'https://github.com/WokSpec/Chopsticks';
@@ -139,6 +140,59 @@ const TUTORIALS: Tutorial[] = [
       { heading: '6. Preview and test', body: <span>Run <code style={cs}>/welcome preview</code> to trigger a test welcome message without leaving and rejoining.</span> },
     ],
   },
+  {
+    slug: 'music',
+    icon: MusicIcon,
+    title: 'Music & Voice',
+    preview: '/images/preview-music.svg?v=9',
+    desc: 'Stream music from YouTube, Spotify, and SoundCloud. Manage queues, loops, and volume — all from Discord.',
+    difficulty: 'beginner',
+    time: '8 min',
+    steps: [
+      { heading: 'Requirements', body: 'Chopsticks needs Connect and Speak permissions in the voice channel you want to use. The bot must also have access to the text channel you issue commands in.' },
+      { heading: '1. Join a voice channel', body: 'Join any voice channel in your server. Chopsticks will follow you into it when you run the first music command.' },
+      { heading: '2. Play a track', body: <span>Run <code style={cs}>!play never gonna give you up</code> or paste a direct YouTube, Spotify, or SoundCloud URL. Chopsticks joins your VC and starts playing.</span> },
+      { heading: '3. Manage the queue', body: <span>Use <code style={cs}>!queue</code> to see upcoming tracks, <code style={cs}>!skip</code> to move to the next, and <code style={cs}>!remove [position]</code> to drop a specific entry.</span> },
+      { heading: '4. Loop and shuffle', body: <span>Run <code style={cs}>!loop</code> to repeat the current track, <code style={cs}>!loop queue</code> to repeat the whole queue, and <code style={cs}>!shuffle</code> to randomise the order.</span> },
+      { heading: '5. Volume and pause', body: <span>Use <code style={cs}>!volume 75</code> (0–100) to adjust loudness, <code style={cs}>!pause</code> to pause, and <code style={cs}>!resume</code> to continue. <code style={cs}>!stop</code> clears the queue and disconnects.</span> },
+      { heading: '6. 49 concurrent sessions', body: 'Each server gets its own independent queue. Up to 49 servers can stream simultaneously on the hosted instance.' },
+    ],
+  },
+  {
+    slug: 'fun-games',
+    icon: GamepadIcon,
+    title: 'Fun & Games',
+    preview: '/images/preview-fun.svg?v=9',
+    desc: 'Trivia, battles, truth or dare, Would You Rather, riddles, and more — everything you need to keep your community engaged.',
+    difficulty: 'beginner',
+    time: '5 min',
+    steps: [
+      { heading: 'Overview', body: 'Fun and Games commands are prefix-only (no slash). They are always on by default and require no setup. Just run them in any channel the bot can see.' },
+      { heading: '1. Trivia', body: <span>Run <code style={cs}>!trivia</code> to start a 30-second multiple-choice question. Anyone in the channel can answer. Categories and difficulty are randomised by default.</span> },
+      { heading: '2. Would You Rather', body: <span>Run <code style={cs}>!wyr</code> for a Would You Rather question with reaction voting. Great for starting conversations.</span> },
+      { heading: '3. Truth or Dare', body: <span>Run <code style={cs}>!tod truth</code> or <code style={cs}>!tod dare</code>. Add <code style={cs}>spicy</code> for adult-rated prompts (restricted to NSFW channels automatically).</span> },
+      { heading: '4. Battle', body: <span>Run <code style={cs}>!battle @opponent</code> to challenge another member to a turn-based RPG battle. Win to earn economy credits.</span> },
+      { heading: '5. Ship and social', body: <span><code style={cs}>!ship @user1 @user2</code> rates compatibility. <code style={cs}>!hug @user</code>, <code style={cs}>!pat @user</code>, and 10+ other reaction commands work great in social servers.</span> },
+      { heading: '6. Full list', body: <span>See all fun commands with <code style={cs}>!help Fun</code>. Includes coinflip, 8-ball, rate, mock, reverse, slots, riddle, and more.</span> },
+    ],
+  },
+  {
+    slug: 'self-host',
+    icon: ServerIcon,
+    title: 'Self-Hosting',
+    preview: '/images/preview-selfhost.svg?v=9',
+    desc: 'Run your own instance of Chopsticks with Docker Compose. Full control — your data, your branding, your commands.',
+    difficulty: 'advanced',
+    time: '30 min',
+    steps: [
+      { heading: 'What self-hosting gives you', body: "A self-hosted instance is fully independent from the public bot. You own the data, can rename the bot globally, change its avatar, and deploy any unreleased code. The bot is MIT-licensed." },
+      { heading: '1. Prerequisites', body: 'You need Docker and Docker Compose installed, a Discord application and bot token from the Developer Portal, and a PostgreSQL-compatible database (bundled in the compose file).' },
+      { heading: '2. Clone and configure', body: <span>Run <code style={cs}>git clone https://github.com/WokSpec/Chopsticks</code>. Copy <code style={cs}>.env.example</code> to <code style={cs}>.env</code> and fill in your bot token, PostgreSQL credentials, and optional Lavalink credentials for music.</span> },
+      { heading: '3. Start the stack', body: <span>Run <code style={cs}>docker compose up -d</code> from the project root. This starts the bot, PostgreSQL, Redis, and a Lavalink music node. First run pulls images and may take a few minutes.</span> },
+      { heading: '4. Register commands', body: <span>After the stack is up, run <code style={cs}>docker compose exec bot node scripts/deployCommands.js</code> to register slash commands with Discord. Do this once, or again if you add new slash commands.</span> },
+      { heading: '5. Monitor and update', body: <span>Use <code style={cs}>docker compose logs -f bot</code> to follow logs. To update, pull the latest code and run <code style={cs}>docker compose up -d --build</code>. See the full guide at the <a href="/self-host" style={{ color: 'var(--accent)' }}>Self-Hosting page</a>.</span> },
+    ],
+  },
 ];
 
 export default function TutorialsUI() {
@@ -177,10 +231,6 @@ export default function TutorialsUI() {
               {tut.title}
             </button>
           ))}
-          <a href="/self-host" className="tut-mobile-tab">
-            <ServerIcon size={12} />
-            Self-hosting
-          </a>
         </div>
       </div>
 
@@ -209,20 +259,6 @@ export default function TutorialsUI() {
               {i === active && <div className="tut-navcard-bar" />}
             </button>
           ))}
-
-          {/* Self-host link card — routes to dedicated page */}
-          <a href="/self-host" className="tut-navcard tut-navcard-link">
-            <div className="tut-navcard-icon-wrap">
-              <ServerIcon size={15} />
-            </div>
-            <div className="tut-navcard-text">
-              <span className="tut-navcard-title">Self-hosting</span>
-              <div className="tut-navcard-chips">
-                <span className="tutorial-tag tag-advanced">Advanced</span>
-                <span className="tut-navcard-time">Full guide →</span>
-              </div>
-            </div>
-          </a>
 
           {/* Sidebar CTAs */}
           <a href={BOT_INVITE} target="_blank" rel="noopener noreferrer" className="tut-sidebar-cta">

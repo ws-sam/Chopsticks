@@ -1,6 +1,11 @@
 // src/tools/voice/limits.js
 import { loadGuildData, saveGuildData } from "../../utils/storage.js";
-import { ensureVoiceState } from "./state.js";
+
+function ensureVoiceState(data) {
+  data.voice ??= {};
+  data.voice.lobbies ??= {};
+  data.voice.tempChannels ??= {};
+}
 
 /* ---------- GET ---------- */
 

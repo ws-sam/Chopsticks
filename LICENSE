@@ -1,4 +1,4 @@
-MIT License
+MIT License with Commercial Attribution Clause
 
 Copyright (c) 2026 goot27 and Wok Specialists
 
@@ -11,6 +11,11 @@ furnished to do so, subject to the following conditions:
 
 The above copyright notice and this permission notice shall be included in all
 copies or substantial portions of the Software.
+
+COMMERCIAL USE ATTRIBUTION: If you use this Software as part of a commercial
+product or service (including paid bots, white-labeled instances, or SaaS
+offerings), you must include a visible attribution to "Powered by Chopsticks
+(WokSpec)" in your product's documentation, bot description, or about section.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,

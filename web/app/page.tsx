@@ -35,17 +35,38 @@ function useCounter(target: number, duration = 1600): number {
 
 // ─── Animated Discord mockup ──────────────────────────────────────────────
 const CHANNELS = ['general', 'music', 'commands', 'bot-log'];
-const MSGS: Array<{
+type Msg = {
   user: string; avatar: string; color: string; type: 'user' | 'bot';
   content?: string; embed?: { color: string; title: string; fields: { k: string; v: string }[] };
-}> = [
-  { user: 'Euxine',     avatar: '/images/avatar-hellokitty.png',  color: '#f472b6', type: 'user', content: '!play never gonna give you up' },
-  { user: 'Chopsticks', avatar: '/images/chopsticks.png',         color: '#5865f2', type: 'bot',  embed: { color: '#5865f2', title: '🎵 Now Playing', fields: [{ k: 'Track', v: 'Never Gonna Give You Up — Rick Astley' }, { k: 'Duration', v: '3:32' }] } },
-  { user: 'Mikel',      avatar: '/images/avatar-mousememe.jpg',   color: '#22d3ee', type: 'user', content: '!balance' },
-  { user: 'Chopsticks', avatar: '/images/chopsticks.png',         color: '#5865f2', type: 'bot',  embed: { color: '#4ade80', title: '💰 Balance', fields: [{ k: 'Wallet', v: '4,280 coins' }, { k: 'Bank', v: '12,500 coins · Rank #3' }] } },
-  { user: 'Nakari',     avatar: '/images/avatar-patrickstar.jpg', color: '#a78bfa', type: 'user', content: '!trivia start' },
-  { user: 'Chopsticks', avatar: '/images/chopsticks.png',         color: '#5865f2', type: 'bot',  embed: { color: '#a78bfa', title: '🎮 Trivia Started', fields: [{ k: 'Category', v: 'General Knowledge' }, { k: 'Players', v: 'Euxine, Mikel, Nakari' }] } },
-];
+};
+const CHANNEL_MSGS: Record<number, Msg[]> = {
+  // general
+  0: [
+    { user: 'Euxine',     avatar: '/images/avatar-hellokitty.png',  color: '#f472b6', type: 'user', content: 'anyone know the bot prefix?' },
+    { user: 'Chopsticks', avatar: '/images/chopsticks.png',         color: '#5865f2', type: 'bot',  embed: { color: '#5865f2', title: '📖 Quick Start', fields: [{ k: 'Prefix', v: '! or /' }, { k: 'Commands', v: '148 prefix · 101 slash across 11 categories' }, { k: 'Invite', v: 'discord.com/invite' }] } },
+    { user: 'Mikel',      avatar: '/images/avatar-mousememe.jpg',   color: '#22d3ee', type: 'user', content: 'just ran /gather for the first time 🔥' },
+    { user: 'Chopsticks', avatar: '/images/chopsticks.png',         color: '#5865f2', type: 'bot',  embed: { color: '#a78bfa', title: '⚡ Gather Complete', fields: [{ k: 'Items Found', v: '3' }, { k: 'Drops', v: '💎 Quantum Crystal [EPIC] · ⚪ Iron Ore ×2 [COMMON]' }, { k: 'XP', v: '+67 XP' }] } },
+  ],
+  // music
+  1: [
+    { user: 'Nakari',     avatar: '/images/avatar-patrickstar.jpg', color: '#a78bfa', type: 'user', content: '!play lo-fi chill beats' },
+    { user: 'Chopsticks', avatar: '/images/chopsticks.png',         color: '#5865f2', type: 'bot',  embed: { color: '#5865f2', title: '🎵 Now Playing', fields: [{ k: 'Track', v: 'Lo-Fi Chill Beats Mix · 1:02:34' }, { k: 'Added by', v: 'Nakari' }, { k: 'Queue', v: '3 tracks waiting' }] } },
+    { user: 'Euxine',     avatar: '/images/avatar-hellokitty.png',  color: '#f472b6', type: 'user', content: '!skip' },
+    { user: 'Chopsticks', avatar: '/images/chopsticks.png',         color: '#5865f2', type: 'bot',  embed: { color: '#22d3ee', title: '⏭ Skipped', fields: [{ k: 'Now Playing', v: 'Synthwave Drive · 47:22' }, { k: 'Requested by', v: 'Euxine' }, { k: 'Up Next', v: 'Study Beats Playlist' }] } },
+  ],
+  // commands
+  2: [
+    { user: 'Mikel',      avatar: '/images/avatar-mousememe.jpg',   color: '#22d3ee', type: 'user', content: '/work' },
+    { user: 'Chopsticks', avatar: '/images/chopsticks.png',         color: '#5865f2', type: 'bot',  embed: { color: '#f0b232', title: '💼 Work Complete', fields: [{ k: 'Job', v: 'Chef 👨‍🍳' }, { k: 'Earned', v: '248 credits' }, { k: 'Balance', v: '4,528 credits · Bank: 12,500' }] } },
+    { user: 'Nakari',     avatar: '/images/avatar-patrickstar.jpg', color: '#a78bfa', type: 'user', content: '/daily' },
+    { user: 'Chopsticks', avatar: '/images/chopsticks.png',         color: '#5865f2', type: 'bot',  embed: { color: '#23a55a', title: '🎁 Daily Reward', fields: [{ k: 'Reward', v: '+500 credits' }, { k: 'Streak', v: '7 days 🔥' }, { k: 'Bonus', v: '×1.5 streak multiplier applied' }] } },
+  ],
+  // bot-log
+  3: [
+    { user: 'Chopsticks', avatar: '/images/chopsticks.png',         color: '#5865f2', type: 'bot',  content: '📥 New member joined', embed: { color: '#f0b232', title: 'Member Joined', fields: [{ k: 'User', v: 'spammer123#4421' }, { k: 'Account Age', v: '3 days ⚠️ New' }, { k: 'Action', v: 'Flagged for review' }] } },
+    { user: 'Chopsticks', avatar: '/images/chopsticks.png',         color: '#5865f2', type: 'bot',  embed: { color: '#ed4245', title: '🔨 Member Banned', fields: [{ k: 'User', v: 'spammer123#4421' }, { k: 'Moderator', v: 'Admin' }, { k: 'Reason', v: 'Spam + raid invite links · Case #048' }] } },
+  ],
+};
 
 function Avatar({ src, size = 36, bot = false }: { src: string; size?: number; bot?: boolean }) {
   return (
@@ -82,11 +103,12 @@ function DiscordMockup() {
   const [visible, setVisible] = useState<number[]>([]);
   const [activeChannel, setActiveChannel] = useState(0);
   const messagesRef = useRef<HTMLDivElement>(null);
+  const msgs = CHANNEL_MSGS[activeChannel] ?? [];
 
   useEffect(() => {
     setVisible([]);
     const timers: ReturnType<typeof setTimeout>[] = [];
-    MSGS.forEach((_, i) => {
+    msgs.forEach((_, i) => {
       timers.push(setTimeout(() => setVisible(v => [...v, i]), i * 1100 + 300));
     });
     return () => timers.forEach(clearTimeout);
@@ -245,7 +267,7 @@ function DiscordMockup() {
           <div ref={messagesRef} style={{ flex: 1, overflowY: 'auto', padding: '0.75rem 0.875rem',
             display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', gap: '0.5rem',
             scrollbarWidth: 'none' }}>
-            {MSGS.map((m, i) => visible.includes(i) ? (
+            {msgs.map((m, i) => visible.includes(i) ? (
               <div key={i} style={{ display: 'flex', gap: '0.625rem', alignItems: 'flex-start',
                 animation: 'msgFadeIn 0.35s ease both' }}>
                 <Avatar src={m.avatar} size={34} bot={m.type === 'bot'} />

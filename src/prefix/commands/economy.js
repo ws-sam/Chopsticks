@@ -5,7 +5,8 @@ import { EmbedBuilder } from "discord.js";
 import { getWallet } from "../../economy/wallet.js";
 import { claimDaily } from "../../economy/streaks.js";
 import { addCredits } from "../../economy/wallet.js";
-import { getCooldown, setCooldown, formatCooldown } from "../../economy/cooldowns.js";
+import { atomicCooldown, getCooldown, setCooldown, formatCooldown } from "../../economy/cooldowns.js";
+import { getBuff } from "../../game/buffs.js";
 import { listShopCategories, listShopItems } from "../../economy/shop.js";
 import { getInventory, searchItems } from "../../economy/inventory.js";
 import { addItem, removeItem } from "../../economy/inventory.js";
@@ -110,7 +111,7 @@ const WORK_REWARD_MIN = 150;
 const WORK_REWARD_MAX = 300;
 const JOB_TITLES = [
   "Software Dev", "Chef", "Pilot", "Artist",
-  "Mechanic", "Doctor", "Teacher", "Chef",
+  "Mechanic", "Doctor", "Teacher", "Barista",
 ];
 
 const workCmd = {
@@ -120,17 +121,25 @@ const workCmd = {
   guildOnly: true,
   async execute(message) {
     try {
-      const cd = await getCooldown(message.author.id, "work");
-      if (!cd.ok) {
+      // Atomic cooldown: avoids double-reward race on rapid duplicate messages.
+      const cdResult = await atomicCooldown(message.author.id, "work", WORK_COOLDOWN_MS);
+      if (!cdResult.ok) {
         return await message.reply(
-          `⏰ You worked too recently! Wait **${formatCooldown(cd.remaining)}**`
+          `⏰ You worked too recently! Wait **${formatCooldown(cdResult.remaining)}**`
         );
       }
       const amount =
         Math.floor(Math.random() * (WORK_REWARD_MAX - WORK_REWARD_MIN + 1)) + WORK_REWARD_MIN;
       await addCredits(message.author.id, amount, "work");
-      await setCooldown(message.author.id, "work", WORK_COOLDOWN_MS);
       await addGameXp(message.author.id, 25, { reason: "work" }).catch(() => {});
+
+      // Apply cd:work buff (e.g. from Energy Drink) to shorten next cooldown.
+      const cdBuff = await getBuff(message.author.id, "cd:work").catch(() => null);
+      if (cdBuff !== null && Number.isFinite(Number(cdBuff)) && Number(cdBuff) > 0 && Number(cdBuff) < 1) {
+        const reducedMs = Math.round(WORK_COOLDOWN_MS * Number(cdBuff));
+        await setCooldown(message.author.id, "work", reducedMs);
+      }
+
       const job = JOB_TITLES[Math.floor(Math.random() * JOB_TITLES.length)];
       const embed = new EmbedBuilder()
         .setTitle("💼 Work Complete")

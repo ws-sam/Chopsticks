@@ -30,3 +30,12 @@ export async function getMultiplier(userId, buffId, fallback = 1) {
   return n;
 }
 
+/**
+ * Returns true if the user has temporary premium access via the master_key item buff.
+ * Intended to be combined with server-booster checks by callers.
+ */
+export async function hasPremiumBuff(userId) {
+  const v = await getBuff(userId, "premium:access");
+  return v !== null;
+}
+

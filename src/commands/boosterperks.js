@@ -15,6 +15,7 @@ import {
   EmbedBuilder,
 } from "discord.js";
 import { loadGuildData, saveGuildData } from "../utils/storage.js";
+import { hasPremiumBuff } from "../game/buffs.js";
 
 export const meta = {
   deployGlobal: false,
@@ -84,7 +85,8 @@ function parseHex(hex) {
 }
 
 async function isBoosting(member) {
-  return !!member.premiumSince;
+  if (member.premiumSince) return true;
+  return hasPremiumBuff(member.id);
 }
 
 export async function execute(interaction) {

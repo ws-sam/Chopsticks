@@ -25,6 +25,7 @@ import {
 import { ownerPermissionOverwrite } from "./ownerPerms.js";
 import { auditLog } from "../../utils/audit.js";
 import { removeTempChannel } from "./state.js";
+import { getCustomRoom } from "./customVcsState.js";
 import { botLogger } from "../../utils/modernLogger.js";
 
 const UI_PREFIX = "voiceui";
@@ -224,9 +225,11 @@ async function resolveContext(interaction, channelId, { requireMembership = true
 
   voice.tempChannels ??= {};
   voice.lobbies ??= {};
+  voice.customRooms ??= {};
 
-  const temp = voice.tempChannels[channelId];
-  if (!temp) return { ok: false, error: "not-temp" };
+  const temp = voice.tempChannels[channelId] ?? null;
+  const customRoom = !temp ? (getCustomRoom(voice, channelId) ?? null) : null;
+  if (!temp && !customRoom) return { ok: false, error: "not-temp" };
 
   const roomChannel = guild.channels.cache.get(channelId)
     ?? (await guild.channels.fetch(channelId).catch(() => null));
@@ -234,7 +237,8 @@ async function resolveContext(interaction, channelId, { requireMembership = true
 
   const inRoom = roomChannel.members.has(interaction.user.id);
   const isAdmin = hasAdmin(interaction);
-  const isOwner = temp.ownerId === interaction.user.id;
+  const ownerId = temp ? temp.ownerId : customRoom.ownerId;
+  const isOwner = ownerId === interaction.user.id;
 
   if (requireMembership && !inRoom && !isAdmin) {
     return { ok: false, error: "not-in-room" };
@@ -244,12 +248,13 @@ async function resolveContext(interaction, channelId, { requireMembership = true
     return { ok: false, error: "not-owner" };
   }
 
-  const lobby = voice.lobbies?.[temp.lobbyId] ?? null;
+  const lobby = temp ? (voice.lobbies?.[temp.lobbyId] ?? null) : null;
   return {
     ok: true,
     guild,
     voice,
     temp,
+    customRoom,
     roomChannel,
     lobby,
     isOwner,
@@ -572,29 +577,34 @@ async function resolveRoomPanelState(guild, roomChannelId) {
   const voice = await getVoiceState(guild.id);
   voice.tempChannels ??= {};
   voice.lobbies ??= {};
+  voice.customRooms ??= {};
 
   const temp = voice.tempChannels[roomChannelId] ?? null;
+  const customRoom = !temp ? (getCustomRoom(voice, roomChannelId) ?? null) : null;
   const roomChannel = guild.channels.cache.get(roomChannelId)
     ?? (await guild.channels.fetch(roomChannelId).catch(() => null));
 
-  if (!temp || !roomChannel) {
+  // A room is open if it exists in either registry AND the Discord channel is present
+  if ((!temp && !customRoom) || !roomChannel) {
     return {
       open: false,
       guild,
       voice,
       temp,
+      customRoom,
       roomChannel,
       lobby: null,
       roomChannelId
     };
   }
 
-  const lobby = voice.lobbies?.[temp.lobbyId] ?? null;
+  const lobby = temp ? (voice.lobbies?.[temp.lobbyId] ?? null) : null;
   return {
     open: true,
     guild,
     voice,
     temp,
+    customRoom,
     roomChannel,
     lobby,
     roomChannelId
@@ -649,12 +659,13 @@ function buildLiveRoomPanelEmbed(state, { reason = "update", notice = null } = {
   const members = state.roomChannel.members.filter(m => !m.user?.bot).size;
   const limit = Number.isFinite(state.roomChannel.userLimit) ? state.roomChannel.userLimit : 0;
   const lobbyLabel = state.temp?.lobbyId ? `<#${state.temp.lobbyId}>` : "n/a";
+  const ownerId = state.temp?.ownerId ?? state.customRoom?.ownerId ?? null;
 
   const embed = new EmbedBuilder()
     .setTitle("Voice Room Live Panel")
     .setDescription(`Live controls for <#${state.roomChannel.id}>`)
     .addFields(
-      { name: "Owner", value: `<@${state.temp.ownerId}>`, inline: true },
+      { name: "Owner", value: ownerId ? `<@${ownerId}>` : "Unknown", inline: true },
       { name: "Members", value: String(members), inline: true },
       { name: "Locked", value: locked ? "yes" : "no", inline: true },
       { name: "Limit", value: String(limit), inline: true },
@@ -755,6 +766,7 @@ export async function showLiveRoomPanel(interaction) {
     guild: interaction.guild,
     voice: ctx.voice,
     temp: ctx.temp,
+    customRoom: ctx.customRoom ?? null,
     roomChannel: ctx.roomChannel,
     lobby: ctx.lobby,
     roomChannelId

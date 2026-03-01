@@ -4,10 +4,11 @@
 // If threshold is exceeded, the engine "punishes" the executor automatically.
 
 import { loadGuildData, saveGuildData } from "../../utils/storage.js";
-import { PermissionFlagsBits } from "discord.js";
 
 // In-memory action counters: Map<"guildId:userId:action", { count, firstAt }>
 const actionCounters = new Map();
+// Corresponding cleanup timers (one per key, replaced on each new action)
+const actionTimers = new Map();
 
 const DEFAULT_CONFIG = {
   enabled: false,
@@ -62,8 +63,13 @@ export function recordAction(guildId, userId, action, config) {
   entry.count++;
   actionCounters.set(key, entry);
 
-  // Auto-clean after 2x window
-  setTimeout(() => actionCounters.delete(key), (config.windowMs ?? 10_000) * 2);
+  // Replace any existing cleanup timer so only one fires per key
+  clearTimeout(actionTimers.get(key));
+  const timer = setTimeout(() => {
+    actionCounters.delete(key);
+    actionTimers.delete(key);
+  }, (config.windowMs ?? 10_000) * 2);
+  actionTimers.set(key, timer);
 
   return entry.count >= threshold;
 }
@@ -79,10 +85,7 @@ export async function punishExecutor(guild, userId, action, config) {
     // Don't punish server owner
     if (guild.ownerId === userId) return;
 
-    // Auto-exempt members with Administrator permission (they should manage their own admins)
-    if (member.permissions?.has(PermissionFlagsBits.Administrator)) return;
-
-    // Check whitelist
+    // Check whitelist (explicit user or role exemptions only)
     if (config.whitelistUserIds?.includes(userId)) return;
     if (config.whitelistRoleIds?.some(rid => member.roles.cache.has(rid))) return;
 

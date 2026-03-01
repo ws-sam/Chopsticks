@@ -1,5 +1,6 @@
 // src/commands/antinuke.js
 import {
+  ChannelType,
   SlashCommandBuilder,
   PermissionFlagsBits,
   MessageFlags,
@@ -79,7 +80,11 @@ export const data = new SlashCommandBuilder()
   .addSubcommand(s => s
     .setName("log-channel")
     .setDescription("Set channel for anti-nuke alerts")
-    .addChannelOption(o => o.setName("channel").setDescription("Alert channel").setRequired(true)));
+    .addChannelOption(o => o
+      .setName("channel")
+      .setDescription("Alert channel")
+      .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
+      .setRequired(true)));
 
 export async function execute(interaction) {
   const sub = interaction.options.getSubcommand();

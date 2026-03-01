@@ -179,9 +179,10 @@ export async function execute(interaction) {
 
     try {
       await interaction.guild.members.ban(user.id, { reason, deleteMessageSeconds: deleteDays * 86400 });
+      const banCase = await createCase(interaction.guildId, { type: "ban", userId: user.id, modId: interaction.user.id, reason }).catch(() => null);
       await replyModSuccess(interaction, {
         title: "User Banned",
-        summary: `Successfully banned **${user.tag}**.`,
+        summary: `Successfully banned **${user.tag}**.${banCase ? ` Case #${banCase.id}.` : ""}`,
         fields: [
           { name: "User", value: `${user.tag} (${user.id})` },
           { name: "Delete Message Days", value: String(deleteDays), inline: true },
@@ -259,9 +260,10 @@ export async function execute(interaction) {
     try {
       await interaction.guild.members.ban(user.id, { reason, deleteMessageSeconds: deleteDays * 86400 });
       await interaction.guild.members.unban(user.id, "Softban cleanup");
+      const softbanCase = await createCase(interaction.guildId, { type: "ban", userId: user.id, modId: interaction.user.id, reason }).catch(() => null);
       await replyModSuccess(interaction, {
         title: "Softban Complete",
-        summary: `Softbanned **${user.tag}** (ban + immediate unban).`,
+        summary: `Softbanned **${user.tag}** (ban + immediate unban).${softbanCase ? ` Case #${softbanCase.id}.` : ""}`,
         fields: [
           { name: "User", value: `${user.tag} (${user.id})` },
           { name: "Delete Message Days", value: String(deleteDays), inline: true },
@@ -313,6 +315,8 @@ export async function execute(interaction) {
     const successes = [];
     const failures = [];
 
+    await interaction.deferReply({ ephemeral: true });
+
     for (const userId of ids) {
       if (userId === interaction.user.id) {
         failures.push({ id: userId, reason: "Cannot ban yourself" });
@@ -359,11 +363,7 @@ export async function execute(interaction) {
     if (failures.length) embed.addFields({ name: "❌ Failed", value: failures.map(f => `\`${f.id}\`: ${f.reason}`).join("\n").slice(0, 1024) });
     embed.addFields({ name: "Reason", value: reason });
 
-    if (interaction.deferred || interaction.replied) {
-      await interaction.editReply({ embeds: [embed] });
-    } else {
-      await interaction.reply({ embeds: [embed], flags: 64 });
-    }
+    await interaction.editReply({ embeds: [embed] });
     return;
   }
 
@@ -540,7 +540,7 @@ export async function execute(interaction) {
 
     await replyModSuccess(interaction, {
       title: "User Warned",
-      summary: `Warning recorded for **${user.tag}**.${modCase ? ` Case #${modCase.id}.` : ""}`,
+      summary: `Warning recorded for **${user.tag}**.${modCase ? ` Case #${modCase.id}.` : ""}${escalationNote}`,
       fields: [
         { name: "User", value: `${user.tag} (${user.id})` },
         { name: "Total Warnings", value: String(list.length), inline: true },

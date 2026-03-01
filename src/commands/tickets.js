@@ -330,9 +330,9 @@ async function createTranscriptAttachment(channel, closerTag) {
   }
 
   lines.reverse();
-  lines.unshift(`# Ticket Transcript`);
-  lines.unshift(`# Closed by: ${closerTag}`);
   lines.unshift(`# Channel: ${channel.name} (${channel.id})`);
+  lines.unshift(`# Closed by: ${closerTag}`);
+  lines.unshift(`# Ticket Transcript`);
 
   const body = lines.join("\n").slice(0, 900_000);
   const file = new AttachmentBuilder(Buffer.from(body, "utf8"), {
@@ -514,6 +514,7 @@ export async function execute(interaction) {
   if (sub === "open") {
     const type = interaction.options.getString("type", false) || "support";
     const subject = interaction.options.getString("subject", false) || "";
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     await handleOpenFlow(interaction, { typeKey: type, subject, source: "slash-open" });
     return;
   }
@@ -521,6 +522,7 @@ export async function execute(interaction) {
   if (sub === "close") {
     const channel = interaction.options.getChannel("channel", false) || interaction.channel;
     const reason = interaction.options.getString("reason", false) || "No reason provided.";
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     await handleCloseFlow(interaction, { channel, reason, source: "slash-close" });
     return;
   }

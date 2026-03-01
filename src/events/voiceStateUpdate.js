@@ -95,23 +95,33 @@ export default {
 
     /* ---------- LEAVE CUSTOM VC ---------- */
 
-    if (oldChannel && !newChannel && voice.customRooms?.[oldChannel.id]) {
+    if (oldChannel && voice.customRooms?.[oldChannel.id]) {
       const channelId = oldChannel.id;
       const record = getCustomRoom(voice, channelId);
-      if (record?.ownerId === member.id) {
-        const cleanup = async () => {
-          const channel =
-            guild.channels.cache.get(channelId) ??
-            (await guild.channels.fetch(channelId).catch(() => null));
-          if (channel) {
-            await channel.delete().catch(() => {});
-          }
-          await removeCustomRoom(guild.id, channelId, voice).catch(() => {});
-          log("custom vc deleted (host left)", { channelId, ownerId: member.id });
-        };
-        setTimeout(() => {
-          cleanup().catch(err => log("custom cleanup failed", { channelId, error: err?.message }));
-        }, 500);
+      const humans = Array.from(oldChannel.members.values()).filter(m => !m.user?.bot && m.id !== member.id);
+
+      if (record) {
+        const isOwnerLeaving = record.ownerId === member.id;
+        // Delete if: owner disconnected entirely, OR last person left
+        if (isOwnerLeaving && !newChannel || humans.length === 0) {
+          const cleanup = async () => {
+            const channel =
+              guild.channels.cache.get(channelId) ??
+              (await guild.channels.fetch(channelId).catch(() => null));
+            if (channel) {
+              await channel.delete().catch(() => {});
+            }
+            await removeCustomRoom(guild.id, channelId, voice).catch(() => {});
+            log("custom vc deleted", { channelId, reason: isOwnerLeaving ? "host-left" : "empty" });
+            await refreshRegisteredRoomPanelsForRoom(guild, channelId, "deleted").catch(() => {});
+          };
+          setTimeout(() => {
+            cleanup().catch(err => log("custom cleanup failed", { channelId, error: err?.message }));
+          }, 500);
+        } else {
+          // Non-owner left, room still has people — refresh panel member count
+          await refreshRegisteredRoomPanelsForRoom(guild, channelId, "member-change").catch(() => {});
+        }
       }
     }
 
@@ -192,9 +202,13 @@ export default {
       }, 500);
     }
 
-    /* ---------- MEMBER JOINED EXISTING TEMP CHANNEL ---------- */
-    if (newChannel && voice.tempChannels?.[newChannel.id]) {
-      await refreshRegisteredRoomPanelsForRoom(guild, newChannel.id, "member-change").catch(() => {});
+    /* ---------- MEMBER JOINED EXISTING TEMP OR CUSTOM VC CHANNEL ---------- */
+    if (newChannel) {
+      if (voice.tempChannels?.[newChannel.id]) {
+        await refreshRegisteredRoomPanelsForRoom(guild, newChannel.id, "member-change").catch(() => {});
+      } else if (voice.customRooms?.[newChannel.id]) {
+        await refreshRegisteredRoomPanelsForRoom(guild, newChannel.id, "member-change").catch(() => {});
+      }
     }
 
     /* ---------- JOIN LOBBY ---------- */

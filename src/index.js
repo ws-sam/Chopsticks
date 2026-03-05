@@ -1148,6 +1148,16 @@ client.on(Events.MessageCreate, async message => {
     void maybeHandleAudiobookMessage(message).catch(() => {});
   }
 
+  // ── Text Session: update lastActive so idle timer stays fresh ─────────────
+  if (message.guildId && global.agentManager) {
+    try {
+      const sess = global.agentManager.getTextSessionAgent(message.guildId, message.channelId, { kind: "text" });
+      if (sess.ok && sess.agent) {
+        sess.agent.lastActive = Date.now();
+      }
+    } catch {}
+  }
+
   if (!message.content?.startsWith(prefix)) return;
 
   const raw = message.content.slice(prefix.length).trim();

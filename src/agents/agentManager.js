@@ -638,6 +638,22 @@ export class AgentManager {
     return out;
   }
 
+  listTextSessions() {
+    const out = [];
+    for (const [key, agentId] of this.textSessions.entries()) {
+      const parts = String(key).split(":");
+      const kind = parts[1] || "text";
+      const guildId = parts[2];
+      const textChannelId = parts[3];
+      const ownerUserId = parts[4] && parts[4] !== "0" ? parts[4] : null;
+      const agent = this.liveAgents.get(agentId);
+      const lastActiveMs = agent?.lastActive ? (Date.now() - agent.lastActive) : null;
+      out.push({ guildId, textChannelId, ownerUserId, agentId, kind, lastActiveMs });
+    }
+    out.sort((a, b) => String(a.textChannelId).localeCompare(String(b.textChannelId)));
+    return out;
+  }
+
   // ===== warm-up pool =====
 
   /**

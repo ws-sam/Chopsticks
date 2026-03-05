@@ -1070,6 +1070,24 @@ export const data = new SlashCommandBuilder()
       .setDescription("Get the AI profile for an agent.")
       .addStringOption(o => o.setName("agent_id").setDescription("The ID of the agent").setRequired(true))
   )
+  .addSubcommand(s =>
+    s
+      .setName("text_assign")
+      .setDescription("Bind an agent to a text channel for chat sessions")
+      .addChannelOption(o => o.setName("channel").setDescription("Text channel to assign").setRequired(true))
+      .addStringOption(o => o.setName("agent_id").setDescription("Specific agent ID (leave empty for auto-select)").setRequired(false))
+  )
+  .addSubcommand(s =>
+    s
+      .setName("text_status")
+      .setDescription("List active text chat sessions in this guild")
+  )
+  .addSubcommand(s =>
+    s
+      .setName("text_release")
+      .setDescription("Release the text chat session for a channel")
+      .addChannelOption(o => o.setName("channel").setDescription("Text channel to release").setRequired(true))
+  )
   .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild);
 
 export async function execute(interaction) {
@@ -1900,14 +1918,22 @@ export async function execute(interaction) {
       const sessions = mgr
         .listSessions()
         .filter(s => s.guildId === guildId)
-        .map(s => `music ${s.voiceChannelId} -> ${s.agentId}`);
+        .map(s => `🎵 music <#${s.voiceChannelId}> → \`${s.agentId}\``);
 
       const assistantSessions = mgr
         .listAssistantSessions()
         .filter(s => s.guildId === guildId)
-        .map(s => `assistant ${s.voiceChannelId} -> ${s.agentId}`);
+        .map(s => `🎙️ assistant <#${s.voiceChannelId}> → \`${s.agentId}\``);
 
-      const lines = [...sessions, ...assistantSessions];
+      const textSessions = mgr
+        .listTextSessions()
+        .filter(s => s.guildId === guildId)
+        .map(s => {
+          const idle = s.lastActiveMs !== null ? ` | idle ${Math.round(s.lastActiveMs / 60000)}m` : "";
+          return `💬 text <#${s.textChannelId}> → \`${s.agentId}\`${idle}`;
+        });
+
+      const lines = [...sessions, ...assistantSessions, ...textSessions];
       const embed = buildInfoEmbed(
         "Active Agent Sessions",
         lines.length ? "Current pinned sessions for this guild." : "No active sessions in this guild.",
@@ -2651,6 +2677,95 @@ export async function execute(interaction) {
     } catch (error) {
       botLogger.error({ err: error }, "Error fetching agent profile");
       await replyEmbed(interaction, "Agent profile", `Error: ${error.message}`);
+    }
+    return;
+  }
+
+  if (sub === "text_assign") {
+    try {
+      const channel = interaction.options.getChannel("channel", true);
+      const requestedId = interaction.options.getString("agent_id") || null;
+
+      if (!channel.isTextBased?.()) {
+        await replyError(interaction, "Invalid Channel", "Please select a text channel.");
+        return;
+      }
+
+      // If a specific agent was requested, bind it directly
+      if (requestedId) {
+        const agent = mgr.liveAgents.get(requestedId);
+        if (!agent?.ready || !agent.ws) {
+          await replyError(interaction, "Agent Not Ready", `Agent \`${requestedId}\` is not online.`);
+          return;
+        }
+        if (!agent.guildIds?.has(guildId)) {
+          await replyError(interaction, "Wrong Guild", `Agent \`${requestedId}\` is not in this guild.`);
+          return;
+        }
+        const k = mgr.bindAgentToTextSession(agent, { guildId, textChannelId: channel.id, ownerUserId: interaction.user.id, kind: "text" });
+        await replySuccess(interaction, "Text Session Bound", `Agent \`${requestedId}\` is now handling chat in <#${channel.id}>.\nSession key: \`${k}\``);
+        return;
+      }
+
+      // Auto-assign: use ensureTextSessionAgent
+      const sess = await mgr.ensureTextSessionAgent(guildId, channel.id, { ownerUserId: interaction.user.id, kind: "text" });
+      if (sess.ok) {
+        await replySuccess(interaction, "Text Session Assigned", `Agent \`${sess.agent.agentId}\` is now handling chat in <#${channel.id}>.\nSession auto-expires after 15 minutes of inactivity.`);
+      } else {
+        const reasons = {
+          "no-agents-in-guild": "No agents are connected to this guild. Use `/agents deploy` first.",
+          "no-free-agents": "All agents are currently busy. Wait for one to free up or deploy more.",
+          "no-session": "No session could be created."
+        };
+        await replyError(interaction, "Assignment Failed", reasons[sess.reason] ?? sess.reason);
+      }
+    } catch (error) {
+      botLogger.error({ err: error }, "[agents:text_assign] Error");
+      await replyError(interaction, "Text Assign Failed", error.message || "Unknown error.");
+    }
+    return;
+  }
+
+  if (sub === "text_status") {
+    try {
+      const all = mgr.listTextSessions().filter(s => s.guildId === guildId);
+      const embed = new EmbedBuilder()
+        .setTitle("💬 Active Text Chat Sessions")
+        .setColor(all.length ? 0x5865F2 : 0x57F287)
+        .setTimestamp();
+
+      if (all.length === 0) {
+        embed.setDescription("No active text sessions in this guild.");
+      } else {
+        const lines = all.map(s => {
+          const idle = s.lastActiveMs !== null ? `idle ${Math.round(s.lastActiveMs / 60000)}m` : "idle unknown";
+          const owner = s.ownerUserId ? `<@${s.ownerUserId}>` : "unowned";
+          return `<#${s.textChannelId}> → \`${s.agentId}\` | ${owner} | ${idle}`;
+        });
+        embed.addFields({ name: `Sessions (${all.length})`, value: lines.join("\n").slice(0, 1024), inline: false });
+        embed.setFooter({ text: "Sessions auto-expire after 15 minutes of inactivity" });
+      }
+      await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+    } catch (error) {
+      botLogger.error({ err: error }, "[agents:text_status] Error");
+      await replyError(interaction, "Text Status Failed", error.message || "Unknown error.");
+    }
+    return;
+  }
+
+  if (sub === "text_release") {
+    try {
+      const channel = interaction.options.getChannel("channel", true);
+      const sess = mgr.getTextSessionAgent(guildId, channel.id, { kind: "text" });
+      if (!sess.ok) {
+        await replyError(interaction, "No Session", `No active text session in <#${channel.id}>.`);
+        return;
+      }
+      mgr.releaseTextSession(guildId, channel.id, { kind: "text" });
+      await replySuccess(interaction, "Session Released", `Text chat session in <#${channel.id}> has been released. The agent is now free.`);
+    } catch (error) {
+      botLogger.error({ err: error }, "[agents:text_release] Error");
+      await replyError(interaction, "Text Release Failed", error.message || "Unknown error.");
     }
     return;
   }

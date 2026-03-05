@@ -54,6 +54,7 @@ async function withTicketLock(guildId, fn) {
 export const meta = {
   deployGlobal: true,
   guildOnly: true,
+  userPerms: [PermissionFlagsBits.ManageGuild],
   category: "tools"
 };
 

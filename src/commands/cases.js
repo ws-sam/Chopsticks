@@ -21,6 +21,8 @@ import {
 
 export const meta = {
   deployGlobal: false,
+  guildOnly: true,
+  userPerms: [PermissionFlagsBits.ModerateMembers],
   name: "cases",
   category: "mod",
 };

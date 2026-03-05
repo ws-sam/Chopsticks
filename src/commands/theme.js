@@ -22,6 +22,8 @@ export const meta = {
   name: "theme",
   category: "utility",
   deployGlobal: false,
+  guildOnly: true,
+  userPerms: [PermissionFlagsBits.ManageGuild],
 };
 
 const COLOR_SLOTS = ["primary", "success", "error", "warning", "info", "neutral"];

@@ -15,6 +15,8 @@ import { sanitizeString } from "../utils/validation.js";
 
 export const meta = {
   deployGlobal: false,
+  guildOnly: true,
+  userPerms: [PermissionFlagsBits.ManageGuild],
   name: "autoresponder",
   category: "tools",
 };

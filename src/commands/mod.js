@@ -12,6 +12,7 @@ import { withTimeout } from "../utils/interactionTimeout.js";
 export const meta = {
   deployGlobal: true,
   guildOnly: true,
+  userPerms: [PermissionFlagsBits.ModerateMembers],
   category: "mod"
 };
 
@@ -27,8 +28,7 @@ function parseMassBanIds(input) {
 export const data = new SlashCommandBuilder()
   .setName("mod")
   .setDescription("Moderation actions")
-
-  // ban
+  .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
   .addSubcommand(sub =>
     sub.setName("ban")
       .setDescription("Ban a user from this server")

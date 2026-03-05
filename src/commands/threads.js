@@ -10,6 +10,8 @@ import { loadGuildData, saveGuildData } from "../utils/storage.js";
 
 export const meta = {
   deployGlobal: false,
+  guildOnly: true,
+  userPerms: [PermissionFlagsBits.ManageGuild],
   name: "threads",
   category: "tools",
 };

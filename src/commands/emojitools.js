@@ -14,6 +14,8 @@ import {
 
 export const meta = {
   deployGlobal: false,
+  guildOnly: true,
+  userPerms: [PermissionFlagsBits.ManageEmojisAndStickers],
   name: "emoji",
   category: "tools",
 };

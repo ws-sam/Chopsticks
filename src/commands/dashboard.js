@@ -528,6 +528,8 @@ async function showHome(interaction, userId) {
 export const meta = {
   category: "admin",
   deployGlobal: true,
+  guildOnly: true,
+  userPerms: [PermissionFlagsBits.ManageGuild],
 };
 
 export const data = new SlashCommandBuilder()

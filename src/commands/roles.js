@@ -16,6 +16,8 @@ export const meta = {
   name: "roles",
   category: "mod",
   deployGlobal: true,
+  guildOnly: true,
+  userPerms: [PermissionFlagsBits.ManageRoles],
 };
 
 export const data = new SlashCommandBuilder()

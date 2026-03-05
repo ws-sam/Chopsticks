@@ -857,18 +857,25 @@ client.on(Events.MessageCreate, async message => {
     const refId = message.reference.messageId;
     const targetUserId = dmRelayMap.get(refId);
     if (targetUserId) {
-      try {
-        const targetUser = await client.users.fetch(targetUserId).catch(() => null);
-        if (targetUser) {
-          const staffContent = message.content?.slice(0, 1800) || "(no text)";
-          const guild = message.guild;
-          const sender = message.author;
-          await targetUser.send(
-            `📨 **Message from ${guild?.name ?? "Support"}:**\n${staffContent}`
-          ).catch(() => null);
-          await message.react("✅").catch(() => {});
-        }
-      } catch {}
+      // Only staff with ManageMessages or higher may relay replies
+      const staffPerms = message.member?.permissions;
+      const isStaff = staffPerms?.has(PermissionFlagsBits.ManageMessages) ||
+                      staffPerms?.has(PermissionFlagsBits.ModerateMembers) ||
+                      staffPerms?.has(PermissionFlagsBits.ManageGuild) ||
+                      staffPerms?.has(PermissionFlagsBits.Administrator);
+      if (isStaff) {
+        try {
+          const targetUser = await client.users.fetch(targetUserId).catch(() => null);
+          if (targetUser) {
+            const staffContent = message.content?.slice(0, 1800) || "(no text)";
+            const guild = message.guild;
+            await targetUser.send(
+              `📨 **Message from ${guild?.name ?? "Support"}:**\n${staffContent}`
+            ).catch(() => null);
+            await message.react("✅").catch(() => {});
+          }
+        } catch {}
+      }
     }
   }
 

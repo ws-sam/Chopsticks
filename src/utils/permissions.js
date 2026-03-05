@@ -2,14 +2,17 @@ import { PermissionsBitField } from "discord.js";
 import { loadGuildData, saveGuildData } from "./storage.js";
 
 const CATEGORY_MAP = {
-  mod: new Set(["ban","unban","kick","timeout","purge","slowmode","warn","warnings","clearwarns","lock","unlock","nick","softban","role"]),
-  util: new Set(["ping","uptime","help","serverinfo","userinfo","avatar","roleinfo","botinfo","invite","echo"]),
-  fun: new Set(["8ball","coinflip","roll","choose","fun"]),
-  admin: new Set(["config","prefix","alias","agents","reactionroles","levels","automations","setup","modlogs","logs","model","scripts","custom","macro"]),
-  music: new Set(["music"]),
-  voice: new Set(["voice","welcome","autorole"]),
-  tools: new Set(["poll","giveaway","remind","starboard","tickets"]),
-  assistant: new Set(["assistant"])
+  mod: new Set(["mod","ban","unban","kick","timeout","purge","slowmode","warn","warnings","clearwarns","lock","unlock","nick","softban","role","cases","modlogs","history","note"]),
+  util: new Set(["ping","uptime","help","serverinfo","userinfo","avatar","roleinfo","botinfo","invite","echo","convert","commands","snipe"]),
+  fun: new Set(["8ball","coinflip","roll","choose","fun","meme","ship","compliment","roast","truthordare","wouldyourather","riddle","trivia","fight","battle"]),
+  admin: new Set(["config","prefix","alias","agents","reactionroles","levels","automations","setup","modlogs","logs","model","scripts","custom","macro","xp","backup","analytics","dashboard","console","schedule","statschannel","autoresponder","customcmd","notify","threads","theme","verify","automod","antinuke","antispam","agentkeys"]),
+  music: new Set(["music","audiobook","voice"]),
+  safety: new Set(["antinuke","antispam","automod","verify","lockdown"]),
+  social: new Set(["xp","levels","leaderboard","rank","card","profile","profilecard","social","marry","birthday","reputation","streak","highlight","colorrole","boosterperks"]),
+  tools: new Set(["poll","giveaway","remind","starboard","tickets","embed","tag","suggest","pin","threads","autoresponder","customcmd","emojitools","roles","auction"]),
+  economy: new Set(["bank","pay","shop","use","craft","gather","trade","vault","casino","heist","collection","quest","quests","pet","pools"]),
+  assistant: new Set(["assistant","ai","imagine","imageinfo","weather"]),
+  games: new Set(["game","fight","battle","heist","trivia","riddle","wouldyourather","truthordare"])
 };
 
 function inferCategory(commandName, meta) {

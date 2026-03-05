@@ -13,7 +13,7 @@ import {
 import { sanitizeString } from "../utils/validation.js";
 import { logger } from "../utils/logger.js";
 
-export const meta = { category: "ai", deployGlobal: false };
+export const meta = { category: "ai", deployGlobal: false, guildOnly: true, userPerms: [PermissionFlagsBits.ManageGuild] };
 
 export const data = new SlashCommandBuilder()
   .setName("agentkeys")

@@ -65,7 +65,7 @@ function buildHealthSnapshot(guildId) {
   return { total, active, busy, capacity, warmStatus };
 }
 
-export const meta = { category: "admin", deployGlobal: false };
+export const meta = { category: "admin", deployGlobal: false, guildOnly: true, userPerms: [PermissionFlagsBits.ManageGuild] };
 
 export const data = new SlashCommandBuilder()
   .setName("console")

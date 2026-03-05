@@ -10,6 +10,8 @@ import { getAntinukeConfig, saveAntinukeConfig } from "../tools/antinuke/engine.
 
 export const meta = {
   deployGlobal: false,
+  guildOnly: true,
+  userPerms: [PermissionFlagsBits.Administrator],
   name: "antinuke",
   category: "safety",
 };

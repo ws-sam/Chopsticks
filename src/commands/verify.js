@@ -19,6 +19,8 @@ export const meta = {
   name: "verify",
   category: "safety",
   deployGlobal: true,
+  guildOnly: true,
+  userPerms: [PermissionFlagsBits.ManageGuild],
 };
 
 export const data = new SlashCommandBuilder()

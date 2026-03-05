@@ -21,6 +21,8 @@ const RULE_LABELS = {
 
 export const meta = {
   deployGlobal: true,
+  guildOnly: true,
+  userPerms: [PermissionFlagsBits.ManageGuild],
   name: "automod",
   category: "safety",
 };

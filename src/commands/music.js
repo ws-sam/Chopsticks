@@ -4824,6 +4824,17 @@ export async function handleSelect(interaction) {
         await interaction.followUp({ ephemeral: true, embeds: [makeEmbed("Playlist Panel", "Invalid channel.", [], null, null, 0xFF0000)] }).catch(() => {});
         return true;
       }
+
+      // Delete the old panel message before posting the new one
+      if (pl.panel?.channelId && pl.panel?.messageId) {
+        const oldCh = guild?.channels?.cache?.get(pl.panel.channelId);
+        if (oldCh?.isTextBased?.()) {
+          const oldMsg = await oldCh.messages.fetch(pl.panel.messageId).catch(() => null);
+          if (oldMsg) await oldMsg.delete().catch(() => {});
+        }
+        pl.panel = null;
+      }
+
       const embed = buildPlaylistPanelMessageEmbed(pl);
       const msg = await ch.send({ embeds: [embed], components: buildPlaylistPanelMessageComponents(pl.id) }).catch(() => null);
       if (!msg) {

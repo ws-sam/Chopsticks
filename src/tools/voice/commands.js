@@ -25,7 +25,8 @@ import {
   handleVoiceUIButton,
   handleVoiceUISelect,
   handleVoiceUIModal,
-  showVoiceConsole
+  showVoiceConsole,
+  registerRoomPanelRef
 } from "./ui.js";
 import {
   buildCustomVcPanelMessage,
@@ -1354,6 +1355,17 @@ export async function execute(interaction) {
           : sent.reason === "off"
             ? "Panel delivery is currently off. Change your default mode first."
             : "Panel delivery failed. Check bot permissions for DM/text channels.";
+
+      // Register new channel panel for live updates
+      if (sent.ok && sent.textMessage) {
+        registerRoomPanelRef({
+          guildId: interaction.guildId,
+          roomChannelId: channel.id,
+          textChannelId: sent.textMessage.channelId,
+          messageId: sent.textMessage.id
+        });
+      }
+
       await interaction.reply({
         embeds: [buildEmbed("Voice panel", status)],
         ephemeral: true

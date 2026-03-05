@@ -207,6 +207,28 @@ function unregisterRoomPanelRef(guildId, roomChannelId, textChannelId, messageId
   if (!refs.size) roomPanelRegistry.delete(key);
 }
 
+/**
+ * Delete all registered panels for a room that are NOT in the given keepChannelId,
+ * and unregister them. Call this after delivering a panel to a new channel.
+ */
+async function purgeStalePanels(guild, roomChannelId, keepChannelId) {
+  const key = roomPanelKey(guild.id, roomChannelId);
+  const refs = roomPanelRegistry.get(key);
+  if (!refs?.size) return;
+  for (const ref of Array.from(refs.values())) {
+    if (ref.textChannelId === keepChannelId) continue;
+    try {
+      const ch = guild.channels.cache.get(ref.textChannelId)
+        ?? await guild.channels.fetch(ref.textChannelId).catch(() => null);
+      if (ch?.isTextBased?.()) {
+        const msg = await ch.messages.fetch(ref.messageId).catch(() => null);
+        if (msg) await msg.delete().catch(() => {});
+      }
+    } catch {}
+    unregisterRoomPanelRef(guild.id, roomChannelId, ref.textChannelId, ref.messageId);
+  }
+}
+
 function inferPanelChannelIdFromInteraction(interaction, mode) {
   const needsChannel = mode === "channel" || mode === "both";
   if (!needsChannel) return undefined;
@@ -1528,6 +1550,7 @@ export async function handleVoiceUIButton(interaction) {
         interactionChannel: interaction.channel,
         reason: "manual"
       });
+
     if (parsed.kind === "panel_dm" && !sent.ok) {
       const embed = buildVoiceRoomDashboardEmbed({
         roomChannel: ctx.roomChannel,
@@ -1543,6 +1566,22 @@ export async function handleVoiceUIButton(interaction) {
         ephemeral: true
       }).catch(() => {});
     }
+
+    // When panel_here succeeds: register the new panel and purge stale panels from other channels
+    if (parsed.kind === "panel_here" && sent.ok && sent.textMessage) {
+      const newChannelId = sent.textMessage.channelId;
+      const roomChannelId = ctx.roomChannel.id;
+      // Delete old panels in other channels
+      await purgeStalePanels(interaction.guild, roomChannelId, newChannelId).catch(() => {});
+      // Register new panel
+      registerRoomPanelRef({
+        guildId: interaction.guildId,
+        roomChannelId,
+        textChannelId: newChannelId,
+        messageId: sent.textMessage.id
+      });
+    }
+
       return updateConsole(interaction, parsed.userId, parsed.channelId, panelDeliveryMessage(sent));
     }
 

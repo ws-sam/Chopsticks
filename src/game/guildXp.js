@@ -3,6 +3,7 @@
 
 import { addGuildXpRow, getGuildXpConfig } from '../utils/storage.js';
 import { checkAchievements } from './achievements.js';
+import { EmbedBuilder } from 'discord.js';
 
 const DEFAULT_CONFIG = {
   enabled: true,
@@ -99,29 +100,49 @@ async function announceLevel(client, guildId, userId, level, cfg) {
   try {
     const guild = client.guilds.cache.get(guildId) ?? await client.guilds.fetch(guildId).catch(() => null);
     if (!guild) return;
-    const msg = (cfg.levelup_message || 'GG {user}, you hit **level {level}**! 🎉')
-      .replace(/{user}/g, `<@${userId}>`)
-      .replace(/{level}/g, String(level));
+
+    const customMsg = (cfg.levelup_message || 'GG {user}, you hit **level {level}**! 🎉');
+
+    // Build a rich embed for channel announcements
+    function buildChannelEmbed() {
+      const description = customMsg
+        .replace(/{user}/g, `<@${userId}>`)
+        .replace(/{level}/g, String(level));
+      return new EmbedBuilder()
+        .setColor(0xF5A623)
+        .setDescription(`🎉 ${description}`)
+        .setFooter({ text: guild.name, iconURL: guild.iconURL() ?? undefined })
+        .setTimestamp();
+    }
+
+    // Build a DM embed (no mention — use display name)
+    function buildDmEmbed(username) {
+      const description = customMsg
+        .replace(/{user}/g, username)
+        .replace(/{level}/g, String(level));
+      return new EmbedBuilder()
+        .setColor(0xF5A623)
+        .setTitle(`🎉 Level Up!`)
+        .setDescription(description)
+        .setThumbnail(guild.iconURL() ?? null)
+        .addFields({ name: 'Server', value: guild.name, inline: true }, { name: 'New Level', value: String(level), inline: true })
+        .setTimestamp();
+    }
 
     // Send to configured channel
     if (cfg.levelup_channel_id) {
       const channel = guild.channels.cache.get(cfg.levelup_channel_id);
       if (channel?.isTextBased?.()) {
-        await channel.send(msg).catch(() => {});
+        await channel.send({ content: `<@${userId}>`, embeds: [buildChannelEmbed()], allowedMentions: { users: [userId] } }).catch(() => {});
       }
     }
 
-    // Send DM to the user if enabled
+    // DM the user if enabled
     if (cfg.levelup_dm) {
-      try {
-        const user = await client.users.fetch(userId).catch(() => null);
-        if (user) {
-          const dmMsg = (cfg.levelup_message || 'GG {user}, you hit **level {level}**! 🎉')
-            .replace(/{user}/g, user.username)
-            .replace(/{level}/g, String(level));
-          await user.send(`🎉 **${guild.name}:** ${dmMsg}`).catch(() => {});
-        }
-      } catch {}
+      const user = await client.users.fetch(userId).catch(() => null);
+      if (user) {
+        await user.send({ embeds: [buildDmEmbed(user.username)] }).catch(() => {});
+      }
     }
   } catch {}
 }

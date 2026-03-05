@@ -184,6 +184,7 @@ export async function checkAchievements(userId, guildId, stats, xpResult, client
 async function notifyAchievements(client, userId, guildId, achIds) {
   try {
     const { getGuildXpConfig } = await import('../utils/storage.js');
+    const { EmbedBuilder } = await import('discord.js');
     const cfg = await getGuildXpConfig(guildId).catch(() => null);
     const channelId = cfg?.levelup_channel_id;
     if (!channelId) return;
@@ -193,7 +194,12 @@ async function notifyAchievements(client, userId, guildId, achIds) {
     if (!channel?.isTextBased?.()) return;
     const defs = ACHIEVEMENT_DEFS.filter(d => achIds.includes(d.id));
     for (const def of defs) {
-      await channel.send(`${def.emoji} <@${userId}> unlocked **${def.name}** *(${def.rarity})*: ${def.description}!`).catch(() => {});
+      const embed = new EmbedBuilder()
+        .setColor(0xF5A623)
+        .setDescription(`${def.emoji} <@${userId}> unlocked **${def.name}** *(${def.rarity})*\n${def.description}`)
+        .setFooter({ text: guild.name, iconURL: guild.iconURL() ?? undefined })
+        .setTimestamp();
+      await channel.send({ content: `<@${userId}>`, embeds: [embed], allowedMentions: { users: [userId] } }).catch(() => {});
     }
   } catch {}
 }

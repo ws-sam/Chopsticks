@@ -793,17 +793,40 @@ const MUTATION_COMMANDS = new Set([
   "agents"
 ]);
 
-// ── DM Relay: in-memory map of relayed bot message ID -> original userId ──
-// Key: relay message snowflake, Value: userId string
-const dmRelayMap = new Map();
-const DM_RELAY_MAP_MAX = 5000; // cap to avoid unbounded growth
+// ── DM Relay: maps relayed message ID → { userId, expiresAt } ──────────────
+// Also tracks per-(guild,user) thread ID so all DMs from the same user are threaded.
+const DM_RELAY_TTL_MS       = 48 * 60 * 60 * 1000; // 48 h
+const DM_RELAY_MAP_MAX      = 5_000;
+const dmRelayMap            = new Map(); // relayMsgId → { userId, expiresAt }
+const dmRelayThreadMap      = new Map(); // `${guildId}:${userId}` → threadId
+
+function dmRelaySet(msgId, userId) {
+  // Prune a stale entry when at capacity
+  if (dmRelayMap.size >= DM_RELAY_MAP_MAX) {
+    const now = Date.now();
+    // First try to evict an expired entry
+    let evicted = false;
+    for (const [k, v] of dmRelayMap) {
+      if (v.expiresAt < now) { dmRelayMap.delete(k); evicted = true; break; }
+    }
+    // Fall back to FIFO eviction
+    if (!evicted) dmRelayMap.delete(dmRelayMap.keys().next().value);
+  }
+  dmRelayMap.set(msgId, { userId, expiresAt: Date.now() + DM_RELAY_TTL_MS });
+}
+
+function dmRelayGet(msgId) {
+  const entry = dmRelayMap.get(msgId);
+  if (!entry) return null;
+  if (entry.expiresAt < Date.now()) { dmRelayMap.delete(msgId); return null; }
+  return entry.userId;
+}
 
 client.on(Events.MessageCreate, async message => {
   if (message.author?.bot) return;
 
   // ── DM Passthrough relay ──────────────────────────────────────────────────
   if (!message.guildId) {
-    // This is a DM to the bot. Forward to all guilds with dmRelayChannelId set.
     try {
       const { getPool } = await import("./utils/storage_pg.js");
       const pool = getPool();
@@ -814,11 +837,13 @@ client.on(Events.MessageCreate, async message => {
       );
       if (!rows.length) return;
 
-      const user = message.author;
+      const user    = message.author;
       const content = message.content?.slice(0, 1800) || "(no text)";
-      const attachmentNote = message.attachments.size
-        ? `\n📎 ${message.attachments.size} attachment(s): ${[...message.attachments.values()].map(a => a.url).join(", ")}`
-        : "";
+      const attachments = message.attachments.size
+        ? [...message.attachments.values()].map(a => a.url)
+        : [];
+
+      const { EmbedBuilder } = await import("discord.js");
 
       for (const row of rows) {
         const guild = client.guilds.cache.get(row.guild_id);
@@ -826,38 +851,61 @@ client.on(Events.MessageCreate, async message => {
         const ch = guild.channels.cache.get(row.relay_ch);
         if (!ch?.isTextBased?.()) continue;
 
-        const { EmbedBuilder } = await import("discord.js");
+        const threadKey = `${guild.id}:${user.id}`;
+        let thread = null;
+
+        // Try to reuse an existing active thread for this user
+        const existingThreadId = dmRelayThreadMap.get(threadKey);
+        if (existingThreadId) {
+          thread = ch.threads?.cache.get(existingThreadId)
+            ?? await ch.threads?.fetch(existingThreadId).catch(() => null);
+          if (thread?.archived) {
+            await thread.setArchived(false).catch(() => {});
+          }
+          if (thread?.locked) thread = null; // can't post to locked threads
+        }
+
+        // Create a thread if none exists
+        if (!thread && ch.threads?.create) {
+          thread = await ch.threads.create({
+            name: `DM — ${user.username} (${user.id})`,
+            autoArchiveDuration: 10080, // 7 days
+            reason: `DM relay thread for ${user.username}`
+          }).catch(() => null);
+          if (thread) dmRelayThreadMap.set(threadKey, thread.id);
+        }
+
         const embed = new EmbedBuilder()
-          .setTitle("📬 Direct Message Received")
-          .setDescription(`${content}${attachmentNote}`)
+          .setDescription(content + (attachments.length ? `\n📎 ${attachments.join(" ")}` : ""))
           .setColor(0x5865F2)
           .setAuthor({ name: `${user.username} (${user.id})`, iconURL: user.displayAvatarURL?.() ?? undefined })
-          .setFooter({ text: `User ID: ${user.id} — Reply to this message to respond via DM` })
+          .setFooter({ text: `Reply to this message to respond via DM  ·  User ID: ${user.id}` })
           .setTimestamp();
 
-        const relayMsg = await ch.send({ embeds: [embed] }).catch(() => null);
-        if (relayMsg) {
-          // Store mapping for reply detection (cap map size)
-          if (dmRelayMap.size >= DM_RELAY_MAP_MAX) {
-            dmRelayMap.delete(dmRelayMap.keys().next().value);
-          }
-          dmRelayMap.set(relayMsg.id, user.id);
+        const target = thread ?? ch;
+        const relayMsg = await target.send({ embeds: [embed] }).catch(() => null);
+        if (relayMsg) dmRelaySet(relayMsg.id, user.id);
+
+        // If we just created the thread, also pin a header in the parent channel
+        if (thread && !existingThreadId) {
+          const header = new EmbedBuilder()
+            .setDescription(`📬 DM thread opened with **${user.username}** (<@${user.id}>)\nAll messages in <#${thread.id}>`)
+            .setColor(0x5865F2)
+            .setTimestamp();
+          await ch.send({ embeds: [header] }).catch(() => {});
         }
       }
     } catch (err) {
       botLogger.error({ err }, "[dm-relay] Failed to relay DM");
     }
-    return; // DMs don't go through guild prefix/command handling
+    return;
   }
 
   // ── DM Passthrough: staff reply forwarding ────────────────────────────────
-  // If a staff member replies to a relay embed in the relay channel, send their
-  // message back to the original user as a DM.
   if (message.guildId && message.reference?.messageId) {
-    const refId = message.reference.messageId;
-    const targetUserId = dmRelayMap.get(refId);
+    const refId        = message.reference.messageId;
+    const targetUserId = dmRelayGet(refId);
     if (targetUserId) {
-      // Only staff with ManageMessages or higher may relay replies
       const staffPerms = message.member?.permissions;
       const isStaff = staffPerms?.has(PermissionFlagsBits.ManageMessages) ||
                       staffPerms?.has(PermissionFlagsBits.ModerateMembers) ||
@@ -865,16 +913,24 @@ client.on(Events.MessageCreate, async message => {
                       staffPerms?.has(PermissionFlagsBits.Administrator);
       if (isStaff) {
         try {
+          const { EmbedBuilder } = await import("discord.js");
           const targetUser = await client.users.fetch(targetUserId).catch(() => null);
           if (targetUser) {
             const staffContent = message.content?.slice(0, 1800) || "(no text)";
-            const guild = message.guild;
-            await targetUser.send(
-              `📨 **Message from ${guild?.name ?? "Support"}:**\n${staffContent}`
-            ).catch(() => null);
-            await message.react("✅").catch(() => {});
+            const guild         = message.guild;
+            const replyEmbed    = new EmbedBuilder()
+              .setDescription(staffContent)
+              .setColor(0x57F287)
+              .setAuthor({ name: `Support — ${guild?.name ?? "Staff"}`, iconURL: guild?.iconURL() ?? undefined })
+              .setFooter({ text: "This is a reply from the support team" })
+              .setTimestamp();
+            const sent = await targetUser.send({ embeds: [replyEmbed] }).catch(() => null);
+            await message.react(sent ? "✅" : "❌").catch(() => {});
           }
         } catch {}
+      } else {
+        // Non-staff replied to a relay message — inform them quietly
+        await message.react("🔒").catch(() => {});
       }
     }
   }

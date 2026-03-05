@@ -1,0 +1,45 @@
+# Sweep AI configuration for Chopsticks
+# https://docs.sweep.dev/usage/config
+
+gpt_4_and_rust_version: "gpt-4o"
+
+# Directories Sweep should focus on
+# (node_modules is automatically excluded)
+include_dirs:
+  - src
+  - prisma
+  - scripts
+  - test
+
+# Directories Sweep should never touch
+exclude_dirs:
+  - node_modules
+  - lavalink
+  - data
+  - docs
+  - .github
+
+# Patterns Sweep should never edit
+exclude_files:
+  - "*.lock"
+  - "*.log"
+  - ".env*"
+  - "prisma/migrations/**"   # Never auto-edit migration files
+
+# Sweep rules for this repo
+rules:
+  - "All slash command handler files in src/commands/ must export `data`, `execute`, and `meta`."
+  - "Never log Discord tokens, agent tokens, or decrypted secrets."
+  - "Interaction handlers must call interaction.reply() or interaction.deferReply() exactly once per execution path."
+  - "All Economy mutations must emit an audit log via src/utils/audit.js."
+  - "New environment variables must be documented in .env.example with __REPLACE_ME__ placeholder."
+  - "Prisma schema changes require a migration file in prisma/migrations/."
+
+# Description for Sweep to understand the project
+description: |
+  Chopsticks is a full-featured open-source Discord bot (discord.js v14, Node.js 22).
+  It has 70+ slash commands across music, moderation, economy, AI, social, and games.
+  It uses PostgreSQL via Prisma, Redis for caching, and Lavalink for audio.
+  It has an Agent Pool System where community members contribute Discord tokens for voice dispatch.
+  Security is critical: Discord tokens and agent tokens must never be logged or exposed.
+  Slash command interfaces are stable contracts — never rename or remove options.

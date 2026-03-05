@@ -1,0 +1,82 @@
+version: "2"
+
+reviews:
+  auto_review:
+    enabled: true
+    drafts: false
+  request_changes_workflow: true
+  high_level_summary: true
+  poem: false
+  review_status: true
+  collapse_walkthrough: false
+
+  path_instructions:
+    - path: "src/commands/**"
+      instructions: |
+        This is a discord.js v14 slash command handler. Verify:
+        - The file exports `data` (SlashCommandBuilder), `execute(interaction)`, and `meta`.
+        - `execute()` calls `withTimeout()` from `src/utils/interactionTimeout.js` for any operation that might take >2 seconds.
+        - Every code path calls `interaction.reply()`, `interaction.deferReply()`, or `interaction.editReply()` exactly once.
+        - Ephemeral responses use `MessageFlags.Ephemeral`, not deprecated `ephemeral: true`.
+        - Do not rename or remove existing slash command option names — live guilds depend on them.
+        - Permission checks use `meta.userPerms` and/or `PermissionFlagsBits` guards, not ad-hoc checks.
+        - Economy-mutating commands emit an audit log via `src/utils/audit.js`.
+
+    - path: "src/agents/**"
+      instructions: |
+        This is the Agent Pool System — community-contributed Discord tokens for voice dispatch.
+        Critical rules:
+        - NEVER log agent tokens. Not even partial values. Not even in debug branches.
+        - NEVER expose decrypted agent tokens in API responses or embeds.
+        - The AGENT_TOKEN_KEY encrypts tokens at rest via AES-256. Do not weaken or bypass this.
+        - Use `timingSafeEqual` for all secret comparisons (see agentRunner.js).
+        - Maintain protocol version compatibility — check agentProtocol.js SUPPORTED_VERSIONS before adding new message types.
+        - Agent runners are designed to be stateless across reconnects. Do not add in-memory state that wouldn't survive a disconnect/reconnect cycle.
+        - Circuit breaker (opossum) is intentional — do not remove it.
+
+    - path: "src/config/**"
+      instructions: |
+        Configuration changes affect ALL guilds simultaneously.
+        - Validate all schema changes — a bad config shape can crash the bot on startup.
+        - Prefer additive changes; removing a config key can break running instances.
+        - Document new config keys in .env.example with a __REPLACE_ME__ placeholder.
+        - Never hard-code guild IDs or user IDs in config files.
+
+    - path: "prisma/**"
+      instructions: |
+        Prisma schema and migration changes.
+        - Every schema change must be accompanied by a migration file in prisma/migrations/.
+        - All tables must have indexes on guild_id and/or user_id columns.
+        - Use compound unique constraints: @@unique([guildId, userId]) for per-user-per-guild records.
+        - BigInt for Discord snowflake IDs (guild, user, channel, message IDs).
+        - Never drop a column without first deprecating it (additive migrations only).
+        - Migration file names should be descriptive: YYYYMMDDHHMMSS_description.
+
+    - path: "src/dashboard/**"
+      instructions: |
+        Web dashboard for guild management. Auth is required on all endpoints.
+        - Every Express route must be protected by session/auth middleware.
+        - CSRF protection must be active on POST/PATCH/DELETE routes.
+        - Never expose raw bot tokens or database credentials via dashboard API responses.
+        - Rate limit all dashboard API endpoints.
+        - Validate and sanitize all user inputs (express-validator is available).
+
+    - path: ".github/workflows/**"
+      instructions: |
+        GitHub Actions workflow files.
+        - Secrets must be referenced as ${{ secrets.SECRET_NAME }} — never hard-coded.
+        - Use pinned action versions (e.g., actions/checkout@v4, not @main or @latest).
+        - Docker build steps should use layer caching where possible.
+        - Never print secrets in run steps, even with masking — just avoid it entirely.
+        - The syntax gate (npm run ci:syntax) must run before any other test steps.
+
+chat:
+  auto_reply: true
+
+language: en-US
+
+tone_instructions: |
+  Be direct and technical. Focus on correctness, security, and maintainability.
+  Flag any code that could leak Discord tokens or agent tokens as a BLOCKER.
+  Flag any change that breaks existing slash command interfaces as a BLOCKER.
+  Flag missing interaction.reply() / withTimeout() usage as a BLOCKER.

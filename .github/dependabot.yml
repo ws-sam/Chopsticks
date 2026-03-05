@@ -1,0 +1,38 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    groups:
+      discord:
+        patterns:
+          - "discord.js"
+          - "@discordjs/*"
+      lavalink:
+        patterns:
+          - "lavalink-client"
+      prisma:
+        patterns:
+          - "@prisma/*"
+          - "prisma"
+      observability:
+        patterns:
+          - "@opentelemetry/*"
+          - "@sentry/*"
+          - "prom-client"
+          - "pino"
+          - "pino-pretty"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5

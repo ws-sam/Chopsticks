@@ -1083,52 +1083,38 @@ export async function execute(interaction) {
   }
 
   if (roomSubs.has(sub)) {
-    // Hardening: room_claim is admin-only. Non-admin users should not be able to take ownership.
-    if (sub === "room_claim" && !hasAdmin(interaction)) {
-      await interaction.reply({ embeds: [buildErrorEmbed("Manage Server permission required for room claim.")], ephemeral: true });
-      return;
-    }
-
-    const requireControl = !new Set(["room_status", "panel"]).has(sub);
-    const ctx = await getRoomContext(interaction, { requireControl });
-    if (!ctx.ok) {
-      await interaction.reply({ embeds: [buildErrorEmbed(roomErrorMessage(ctx.error))], ephemeral: true });
-      return;
-    }
-    const { channel, voice } = ctx;
-    const everyoneId = interaction.guild?.roles?.everyone?.id;
-
-    const lobby = ctx.temp ? (voice?.lobbies?.[ctx.temp.lobbyId] ?? null) : null;
-    const ownerOverwrite = ownerPermissionOverwrite(lobby?.ownerPermissions);
-    const activeOwnerId = ctx.temp ? ctx.temp.ownerId : ctx.customRoom?.ownerId;
-
-    try {
-
-      if (sub === "room_status") {
-      const lobbyId = ctx.temp?.lobbyId ? `<#${ctx.temp.lobbyId}>` : "n/a";
-      const limit = Number.isFinite(channel.userLimit) ? channel.userLimit : 0;
-      const overwrite = everyoneId ? channel.permissionOverwrites.cache.get(everyoneId) : null;
-      const locked = Boolean(overwrite?.deny?.has(PermissionFlagsBits.Connect));
-      const roomType = ctx.temp ? "Temp Channel" : "Custom VC";
-      const embed = buildEmbed(
-        "Room status",
-        `Type: ${roomType}\nLobby: ${lobbyId}\nOwner: <@${activeOwnerId}>\nLimit: ${limit}\nLocked: ${locked ? "yes" : "no"}`
-      );
-      await interaction.reply({ embeds: [embed], ephemeral: true });
-      return;
-    }
-
+    // room_claim: allow admins freely; non-admins may only claim if the room has no owner (claimable).
+    // We defer the full check to the claim handler after loading room context.
     if (sub === "room_claim") {
-      if (ctx.isOwner) {
-        await interaction.reply({
-          embeds: [buildErrorEmbed("You already own this room.")],
-          ephemeral: true
-        });
+      const requireControl = false; // handled inline below
+      const ctx = await getRoomContext(interaction, { requireControl });
+      if (!ctx.ok) {
+        await interaction.reply({ embeds: [buildErrorEmbed(roomErrorMessage(ctx.error))], ephemeral: true });
         return;
       }
 
-      const ownerPresent = channel.members.has(activeOwnerId);
-      if (ownerPresent && !ctx.isAdmin) {
+      const activeOwnerId = ctx.temp ? ctx.temp.ownerId : ctx.customRoom?.ownerId;
+      const isClaimable   = ctx.temp?.claimable === true || ctx.customRoom?.claimable === true;
+      const isAdmin       = hasAdmin(interaction);
+
+      // Non-admins blocked unless room is explicitly in claimable state
+      if (!isAdmin && !isClaimable) {
+        await interaction.reply({ embeds: [buildErrorEmbed("Manage Server permission required to claim this room.")], ephemeral: true });
+        return;
+      }
+
+      const { channel, voice } = ctx;
+      const everyoneId = interaction.guild?.roles?.everyone?.id;
+      const lobby = ctx.temp ? (voice?.lobbies?.[ctx.temp.lobbyId] ?? null) : null;
+      const ownerOverwrite = ownerPermissionOverwrite(lobby?.ownerPermissions);
+
+      if (ctx.isOwner) {
+        await interaction.reply({ embeds: [buildErrorEmbed("You already own this room.")], ephemeral: true });
+        return;
+      }
+
+      const ownerPresent = activeOwnerId ? channel.members.has(activeOwnerId) : false;
+      if (ownerPresent && !isAdmin && !isClaimable) {
         await interaction.reply({
           embeds: [buildErrorEmbed("Current owner is still in the room. Ask them to transfer ownership.")],
           ephemeral: true
@@ -1142,8 +1128,10 @@ export async function execute(interaction) {
           await interaction.reply({ embeds: [buildErrorEmbed("Unable to claim this room right now.")], ephemeral: true });
           return;
         }
+        // Clear claimable flag now that it has a new owner
+        await VoiceDomain.setRoomClaimable(guildId, channel.id, false).catch(() => {});
       } else {
-        const res = await patchCustomRoom(guildId, channel.id, { ownerId: interaction.user.id }, ctx.voice);
+        const res = await patchCustomRoom(guildId, channel.id, { ownerId: interaction.user.id, claimable: false }, ctx.voice);
         if (!res.ok) {
           await interaction.reply({ embeds: [buildErrorEmbed("Unable to claim this room right now.")], ephemeral: true });
           return;
@@ -1166,7 +1154,7 @@ export async function execute(interaction) {
         guildId,
         userId: interaction.user.id,
         action: "voice.room.claim",
-        details: { channelId: channel.id, previousOwnerId: activeOwnerId, ownerId: interaction.user.id }
+        details: { channelId: channel.id, previousOwnerId: activeOwnerId, ownerId: interaction.user.id, wasClaimable: isClaimable }
       });
 
       await interaction.reply({
@@ -1177,41 +1165,63 @@ export async function execute(interaction) {
       return;
     }
 
+    // ── Shared context load for remaining room subcommands ─────────────────────
+    const requireControl = !new Set(["room_status", "panel"]).has(sub);
+    const ctx = await getRoomContext(interaction, { requireControl });
+    if (!ctx.ok) {
+      await interaction.reply({ embeds: [buildErrorEmbed(roomErrorMessage(ctx.error))], ephemeral: true });
+      return;
+    }
+    const { channel, voice } = ctx;
+    const everyoneId = interaction.guild?.roles?.everyone?.id;
+    const lobby = ctx.temp ? (voice?.lobbies?.[ctx.temp.lobbyId] ?? null) : null;
+    const ownerOverwrite = ownerPermissionOverwrite(lobby?.ownerPermissions);
+    const activeOwnerId = ctx.temp ? ctx.temp.ownerId : ctx.customRoom?.ownerId;
+
+    try {
+
+    if (sub === "room_status") {
+      const lobbyId = ctx.temp?.lobbyId ? `<#${ctx.temp.lobbyId}>` : "n/a";
+      const limit = Number.isFinite(channel.userLimit) ? channel.userLimit : 0;
+      const overwrite = everyoneId ? channel.permissionOverwrites.cache.get(everyoneId) : null;
+      const locked = Boolean(overwrite?.deny?.has(PermissionFlagsBits.Connect));
+      const roomType = ctx.temp ? "Temp Channel" : "Custom VC";
+      const isClaimable = ctx.temp?.claimable === true || ctx.customRoom?.claimable === true;
+      const embed = buildEmbed(
+        "Room status",
+        `Type: ${roomType}\nLobby: ${lobbyId}\nOwner: ${activeOwnerId ? `<@${activeOwnerId}>` : "*(unclaimed)*"}\nLimit: ${limit}\nLocked: ${locked ? "yes" : "no"}${isClaimable ? "\n🔓 **This room is claimable** — use \`/voice room_claim\`" : ""}`
+      );
+      await interaction.reply({ embeds: [embed], ephemeral: true });
+      return;
+    }
+
     if (sub === "room_release") {
-      const lobbyChannelId = ctx.temp?.lobbyId ?? null;
-      const lobbyChannel = lobbyChannelId
-        ? (interaction.guild.channels.cache.get(lobbyChannelId)
-          ?? (await interaction.guild.channels.fetch(lobbyChannelId).catch(() => null)))
-        : null;
-      const canMoveToLobby = Boolean(lobbyChannel && lobbyChannel.type === ChannelType.GuildVoice);
+      const embed = new EmbedBuilder()
+        .setTitle("🚪 Release this room?")
+        .setDescription(
+          "Choose what happens to this room:\n\n" +
+          "🔓 **Make Claimable** — You leave ownership; anyone in the channel can claim it with `/voice room_claim`.\n" +
+          "👤 **Transfer to User** — Hand off ownership to a specific person.\n" +
+          "🗑️ **Delete Room** — Remove the channel permanently."
+        )
+        .setColor(0xFEE75C);
 
-      const humans = Array.from(channel.members.values()).filter(m => !m.user?.bot);
-      for (const m of humans) {
-        try {
-          if (canMoveToLobby) await m.voice?.setChannel?.(lobbyChannel).catch(() => {});
-          else await m.voice?.setChannel?.(null).catch(() => {});
-        } catch {}
-      }
+      const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId(`voiceui:release_claimable:${interaction.user.id}:${channel.id}`)
+          .setLabel("🔓 Make Claimable")
+          .setStyle(ButtonStyle.Primary),
+        new ButtonBuilder()
+          .setCustomId(`voiceui:release_transfer_hint:${interaction.user.id}:${channel.id}`)
+          .setLabel("👤 Transfer to User")
+          .setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder()
+          .setCustomId(`voiceui:release_delete:${interaction.user.id}:${channel.id}`)
+          .setLabel("🗑️ Delete Room")
+          .setStyle(ButtonStyle.Danger),
+      );
 
-      if (ctx.temp) {
-        await removeTempChannel(guildId, channel.id, voice).catch(() => {});
-      } else {
-        await removeCustomRoom(guildId, channel.id, voice).catch(() => {});
-      }
-      await channel.delete().catch(() => {});
-
-      await auditLog({
-        guildId,
-        userId: interaction.user.id,
-        action: "voice.room.release",
-        details: { channelId: channel.id, lobbyId: lobbyChannelId, moved: humans.length }
-      });
-
-      await interaction.reply({
-        embeds: [buildEmbed("Room released", "Room deleted.")],
-        ephemeral: true
-      });
-      await refreshRegisteredRoomPanelsForRoom(interaction.guild, channel.id, "deleted").catch(() => {});
+      await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
       return;
     }
 

@@ -1557,6 +1557,64 @@ export async function handleVoiceUIButton(interaction) {
   }
 
   if (parsed.kind === "release") {
+    // Show prompt instead of immediately deleting
+    const relCtx = await resolveContext(interaction, parsed.channelId, { requireMembership: false, requireControl: true });
+    if (!relCtx.ok) {
+      await interaction.reply({ embeds: [buildErrorEmbed(contextErrorMessage(relCtx.error))], ephemeral: true });
+      return true;
+    }
+    const embed = new EmbedBuilder()
+      .setTitle("🚪 Release this room?")
+      .setDescription(
+        "Choose what happens to this room:\n\n" +
+        "🔓 **Make Claimable** — You leave ownership; anyone in the channel can claim it with `/voice room_claim`.\n" +
+        "👤 **Transfer to User** — Hand off ownership to a specific person.\n" +
+        "🗑️ **Delete Room** — Remove the channel permanently."
+      )
+      .setColor(0xFEE75C);
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`voiceui:release_claimable:${interaction.user.id}:${parsed.channelId}`).setLabel("🔓 Make Claimable").setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId(`voiceui:release_transfer_hint:${interaction.user.id}:${parsed.channelId}`).setLabel("👤 Transfer to User").setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId(`voiceui:release_delete:${interaction.user.id}:${parsed.channelId}`).setLabel("🗑️ Delete Room").setStyle(ButtonStyle.Danger),
+    );
+    await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
+    return true;
+  }
+
+  if (parsed.kind === "release_claimable") {
+    const relCtx = await resolveContext(interaction, parsed.channelId, { requireMembership: false, requireControl: true });
+    if (!relCtx.ok) {
+      await interaction.reply({ embeds: [buildErrorEmbed(contextErrorMessage(relCtx.error))], ephemeral: true });
+      return true;
+    }
+    const res = await VoiceDomain.setRoomClaimable(interaction.guildId, parsed.channelId, true);
+    if (!res.ok) {
+      await interaction.reply({ embeds: [buildErrorEmbed("Unable to mark room as claimable right now.")], ephemeral: true });
+      return true;
+    }
+    await auditLog({
+      guildId: interaction.guildId,
+      userId: interaction.user.id,
+      action: "voice.room.release",
+      details: { channelId: parsed.channelId, action: "claimable" }
+    }).catch(() => {});
+    await refreshRegisteredRoomPanelsForRoom(interaction.guild, parsed.channelId, "claimable").catch(() => {});
+    await interaction.update({
+      embeds: [buildEmbed("Room unclaimed", "🔓 This room is now **claimable** — anyone in the channel can use `/voice room_claim` to take ownership.")],
+      components: []
+    });
+    return true;
+  }
+
+  if (parsed.kind === "release_transfer_hint") {
+    await interaction.update({
+      embeds: [buildEmbed("Transfer Ownership", "Use `/voice room_transfer @user` to hand this room to a specific person.\n\nThe user must be in the voice channel.")],
+      components: []
+    });
+    return true;
+  }
+
+  if (parsed.kind === "release_delete") {
     const relCtx = await resolveContext(interaction, parsed.channelId, { requireMembership: false, requireControl: true });
     if (!relCtx.ok) {
       await interaction.reply({ embeds: [buildErrorEmbed(contextErrorMessage(relCtx.error))], ephemeral: true });
@@ -1567,7 +1625,9 @@ export async function handleVoiceUIButton(interaction) {
       await interaction.reply({ embeds: [buildErrorEmbed(result.error)], ephemeral: true });
       return true;
     }
-    return updateConsole(interaction, parsed.userId, parsed.channelId, result.notice);
+    // Channel is gone — just update the prompt message
+    await interaction.update({ embeds: [buildEmbed("Room deleted", "🗑️ The channel has been removed.")], components: [] }).catch(() => {});
+    return true;
   }
 
   if (parsed.kind === "lock" || parsed.kind === "unlock") {

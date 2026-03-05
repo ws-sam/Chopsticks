@@ -193,3 +193,34 @@ export async function resetVoice(guildId) {
   });
   return { ok: true, action: "reset" };
 }
+
+/**
+ * Marks a temp or custom room as claimable (no owner required to take it).
+ * When claimable, any member in the channel can use `/voice room_claim` without admin.
+ */
+export async function setRoomClaimable(guildId, channelId, claimable) {
+  if (!guildId || !channelId) return { ok: false, error: "invalid-ids" };
+  const voice = await getVoiceState(guildId);
+  voice.tempChannels ??= {};
+
+  const temp = voice.tempChannels[channelId];
+  if (temp) {
+    temp.claimable = claimable;
+    if (claimable) temp.ownerId = null;
+    temp.updatedAt = Date.now();
+    await saveVoiceState(guildId, voice);
+    return { ok: true, kind: "temp" };
+  }
+
+  voice.customRooms ??= {};
+  const customRoom = Object.values(voice.customRooms).find(r => r.channelId === channelId);
+  if (customRoom) {
+    customRoom.claimable = claimable;
+    if (claimable) customRoom.ownerId = null;
+    customRoom.updatedAt = Date.now();
+    await saveVoiceState(guildId, voice);
+    return { ok: true, kind: "custom" };
+  }
+
+  return { ok: false, error: "room-not-found" };
+}

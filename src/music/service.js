@@ -1,10 +1,18 @@
 // src/music/service.js
-import { createPrimarySession, getPrimarySession } from "../music/primarySession.js";
+import { createPrimarySession, getPrimarySession, releasePrimarySession } from "../music/primarySession.js";
 
 export function getSessionAgent(guildId, voiceChannelId) {
   const mgr = global.agentManager;
   if (!mgr) return { ok: false, reason: "agents-not-ready" };
-  return mgr.getSessionAgent(guildId, voiceChannelId);
+  const result = mgr.getSessionAgent(guildId, voiceChannelId);
+  // Fall back to primary session if no agent session found
+  if (!result.ok) {
+    const primary = getPrimarySession(guildId);
+    if (primary && primary.voiceChannelId === voiceChannelId) {
+      return { ok: true, agent: primary, isPrimaryMode: true };
+    }
+  }
+  return result;
 }
 
 export async function ensureSessionAgent(guildId, voiceChannelId, { textChannelId, ownerUserId } = {}) {
@@ -26,12 +34,21 @@ export async function ensureSessionAgent(guildId, voiceChannelId, { textChannelI
 }
 
 export function releaseSession(guildId, voiceChannelId) {
+  // Release primary session if applicable
+  const primary = getPrimarySession(guildId);
+  if (primary && primary.voiceChannelId === voiceChannelId) {
+    releasePrimarySession(guildId);
+  }
   const mgr = global.agentManager;
   if (!mgr) return;
   mgr.releaseSession(guildId, voiceChannelId);
 }
 
 export async function sendAgentCommand(agent, op, data) {
+  // Primary sessions (music without agents) handle requests directly.
+  if (agent?.isPrimary && typeof agent.handleRequest === "function") {
+    return agent.handleRequest(op, data);
+  }
   const mgr = global.agentManager;
   if (!mgr) throw new Error("agents-not-ready");
   return mgr.request(agent, op, data);

@@ -604,6 +604,16 @@ export async function execute(interaction) {
       return;
     }
 
+    // Delete old panel message if it exists in a different location
+    if (cfg.panelMessageId && cfg.panelChannelId) {
+      const oldCh = interaction.guild.channels.cache.get(cfg.panelChannelId)
+        || await interaction.guild.channels.fetch(cfg.panelChannelId).catch(() => null);
+      if (oldCh?.isTextBased?.()) {
+        const oldMsg = await oldCh.messages.fetch(cfg.panelMessageId).catch(() => null);
+        if (oldMsg) await oldMsg.delete().catch(() => {});
+      }
+    }
+
     const panelMessage = await panelChannel.send({
       embeds: [buildPanelEmbed(cfg)],
       components: panelComponents()

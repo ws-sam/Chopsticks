@@ -1539,6 +1539,7 @@ export async function ensureEconomySchema() {
       xp_multiplier NUMERIC(4,2) NOT NULL DEFAULT 1.0,
       levelup_channel_id TEXT,
       levelup_message TEXT NOT NULL DEFAULT 'GG {user}, you hit **level {level}**! 🎉',
+      levelup_dm BOOLEAN NOT NULL DEFAULT false,
       sync_global_xp BOOLEAN NOT NULL DEFAULT true,
       updated_at BIGINT NOT NULL DEFAULT 0
     )`,
@@ -1656,7 +1657,7 @@ export async function upsertGuildXpConfig(guildId, fields) {
     'enabled','xp_per_message','xp_per_vc_minute','xp_per_work','xp_per_gather',
     'xp_per_fight_win','xp_per_trivia_win','xp_per_daily','xp_per_command',
     'xp_per_agent_action','message_xp_cooldown_s','xp_multiplier',
-    'levelup_channel_id','levelup_message','sync_global_xp'
+    'levelup_channel_id','levelup_message','sync_global_xp','levelup_dm'
   ]);
   const safe = {};
   for (const [k, v] of Object.entries(fields)) {

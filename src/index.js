@@ -107,6 +107,8 @@ const client = new Client({
     GatewayIntentBits.MessageContent,
     GatewayIntentBits.GuildIntegrations,
     GatewayIntentBits.GuildModeration,
+    GatewayIntentBits.DirectMessages,
+    GatewayIntentBits.DirectMessageReactions,
   ],
   partials: [Partials.Channel, Partials.Message, Partials.Reaction, Partials.User]
 });
@@ -791,8 +793,84 @@ const MUTATION_COMMANDS = new Set([
   "agents"
 ]);
 
+// ── DM Relay: in-memory map of relayed bot message ID -> original userId ──
+// Key: relay message snowflake, Value: userId string
+const dmRelayMap = new Map();
+const DM_RELAY_MAP_MAX = 5000; // cap to avoid unbounded growth
+
 client.on(Events.MessageCreate, async message => {
   if (message.author?.bot) return;
+
+  // ── DM Passthrough relay ──────────────────────────────────────────────────
+  if (!message.guildId) {
+    // This is a DM to the bot. Forward to all guilds with dmRelayChannelId set.
+    try {
+      const { getPool } = await import("./utils/storage_pg.js");
+      const pool = getPool();
+      const { rows } = await pool.query(
+        `SELECT guild_id, data->>'dmRelayChannelId' AS relay_ch
+           FROM guild_settings
+          WHERE data->>'dmRelayChannelId' IS NOT NULL`
+      );
+      if (!rows.length) return;
+
+      const user = message.author;
+      const content = message.content?.slice(0, 1800) || "(no text)";
+      const attachmentNote = message.attachments.size
+        ? `\n📎 ${message.attachments.size} attachment(s): ${[...message.attachments.values()].map(a => a.url).join(", ")}`
+        : "";
+
+      for (const row of rows) {
+        const guild = client.guilds.cache.get(row.guild_id);
+        if (!guild) continue;
+        const ch = guild.channels.cache.get(row.relay_ch);
+        if (!ch?.isTextBased?.()) continue;
+
+        const { EmbedBuilder } = await import("discord.js");
+        const embed = new EmbedBuilder()
+          .setTitle("📬 Direct Message Received")
+          .setDescription(`${content}${attachmentNote}`)
+          .setColor(0x5865F2)
+          .setAuthor({ name: `${user.username} (${user.id})`, iconURL: user.displayAvatarURL?.() ?? undefined })
+          .setFooter({ text: `User ID: ${user.id} — Reply to this message to respond via DM` })
+          .setTimestamp();
+
+        const relayMsg = await ch.send({ embeds: [embed] }).catch(() => null);
+        if (relayMsg) {
+          // Store mapping for reply detection (cap map size)
+          if (dmRelayMap.size >= DM_RELAY_MAP_MAX) {
+            dmRelayMap.delete(dmRelayMap.keys().next().value);
+          }
+          dmRelayMap.set(relayMsg.id, user.id);
+        }
+      }
+    } catch (err) {
+      botLogger.error({ err }, "[dm-relay] Failed to relay DM");
+    }
+    return; // DMs don't go through guild prefix/command handling
+  }
+
+  // ── DM Passthrough: staff reply forwarding ────────────────────────────────
+  // If a staff member replies to a relay embed in the relay channel, send their
+  // message back to the original user as a DM.
+  if (message.guildId && message.reference?.messageId) {
+    const refId = message.reference.messageId;
+    const targetUserId = dmRelayMap.get(refId);
+    if (targetUserId) {
+      try {
+        const targetUser = await client.users.fetch(targetUserId).catch(() => null);
+        if (targetUser) {
+          const staffContent = message.content?.slice(0, 1800) || "(no text)";
+          const guild = message.guild;
+          const sender = message.author;
+          await targetUser.send(
+            `📨 **Message from ${guild?.name ?? "Support"}:**\n${staffContent}`
+          ).catch(() => null);
+          await message.react("✅").catch(() => {});
+        }
+      } catch {}
+    }
+  }
 
   // ── Antispam enforcement ──────────────────────────────────────────────────
   if (message.guildId && message.guild) {

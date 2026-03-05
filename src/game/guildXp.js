@@ -19,6 +19,7 @@ const DEFAULT_CONFIG = {
   xp_multiplier: 1.0,
   levelup_channel_id: null,
   levelup_message: 'GG {user}, you hit **level {level}**! 🎉',
+  levelup_dm: false,
   sync_global_xp: true,
 };
 
@@ -84,7 +85,7 @@ export async function addGuildXp(userId, guildId, reason, { client = null, stats
     }
 
     // Level-up announcement (fire-and-forget)
-    if (result.leveledUp && client && cfg.levelup_channel_id) {
+    if (result.leveledUp && client && (cfg.levelup_channel_id || cfg.levelup_dm)) {
       void announceLevel(client, guildId, userId, result.toLevel, cfg).catch(() => {});
     }
 
@@ -98,11 +99,29 @@ async function announceLevel(client, guildId, userId, level, cfg) {
   try {
     const guild = client.guilds.cache.get(guildId) ?? await client.guilds.fetch(guildId).catch(() => null);
     if (!guild) return;
-    const channel = guild.channels.cache.get(cfg.levelup_channel_id);
-    if (!channel?.isTextBased?.()) return;
     const msg = (cfg.levelup_message || 'GG {user}, you hit **level {level}**! 🎉')
       .replace(/{user}/g, `<@${userId}>`)
       .replace(/{level}/g, String(level));
-    await channel.send(msg).catch(() => {});
+
+    // Send to configured channel
+    if (cfg.levelup_channel_id) {
+      const channel = guild.channels.cache.get(cfg.levelup_channel_id);
+      if (channel?.isTextBased?.()) {
+        await channel.send(msg).catch(() => {});
+      }
+    }
+
+    // Send DM to the user if enabled
+    if (cfg.levelup_dm) {
+      try {
+        const user = await client.users.fetch(userId).catch(() => null);
+        if (user) {
+          const dmMsg = (cfg.levelup_message || 'GG {user}, you hit **level {level}**! 🎉')
+            .replace(/{user}/g, user.username)
+            .replace(/{level}/g, String(level));
+          await user.send(`🎉 **${guild.name}:** ${dmMsg}`).catch(() => {});
+        }
+      } catch {}
+    }
   } catch {}
 }

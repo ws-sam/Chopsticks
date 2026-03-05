@@ -83,7 +83,8 @@ export const data = new SlashCommandBuilder()
           .addChoices(
             { name: "suggestions", value: "suggestionChannelId" },
             { name: "birthday-announcements", value: "birthdayChannelId" },
-            { name: "events-announcements", value: "eventChannelId" }
+            { name: "events-announcements", value: "eventChannelId" },
+            { name: "dm-relay", value: "dmRelayChannelId" }
           )
       )
       .addChannelOption(o =>
@@ -133,7 +134,7 @@ export async function execute(interaction) {
        ON CONFLICT(guild_id) DO UPDATE SET data = guild_settings.data || $2::jsonb`,
       [interaction.guildId, JSON.stringify({ [type]: channel.id })]
     );
-    const typeLabel = { suggestionChannelId: "Suggestions", birthdayChannelId: "Birthday Announcements", eventChannelId: "Events Announcements" }[type] || type;
+    const typeLabel = { suggestionChannelId: "Suggestions", birthdayChannelId: "Birthday Announcements", eventChannelId: "Events Announcements", dmRelayChannelId: "DM Relay" }[type] || type;
     await replySuccess(interaction, `${typeLabel} channel set to ${channel}.`);
     return;
   }

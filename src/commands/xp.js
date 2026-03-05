@@ -10,7 +10,8 @@ import {
 import { withTimeout } from '../utils/interactionTimeout.js';
 
 export const meta = {
-  deployGlobal: false,
+  deployGlobal: true,
+  guildOnly: true,
   name: 'xp',
   description: 'Configure per-guild XP and leveling system',
   category: "social",
@@ -76,6 +77,11 @@ export const data = new SlashCommandBuilder()
           { name: 'Grind (slow, competitive)', value: 'grind' },
         )))
     .addSubcommand(s => s
+      .setName('levelup_dm')
+      .setDescription('Toggle DM notifications when a user levels up')
+      .addStringOption(o => o.setName('state').setDescription('on or off').setRequired(true)
+        .addChoices({ name: 'on', value: 'on' }, { name: 'off', value: 'off' })))
+    .addSubcommand(s => s
       .setName('cooldown')
       .setDescription('Set the message XP cooldown to prevent spam')
       .addIntegerOption(o => o.setName('seconds').setDescription('Seconds between message XP awards (default: 60)').setRequired(true).setMinValue(10).setMaxValue(3600)))
@@ -140,6 +146,7 @@ export async function execute(interaction) {
         embed.addFields(
           { name: '⏱️ Msg Cooldown', value: `${cfg.message_xp_cooldown_s ?? 60}s`, inline: true },
           { name: '📢 Level-up Channel', value: cfg.levelup_channel_id ? `<#${cfg.levelup_channel_id}>` : 'None', inline: true },
+          { name: '📬 Level-up DMs', value: cfg.levelup_dm ? '✅ Enabled' : '❌ Disabled', inline: true },
           { name: '💬 Level-up Message', value: cfg.levelup_message || 'GG {user}, you hit **level {level}**! 🎉', inline: false },
         );
         await interaction.editReply({ embeds: [embed] });
@@ -187,6 +194,13 @@ export async function execute(interaction) {
         const template = interaction.options.getString('template');
         await upsertGuildXpConfig(guildId, { levelup_message: template });
         await interaction.editReply({ content: `✅ Level-up message set to:\n> ${template}` });
+        return;
+      }
+
+      if (sub === 'levelup_dm') {
+        const state = interaction.options.getString('state') === 'on';
+        await upsertGuildXpConfig(guildId, { levelup_dm: state });
+        await interaction.editReply({ content: `✅ Level-up DM notifications are now **${state ? 'enabled' : 'disabled'}**. Users will ${state ? '' : 'not '}receive a DM when they level up.` });
         return;
       }
 

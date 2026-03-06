@@ -68,7 +68,7 @@ export async function getGuildAiConfig(guildId) {
 
   const ai = res.rows[0]?.data?.ai || {};
   return {
-    provider: AI_PROVIDERS.includes(ai.provider) ? ai.provider : "eral",
+    provider: AI_PROVIDERS.includes(ai.provider) ? ai.provider : "none",
     ollamaUrl: ai.ollama_url || null,
     persona:   ai.persona   || null,
   };

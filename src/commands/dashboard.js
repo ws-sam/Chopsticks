@@ -1,5 +1,5 @@
 /**
- * /dashboard — Discord-native server setup dashboard
+ * /setuppanel — Discord-native server setup dashboard
  * Full button UI for configuring all major bot modules inline.
  * All interactions are ephemeral and user-scoped.
  */
@@ -134,7 +134,7 @@ async function buildHomeEmbed(guild, data) {
         inline: true,
       },
     )
-    .setFooter({ text: "All changes save instantly • Chopsticks /dashboard" });
+    .setFooter({ text: "All changes save instantly • Chopsticks /setuppanel" });
 }
 
 function homeNavRows(userId) {
@@ -168,7 +168,7 @@ function buildWelcomeEmbed(data, userId) {
       { name: "Welcome", value: `Status: ${pill(w.enabled)}\nChannel: ${chanRef(w.channelId)}\nMessage: \`${(w.message ?? "default").slice(0, 60)}\``, inline: false },
       { name: "Farewell", value: `Status: ${pill(fw.enabled)}\nChannel: ${chanRef(fw.channelId ?? w.channelId)}\nMessage: \`${(fw.message ?? "default").slice(0, 60)}\``, inline: false },
     )
-    .setFooter({ text: `Use buttons to configure • /dashboard` });
+    .setFooter({ text: `Use buttons to configure • /setuppanel` });
 }
 
 function welcomeRows(userId, data) {
@@ -533,7 +533,7 @@ export const meta = {
 };
 
 export const data = new SlashCommandBuilder()
-  .setName("dashboard")
+  .setName("setuppanel")
   .setDescription("Open the server setup dashboard — configure all modules with buttons")
   .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild);
 
@@ -975,7 +975,7 @@ async function renderSectionOnModal(interaction, section, userId, data) {
     await renderSection(interaction, section, userId, data);
   } catch {
     await interaction.followUp({
-      content: "✅ Settings saved! Re-open `/dashboard` to see changes.",
+      content: "✅ Settings saved! Re-open `/setuppanel` to see changes.",
       flags: MessageFlags.Ephemeral,
     }).catch(() => {});
   }

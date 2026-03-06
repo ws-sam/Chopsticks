@@ -9,28 +9,22 @@ services:
   bot:
     init: true
     read_only: true
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
     tmpfs:
       - /tmp
       - /var/tmp
-      - /root/.cache
+      - /app/.cache
+      - /app/.npm
       - /var/cache/fontconfig
     stop_grace_period: 30s
 
   agents:
     init: true
     read_only: true
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
     tmpfs:
       - /tmp
       - /var/tmp
-      - /root/.cache
+      - /app/.cache
+      - /app/.npm
       - /var/cache/fontconfig
     stop_grace_period: 30s
 
@@ -44,7 +38,8 @@ services:
     tmpfs:
       - /tmp
       - /var/tmp
-      - /root/.cache
+      - /app/.cache
+      - /app/.npm
     stop_grace_period: 30s
 
   funhub:
@@ -57,6 +52,6 @@ services:
     tmpfs:
       - /tmp
       - /var/tmp
-      - /root/.cache
+      - /app/.cache
+      - /app/.npm
     stop_grace_period: 30s
-

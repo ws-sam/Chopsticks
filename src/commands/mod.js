@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } from "discord.js";
+import { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, MessageFlags } from "discord.js";
 import { canModerateTarget, fetchTargetMember, moderationGuardMessage } from "../moderation/guards.js";
 import { notifyUserByDm, reasonOrDefault, replyModError, replyModSuccess, buildModEmbed, replyModEmbed } from "../moderation/output.js";
 import { dispatchModerationLog } from "../utils/modLogs.js";
@@ -315,7 +315,11 @@ export async function execute(interaction) {
     const successes = [];
     const failures = [];
 
-    await interaction.deferReply({ ephemeral: true });
+    let deferred = false;
+    if (!interaction.deferred && !interaction.replied && typeof interaction.deferReply === "function") {
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+      deferred = true;
+    }
 
     for (const userId of ids) {
       if (userId === interaction.user.id) {
@@ -363,7 +367,11 @@ export async function execute(interaction) {
     if (failures.length) embed.addFields({ name: "❌ Failed", value: failures.map(f => `\`${f.id}\`: ${f.reason}`).join("\n").slice(0, 1024) });
     embed.addFields({ name: "Reason", value: reason });
 
-    await interaction.editReply({ embeds: [embed] });
+    if ((deferred || interaction.deferred || interaction.replied) && typeof interaction.editReply === "function") {
+      await interaction.editReply({ embeds: [embed] });
+    } else if (typeof interaction.reply === "function") {
+      await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+    }
     return;
   }
 

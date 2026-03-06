@@ -41,6 +41,7 @@
 | `/inventory` | 🎒 View your item inventory |
 | `/leaderboard [type]` | 🏆 Server leaderboard (credits, XP, level) |
 | `/marry propose/view/divorce` | 💍 Propose, manage, or view your in-bot marriage |
+| `/pet view/adopt/feed/rename/release` | 🐾 Adopt and care for a companion with passive buffs |
 | `/pay @user <amount>` | 💸 Transfer credits to another user |
 | `/profile [@user]` | 👤 View full game profile with stats and achievements |
 | `/profilecard [@user]` | 🖼️ Canvas-rendered profile image card |
@@ -121,6 +122,7 @@
 | `/autorole set/clear` | 🤖 Auto-assign roles on join |
 | `/autoresponder add/list/remove` | 🤖 Create auto-responders that react to message triggers |
 | `/avatar [@user]` | 🖼️ Show user or server avatar |
+| `/backup create/list/restore/delete` | 🧰 Snapshot and restore server roles, channels, and permissions |
 | `/birthday set/clear/list` | 🎂 Birthday reminders |
 | `/boosterperks color/setup` | 🚀 Customize boost role or configure boost perks |
 | `/colorrole` | 🎨 Self-assignable colour roles |
@@ -145,6 +147,7 @@
 | `/schedule message` | 🕐 Schedule a message to be sent in a channel |
 | `/serverinfo` | ℹ️ Server, bot, and role info |
 | `/setup wizard` | 🔧 Guided server setup |
+| `/setuppanel` | 🧭 Discord-native server setup dashboard with button-driven module controls |
 | `/suggest <text>` | 💡 Submit a suggestion to the server's suggestions channel |
 | `/tags create/edit/delete/list/use` | 🏷️ Custom tag/response shortcuts |
 | `/theme color/reset` | 🎨 Customize how the bot looks in this server |

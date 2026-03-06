@@ -68,7 +68,7 @@ function buildHealthSnapshot(guildId) {
 export const meta = { category: "admin", deployGlobal: false, guildOnly: true, userPerms: [PermissionFlagsBits.ManageGuild] };
 
 export const data = new SlashCommandBuilder()
-  .setName("console")
+  .setName("dashboard")
   .setDescription("Open your server's Chopsticks web dashboard — ephemeral single-use link")
   .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild);
 
@@ -146,4 +146,3 @@ export async function execute(interaction) {
     ephemeral: true,
   });
 }
-

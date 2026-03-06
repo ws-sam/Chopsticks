@@ -4,6 +4,7 @@
 // If threshold is exceeded, the engine "punishes" the executor automatically.
 
 import { loadGuildData, saveGuildData } from "../../utils/storage.js";
+import { PermissionFlagsBits } from "discord.js";
 
 // In-memory action counters: Map<"guildId:userId:action", { count, firstAt }>
 const actionCounters = new Map();
@@ -85,6 +86,9 @@ export async function punishExecutor(guild, userId, action, config) {
     // Don't punish server owner
     if (guild.ownerId === userId) return;
 
+    // Don't punish administrators; anti-nuke should protect the server, not lock out trusted admins.
+    if (member.permissions?.has(PermissionFlagsBits.Administrator)) return;
+
     // Check whitelist (explicit user or role exemptions only)
     if (config.whitelistUserIds?.includes(userId)) return;
     if (config.whitelistRoleIds?.some(rid => member.roles.cache.has(rid))) return;
@@ -97,12 +101,12 @@ export async function punishExecutor(guild, userId, action, config) {
       await member.kick(`[AntiNuke] Exceeded ${action} threshold`).catch(() => null);
     } else {
       // Strip all managed roles that grant dangerous permissions
-      const dangerousPerms = 0n
-        | BigInt(0x00000004)  // ADMINISTRATOR
-        | BigInt(0x00000008)  // MANAGE_CHANNELS
-        | BigInt(0x00000010)  // MANAGE_GUILD
-        | BigInt(0x10000000) // MANAGE_ROLES
-        | BigInt(0x00400000); // MANAGE_WEBHOOKS
+      const dangerousPerms =
+        PermissionFlagsBits.Administrator |
+        PermissionFlagsBits.ManageChannels |
+        PermissionFlagsBits.ManageGuild |
+        PermissionFlagsBits.ManageRoles |
+        PermissionFlagsBits.ManageWebhooks;
 
       for (const role of member.roles.cache.values()) {
         if (role.managed) continue;

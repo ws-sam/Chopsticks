@@ -383,7 +383,18 @@ async function handleChat(interaction) {
           body: JSON.stringify({
             message,
             sessionId: `discord_${interaction.user.id}`,
-            context: guildConfig.persona ? `Guild persona: ${guildConfig.persona}` : undefined,
+            product: 'chopsticks',
+            pageContext: guildConfig.persona ? `Guild persona: ${guildConfig.persona}` : undefined,
+            integration: {
+              name: 'Chopsticks Discord Bot',
+              kind: 'discord-bot',
+              capabilities: ['guild-assistance', 'bot-guidance'],
+              metadata: {
+                guildId: interaction.guildId ?? 'dm',
+                channelId: interaction.channelId,
+                surface: 'slash-command',
+              },
+            },
           }),
         });
 

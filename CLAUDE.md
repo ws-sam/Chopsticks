@@ -33,6 +33,17 @@ directly. The public hosted instance lives at `chopsticks.wokspec.org`.
 
 ---
 
+## High-Fidelity UI Standards (Anti-Vibe-Coded)
+
+Chopsticks must follow the WokSpec High-Fidelity UI Standards defined in [../UI_STANDARDS.md](../UI_STANDARDS.md).
+
+- **8pt Spacing:** Use strict 4/8pt increments for all layout gaps and paddings.
+- **Loading States:** Every async action (e.g. music loading, economy processing) must show a loading indicator or skeleton screen.
+- **Consistency:** Maintain uniform border-radii and typography across all UI elements.
+- **Anti-Vibe:** Avoid random purple gradients and sparkle emoji overkill.
+
+---
+
 ## Repository Structure
 
 ```

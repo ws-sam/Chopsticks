@@ -7,8 +7,8 @@
     "build": "next build",
     "start": "next start",
     "preview": "next build && npx wrangler pages dev out --port 3000",
-    "deploy": "next build && ../../WokSite/node_modules/.bin/wrangler pages deploy out --project-name chopsticks-wokspec --branch main",
-    "deploy:ci": "next build && CLOUDFLARE_API_TOKEN=$CF_API_TOKEN ../../WokSite/node_modules/.bin/wrangler pages deploy out --project-name chopsticks-wokspec --branch main --commit-dirty=true"
+    "deploy": "next build && npx wrangler pages deploy out --project-name chopsticks-wokspec --branch main",
+    "deploy:ci": "next build && CLOUDFLARE_API_TOKEN=$CF_API_TOKEN npx wrangler pages deploy out --project-name chopsticks-wokspec --branch main --commit-dirty=true"
   },
   "dependencies": {
     "next": "^16.1.6",

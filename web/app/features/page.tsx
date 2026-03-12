@@ -6,14 +6,16 @@ import {
   GamepadIcon, CheckIcon, BookOpenIcon,
 } from '../icons';
 
+import { Config, getBotInvite } from '../config';
+
 export const metadata: Metadata = {
   title: 'Features — Chopsticks',
   description: 'Everything Chopsticks can do: personal playlist channels, AI audiobook narration, near-human agents, gamification platform, raid protection, fully programmable automation, and open-source AI integration.',
-  alternates: { canonical: 'https://chopsticks.wokspec.org/features' },
+  alternates: { canonical: `${Config.baseUrl}/features` },
 };
 
-const BOT_INVITE = 'https://discord.com/api/oauth2/authorize?client_id=1466382874587431036&permissions=1099514858544&scope=bot%20applications.commands';
-const GITHUB = 'https://github.com/WokSpec/Chopsticks';
+const BOT_INVITE = getBotInvite();
+const GITHUB = Config.githubRepo;
 
 function Check({ color = '#57f287' }: { color?: string }) {
   return (
@@ -234,11 +236,11 @@ export default function FeaturesPage() {
           {/* Stat pills */}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.625rem', marginBottom: '2.5rem' }}>
             {[
-              { n: '148', l: 'prefix commands' },
-              { n: '101', l: 'slash commands' },
+              { n: String(Config.stats.prefixCommands), l: 'prefix commands' },
+              { n: String(Config.stats.slashCommands),  l: 'slash commands' },
               { n: '11',  l: 'categories' },
-              { n: '7',   l: 'core systems' },
-              { n: '16',  l: 'agent roles' },
+              { n: String(Config.stats.systems),   l: 'core systems' },
+              { n: String(Config.stats.agentRoles),  l: 'agent roles' },
               { n: '5',   l: 'backups/server' },
             ].map(s => (
               <div key={s.n} style={{ display: 'flex', alignItems: 'baseline', gap: '0.35rem',

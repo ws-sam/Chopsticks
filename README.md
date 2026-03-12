@@ -35,12 +35,11 @@
 
 ## Overview
 
-Chopsticks is a full-featured Discord bot built on [discord.js v14](https://discord.js.org) with PostgreSQL persistence, Redis caching, and a Lavalink audio backend. It ships 70 slash commands across music, moderation, economy, games, AI, and social features — all configurable per-server via `/setup`.
+Chopsticks is a full-featured Discord bot built on [discord.js v14](https://discord.js.org) with PostgreSQL persistence, Redis caching, and a Lavalink audio backend. It ships **100+ slash commands** across music, moderation, economy, games, AI, and social features — all configurable per-server via `/setup`.
 
 The flagship feature is the **Agent Pool System**: a community model where multiple Discord bot tokens are pooled, encrypted, and dispatched to voice channels on demand. Servers never manage tokens directly; they consume from shared pools maintained by the community.
 
-**Hosted instance:** Invite Chopsticks to your server — no self-hosting required.
-> Replace `YOUR_CLIENT_ID` with the bot's application ID: `https://discord.com/api/oauth2/authorize?client_id=YOUR_CLIENT_ID&permissions=8&scope=bot%20applications.commands`
+**Self-hosting encouraged:** Chopsticks is built for community ownership. While a public instance may be available at [chopsticks.wokspec.org](https://chopsticks.wokspec.org), we encourage you to run your own instance to match your community's needs.
 
 ---
 
@@ -292,9 +291,10 @@ cd Chopsticks
 npm install
 cp .env.example .env
 # Edit .env — minimum required: DISCORD_TOKEN, CLIENT_ID, DATABASE_URL, REDIS_URL
-npm run migrate
-node scripts/deployCommands.js   # deploy slash commands to your test guild
-npm run bot
+npm run verify    # check environment and connections
+npm run migrate   # apply database migrations
+node scripts/deployCommands.js   # deploy slash commands
+npm start
 ```
 
 See [QUICKSTART.md](QUICKSTART.md) for a step-by-step walkthrough including Lavalink configuration.
@@ -369,7 +369,7 @@ Chopsticks/
 ├── migrations/             PostgreSQL schema migrations
 ├── scripts/
 │   └── deployCommands.js   Slash command deploy (guild or global)
-├── docs/                   Architecture and deployment guides
+├── docs/                   Architecture, deployment, and security guides
 ├── test/                   Unit and contract tests (872 tests)
 ├── web/                    Public website (Next.js → chopsticks.wokspec.org)
 ├── docker-compose.*.yml    Compose files for different environments
@@ -446,7 +446,7 @@ make test-level-1      # Agent lifecycle invariant tests
 
 ## Contributing
 
-Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request — it covers the development workflow, commit conventions, and how to run the stack locally.
+Contributions are welcome. Please read the [WokSpec Contributing Guide](https://github.com/WokSpec/WokDocs/blob/main/CONTRIBUTING.md) before opening a pull request — it covers the development workflow, commit conventions, and how to run the stack locally.
 
 1. Fork the repository
 2. Create a branch: `git checkout -b feat/your-feature`
@@ -461,7 +461,7 @@ Issues labeled [`good first issue`](https://github.com/wokspec/Chopsticks/labels
 
 Do not report security vulnerabilities through public GitHub issues.
 
-See [SECURITY.md](SECURITY.md) for the responsible disclosure process and the security model for the agent token system.
+See the [WokSpec Global Security Policy](https://github.com/WokSpec/WokDocs/blob/main/SECURITY.md) for the responsible disclosure process, and the [Chopsticks Security Doc](./docs/security.md) for the detailed security model of the agent token system.
 
 ---
 

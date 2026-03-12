@@ -2,9 +2,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MusicIcon, ShieldIcon, CoinIcon, SparkleIcon, GamepadIcon, ZapIcon, WrenchIcon, RadioIcon, ServerIcon } from './icons';
 
-const BOT_INVITE = 'https://discord.com/api/oauth2/authorize?client_id=1466382874587431036&permissions=1099514858544&scope=bot%20applications.commands';
-const DISCORD_SERVER = 'https://discord.gg/QbS47HDdpf';
-const GITHUB_REPO = 'https://github.com/wokspec/chopsticks';
+import { Config, getBotInvite } from './config';
+
+const BOT_INVITE = getBotInvite();
+const DISCORD_SERVER = Config.supportServer;
+const GITHUB_REPO = Config.githubRepo;
 
 // ─── Animated Discord mockup ──────────────────────────────────────────────
 const CHANNELS = ['general', 'music', 'commands', 'bot-log', 'giveaways'];
@@ -502,7 +504,7 @@ export default function HomePage() {
             </div>
             {/* Stat pills */}
             <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap' }}>
-              {[['249', 'Total commands'], ['14', 'Agent roles'], ['5', 'Backups/server'], ['6', 'Core systems']].map(([n, l]) => (
+              {[[String(Config.stats.prefixCommands + Config.stats.slashCommands), 'Total commands'], [String(Config.stats.agentRoles), 'Agent roles'], ['5', 'Backups/server'], [String(Config.stats.systems), 'Core systems']].map(([n, l]) => (
                 <div key={l} style={{ textAlign: 'center' }}>
                   <div style={{ fontFamily: 'var(--font-heading)', fontWeight: 800, fontSize: '1.6rem', color: 'var(--text)', letterSpacing: '-0.05em' }}>{n}</div>
                   <div style={{ fontSize: '0.72rem', color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '0.07em', fontFamily: 'var(--font-heading)', fontWeight: 600 }}>{l}</div>

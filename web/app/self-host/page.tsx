@@ -2,7 +2,9 @@
 import React, { useState } from 'react';
 import { GitHubIcon, DockerIcon, ServerIcon, CheckIcon } from '../icons';
 
-const GITHUB = 'https://github.com/WokSpec/Chopsticks';
+import { Config } from '../config';
+
+const GITHUB = Config.githubRepo;
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);

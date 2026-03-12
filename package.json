@@ -17,6 +17,7 @@
     "nuke:data": "INITIAL_DATA_WIPE=true node scripts/nuke_guild_data.js",
     "nuke:all": "INITIAL_DATA_WIPE=true NUKE_USER_DATA=true node scripts/nuke_guild_data.js",
     "migrate": "node scripts/migrate.js",
+    "verify": "node scripts/verify-setup.js",
     "seed:pg": "node scripts/seedFromFiles.js",
     "deploy:guild": "DEPLOY_MODE=guild node scripts/deployCommands.js",
     "deploy:global": "DEPLOY_MODE=global node scripts/deployCommands.js",

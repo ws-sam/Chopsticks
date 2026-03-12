@@ -1,7 +1,8 @@
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
+import { Config } from '../config';
 
-const GITHUB = 'https://github.com/WokSpec/Chopsticks';
+const GITHUB = Config.githubRepo;
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -116,10 +117,10 @@ export default function DocsPage() {
 
           <section id="overview" style={SECTION}>
             <h2 style={H2}>Overview</h2>
-            <p style={P}>Chopsticks is a full-featured Discord bot built on discord.js v14 with PostgreSQL persistence, Redis caching, and a Lavalink audio backend. It ships 148 prefix commands and 101 slash commands across music, moderation, economy, games, AI, and social features.</p>
+            <p style={P}>Chopsticks is a full-featured Discord bot built on discord.js v14 with PostgreSQL persistence, Redis caching, and a Lavalink audio backend. It ships {Config.stats.prefixCommands} prefix commands and {Config.stats.slashCommands} slash commands across music, moderation, economy, games, AI, and social features.</p>
             <p style={P}>It&apos;s open source and actively developed — you can self-host your own instance, fork the code, or <strong style={{ color: 'var(--text)' }}>contribute directly</strong> and help build something genuinely great.</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.625rem', marginTop: '1.25rem' }}>
-              {[['148', 'Prefix commands'], ['101', 'Slash commands'], ['MIT', 'License']].map(([v, l]) => (
+              {[[String(Config.stats.prefixCommands), 'Prefix commands'], [String(Config.stats.slashCommands), 'Slash commands'], ['MIT', 'License']].map(([v, l]) => (
                 <div key={l} style={{ background: 'var(--surface-raised)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '1rem', textAlign: 'center' }}>
                   <div style={{ fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: '1.25rem', color: 'var(--accent)', letterSpacing: '-0.03em' }}>{v}</div>
                   <div style={{ fontSize: '0.7rem', color: 'var(--text-faint)', fontFamily: 'var(--font-heading)', textTransform: 'uppercase', letterSpacing: '0.07em', marginTop: '0.2rem' }}>{l}</div>

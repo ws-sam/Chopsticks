@@ -246,9 +246,25 @@ function inferBroadCategory(commandName, explicitCategory = "") {
   return "core";
 }
 
-function commandRecord(command) {
+function commandRecord(command, memberPerms) {
   const json = command?.data?.toJSON?.() ?? command?.data ?? {};
   const name = String(json.name || command?.data?.name || "").trim();
+
+  // Role-aware filtering: check if user has required permissions
+  if (memberPerms) {
+    const requiredPerms = json.default_member_permissions;
+    if (requiredPerms && !memberPerms.has(BigInt(requiredPerms))) {
+      return null;
+    }
+    // Also check meta.userPerms if present (custom field used in some commands)
+    const metaPerms = command?.meta?.userPerms;
+    if (metaPerms && Array.isArray(metaPerms)) {
+      for (const perm of metaPerms) {
+        if (!memberPerms.has(perm)) return null;
+      }
+    }
+  }
+
   const description = String(json.description || command?.data?.description || "No description.");
   const options = Array.isArray(json.options) ? json.options : [];
   const variants = extractVariants(options);
@@ -267,10 +283,10 @@ function commandRecord(command) {
   };
 }
 
-function buildCategoryData(client) {
+function buildCategoryData(client, memberPerms) {
   const records = Array.from(client.commands.values())
-    .map(commandRecord)
-    .filter(r => r.name)
+    .map(c => commandRecord(c, memberPerms))
+    .filter(r => r && r.name)
     .sort((a, b) => a.name.localeCompare(b.name));
 
   const byCategory = new Map(BROAD_CATEGORIES.map(c => [c.key, []]));
@@ -447,7 +463,8 @@ async function resolvePrefix(interaction) {
 }
 
 function buildPanelPayload(interaction, selected) {
-  const { records, byCategory, categories } = buildCategoryData(interaction.client);
+  const memberPerms = interaction.inGuild() ? interaction.member.permissions : null;
+  const { records, byCategory, categories } = buildCategoryData(interaction.client, memberPerms);
   const prefix = interaction.__helpPrefix || "!";
 
   const embed = selected === MAIN_VALUE

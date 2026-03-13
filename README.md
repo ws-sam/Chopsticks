@@ -467,7 +467,7 @@ See the [WokSpec Global Security Policy](https://github.com/WokSpec/WokDocs/blob
 
 ## License
 
-MIT License with Commercial Attribution Clause — Copyright (c) 2026 goot27 and Wok Specialists
+MIT License with Commercial Attribution Clause — Copyright (c) 2026 WokSpec
 
 Free to self-host, fork, and white-label. **Commercial use** (paid bots, white-labeled instances, SaaS offerings) requires a visible attribution to "Powered by Chopsticks (WokSpec)" in your product's documentation, bot description, or about section.
 
@@ -477,6 +477,6 @@ See [LICENSE](LICENSE) for the full text.
 
 <div align="center">
 
-Built by **[goot27](https://github.com/goot27)** and the **[Wok Specialists](https://github.com/wokspec)** community.
+Built by the **[WokSpec](https://github.com/wokspec)** community.
 
 </div>

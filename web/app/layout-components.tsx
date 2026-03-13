@@ -135,7 +135,7 @@ export function Footer() {
               <div style={{ width: 26, height: 26, borderRadius: 7, background: 'rgba(56,189,248,0.08)', border: '1px solid rgba(56,189,248,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><img src="/images/chopsticks.png" alt="Chopsticks" width={18} height={18} style={{ objectFit: 'contain', display: 'block' }} /></div>
               <span style={{ fontWeight: 700, fontSize: '0.9rem', fontFamily: 'var(--font-heading)', letterSpacing: '-0.02em' }}>Chopsticks</span>
             </div>
-            <p>An open source Discord bot built by goot27 and the WokSpec community. MIT licensed.</p>
+            <p>An open source Discord bot built by WokSpec and the WokSpec community. MIT licensed.</p>
           </div>
 
           <div className="footer-col">
@@ -164,7 +164,7 @@ export function Footer() {
         </div>
 
         <div className="footer-bottom">
-          <p>Built by <a href="https://github.com/goot27" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text-muted)', textDecoration: 'underline', textUnderlineOffset: '3px' }}>goot27</a> &amp; Wok Specialists · {new Date().getFullYear()}</p>
+          <p>Built by <a href="https://github.com/WokSpec" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text-muted)', textDecoration: 'underline', textUnderlineOffset: '3px' }}>WokSpec</a> &amp; Wok Specialists · {new Date().getFullYear()}</p>
           <div className="footer-social">
             <a href={GITHUB} target="_blank" rel="noopener noreferrer" title="GitHub"><GitHubIcon size={15} /></a>
             <a href={BOT_INVITE} target="_blank" rel="noopener noreferrer" title="Add to Discord"><DiscordIcon size={15} /></a>

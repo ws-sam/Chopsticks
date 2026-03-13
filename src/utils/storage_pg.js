@@ -307,38 +307,33 @@ export async function ensureSchema() {
     throw err;
   }
 
-  // Create default pool for goot27 if it doesn't exist
+  // Create default pool (ID: pool_goot27) if it doesn't exist
   try {
     logger.debug("Ensuring default pool_goot27 exists...");
-    const ensureDefaultPoolSql = `
+    const now = Date.now();
+    await p.query(`
       INSERT INTO agent_pools (pool_id, owner_user_id, name, visibility, created_at, updated_at)
       VALUES ($1, $2, $3, $4, $5, $6)
       ON CONFLICT (pool_id) DO NOTHING;
-    `;
-    const now = Date.now();
-    await p.query(ensureDefaultPoolSql, [
+    `, [
       'pool_goot27',
-      process.env.BOT_OWNER_ID || '', // Bot owner Discord ID (set BOT_OWNER_ID in .env)
+      process.env.BOT_OWNER_ID || '',
       'Official Chopsticks Pool',
       'public',
       now,
       now
     ]);
-    logger.debug("Default pool_goot27 ensured.");
 
-  // Migration: rename default pool to "goot27's pool" (one-time, guarded by old name)
-  try {
-    await p.query(
-      "UPDATE agent_pools SET name = $1, visibility = 'public' WHERE pool_id = 'pool_goot27' AND name = 'Official Chopsticks Pool'",
-      ["goot27's pool"]
+    // Migration: rename default pool to "Official Chopsticks Pool" from any old names
+    const migrationRes = await p.query(
+      "UPDATE agent_pools SET name = $1, visibility = 'public' WHERE pool_id = 'pool_goot27' AND (name = 'Official Chopsticks Pool' OR name = 'goot27''s pool')",
+      ["Official Chopsticks Pool"]
     );
-    logger.debug("Default pool rename migration applied (if needed).");
-  } catch (err) {
-    logger.error("Error applying default pool rename migration:", { error: err.message });
-  }
+    if (migrationRes.rowCount > 0) {
+      logger.debug("Default pool rename migration applied.");
+    }
   } catch (err) {
     logger.error("Error ensuring default pool:", { error: err.message });
-    // Don't throw - pool might already exist
   }
 
   // Create indices for performance

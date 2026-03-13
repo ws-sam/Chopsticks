@@ -1,6 +1,6 @@
 # Trademarks
 
-"Chopsticks", the Chopsticks logo(s), and related marks are trademarks of **goot27** and **WokSpec**.
+"Chopsticks", the Chopsticks logo(s), and related marks are trademarks of **WokSpec**.
 
 ## Allowed
 - You may refer to the project as "Chopsticks" when discussing or reviewing it.
@@ -9,7 +9,7 @@
 
 ## Not Allowed (Without Written Permission)
 - Using "Chopsticks" or confusingly similar names/logos to market a bot, hosted service, or product.
-- Using Chopsticks branding in a way that implies endorsement by goot27 or WokSpec.
+- Using Chopsticks branding in a way that implies endorsement by WokSpec.
 - Rehosting any official Chopsticks branding assets for your own distribution.
 
 ## Fork Naming Guidance
@@ -17,4 +17,4 @@
 - Not allowed: `Chopsticks Pro`, `Chopsticks Official`, or anything implying official status.
 
 ---
-© 2026 goot27 / WokSpec. All rights reserved.
+© 2026 WokSpec. All rights reserved.

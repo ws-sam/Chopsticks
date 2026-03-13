@@ -9,7 +9,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and
 ### Added
 - Phase I: Agent pool hardening — `/api/agents/diagnose` endpoint surfaces offline root cause per agent
 - Phase I: Public pool contribution review workflow (`pool_contributions` table, approve/reject/approve-all)
-- Phase I: Pool rename migration — default pool now "goot27's pool"
+- Phase I: Pool rename migration — default pool now "Official Chopsticks Pool"
 - Phase I: Admin pool delete with agent reassignment (`DELETE /api/admin/pools/:poolId`)
 - Phase I: Per-user contribution limits (`max_contributions_per_user`) on pools
 - Phase I: Pool audit log route (`GET /api/pools/:id/audit`)

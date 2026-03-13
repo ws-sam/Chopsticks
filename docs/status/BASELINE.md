@@ -92,7 +92,7 @@ docker exec chopsticks-bot node -e "(async()=>{const s=await import('/app/src/ut
 
 Observed:
 - `pool_count 1`
-- `pool_goot27` present, visibility `public`, expected owner id present.
+- `pool_WokSpec` present, visibility `public`, expected owner id present.
 
 ### B) Agent registration works
 ```bash

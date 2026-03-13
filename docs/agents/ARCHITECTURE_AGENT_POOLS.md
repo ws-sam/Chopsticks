@@ -63,7 +63,7 @@ Visibility and ownership behavior:
 - Public pools are visible/selectable for contribution/deploy commands.
 - Private pools are owner-restricted.
 - Ownership ties to `owner_user_id`.
-- Default seed pool `pool_goot27` is auto-ensured as `public`.
+- Default seed pool `pool_WokSpec` is auto-ensured as `public`.
 
 ## 3) Deployment tracking, limits, and allocation model
 

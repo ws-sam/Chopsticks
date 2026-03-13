@@ -2223,7 +2223,7 @@ export async function execute(interaction) {
             embeds: [
               buildInfoEmbed(
                 "Choose a Pool",
-                "Re-run this command with `pool:<pool_id>`.\nExample: `/agents add_token pool:pool_goot27`.",
+                "Re-run this command with `pool:<pool_id>`.\nExample: `/agents add_token pool:pool_WokSpec`.",
                 Colors.INFO
               ).addFields(
                 { name: "Available Public Pools", value: trimText(poolList, 1024), inline: false },
@@ -2357,7 +2357,7 @@ export async function execute(interaction) {
       if (!requesterIsBotOwner) {
         const accessiblePools = await listAccessiblePoolsForUser(interaction.user.id, ownerIds);
         const accessiblePoolIds = new Set(accessiblePools.map(p => p.pool_id));
-        tokens = allTokens.filter(token => accessiblePoolIds.has(token.pool_id || "pool_goot27"));
+        tokens = allTokens.filter(token => accessiblePoolIds.has(token.pool_id || "pool_WokSpec"));
       }
 
       if (tokens.length === 0) {
@@ -2378,7 +2378,7 @@ export async function execute(interaction) {
       // Group by pool
       const poolMap = new Map();
       for (const token of tokens) {
-        const poolId = token.pool_id || 'pool_goot27';
+        const poolId = token.pool_id || 'pool_WokSpec';
         if (!poolMap.has(poolId)) {
           poolMap.set(poolId, []);
         }

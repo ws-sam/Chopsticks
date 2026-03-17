@@ -446,7 +446,7 @@ make test-level-1      # Agent lifecycle invariant tests
 
 ## Contributing
 
-Contributions are welcome. Please read the [WokSpec Contributing Guide](https://github.com/WokSpec/WokDocs/blob/main/CONTRIBUTING.md) before opening a pull request — it covers the development workflow, commit conventions, and how to run the stack locally.
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide — development workflow, commit conventions, code standards, and how to run the full stack locally.
 
 1. Fork the repository
 2. Create a branch: `git checkout -b feat/your-feature`
@@ -454,6 +454,8 @@ Contributions are welcome. Please read the [WokSpec Contributing Guide](https://
 4. Push and open a pull request against `main`
 
 Issues labeled [`good first issue`](https://github.com/wokspec/Chopsticks/labels/good%20first%20issue) are a good starting point.
+
+Chopsticks is part of the [WokSpec](https://github.com/WokSpec) ecosystem — a collection of open source tools and bots built for Discord communities.
 
 ---
 
@@ -477,6 +479,6 @@ See [LICENSE](LICENSE) for the full text.
 
 <div align="center">
 
-Built with <3 by goot27. Enjoy!
+Built with ♥ by [goot27](https://github.com/goot27) · Part of the [WokSpec](https://github.com/WokSpec) ecosystem
 
 </div>

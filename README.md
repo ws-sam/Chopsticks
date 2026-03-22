@@ -13,7 +13,7 @@
 
 </div>
 
-> **Status — On hold:** Chopsticks is production-stable and fully self-hostable. Active feature development is paused while [ws-sam](https://github.com/ws-sam) focuses on building [WokSpec](https://github.com/WokSpec). Community PRs are still reviewed and merged. Still MIT. Still self-hostable. Contributions welcome.
+> **Status — On hold:** Chopsticks is production-stable and fully self-hostable. Active feature development is paused while [ws-sam](https://github.com/ws-sam) focuses on building [WokSpec](https://github.com/WokSpec). Community PRs are still reviewed and merged. Still MIT. Still self-hostable. Contributions welcome. Note that goot27 has been suspended by Github. 
 
 ---
 

@@ -44,7 +44,7 @@
   },
   "dependencies": {
     "@discordjs/opus": "^0.10.0",
-    "@discordjs/voice": "^0.19.1",
+    "@discordjs/voice": "^0.19.2",
     "@napi-rs/canvas": "^0.1.96",
     "@opentelemetry/auto-instrumentations-node": "^0.71.0",
     "@opentelemetry/sdk-node": "^0.213.0",

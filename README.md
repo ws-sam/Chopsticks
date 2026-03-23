@@ -1,8 +1,6 @@
-<div align="center">
+# Chopsticks
 
-<h1>Chopsticks</h1>
-
-<p><strong>A production-grade, open source Discord bot — music, moderation, economy, AI, and a community-powered agent pool system for voice and assistant workloads at scale.</strong></p>
+**A production-grade, open source Discord bot — music, moderation, economy, AI, and a community-powered agent pool system for voice and assistant workloads at scale.**
 
 [![License: MIT + Commercial Attribution](https://img.shields.io/badge/License-MIT%20%2B%20Commercial%20Attribution-blue.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-22%2B-339933?logo=node.js&logoColor=white)](https://nodejs.org)
@@ -10,8 +8,6 @@
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](docker-compose.laptop.yml)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](CONTRIBUTING.md)
 [![GitHub Stars](https://img.shields.io/github/stars/ws-sam/Chopsticks?style=social)](https://github.com/ws-sam/Chopsticks/stargazers)
-
-</div>
 
 > **Status — On hold:** Chopsticks is production-stable and fully self-hostable. Active feature development is paused while [ws-sam](https://github.com/ws-sam) focuses on building [WokSpec](https://github.com/WokSpec). Community PRs are still reviewed and merged. Still MIT. Still self-hostable. Contributions welcome. Note that goot27 has been suspended by Github. 
 

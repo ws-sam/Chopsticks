@@ -55,7 +55,7 @@
     "autocannon": "^8.0.0",
     "bcrypt": "^6.0.0",
     "compression": "^1.8.1",
-    "connect-redis": "^8.0.1",
+    "connect-redis": "^9.0.0",
     "cors": "^2.8.6",
     "discord.js": "^14.26.2",
     "dotenv": "^16.4.5",

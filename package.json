@@ -58,7 +58,7 @@
     "connect-redis": "^8.0.1",
     "cors": "^2.8.6",
     "discord.js": "^14.26.2",
-    "dotenv": "^16.4.5",
+    "dotenv": "^17.4.0",
     "epub2": "^3.0.2",
     "express": "^5.2.1",
     "express-mongo-sanitize": "^2.2.0",

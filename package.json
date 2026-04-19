@@ -73,7 +73,7 @@
     "jsonwebtoken": "^9.0.3",
     "lavalink-client": "^2.10.1",
     "mammoth": "^1.12.0",
-    "msedge-tts": "^2.0.4",
+    "msedge-tts": "^2.0.5",
     "opossum": "^8.1.0",
     "opusscript": "^0.1.1",
     "pdf-parse": "^2.4.5",

@@ -7,9 +7,9 @@
 [![Discord.js](https://img.shields.io/badge/discord.js-v14-5865F2?logo=discord&logoColor=white)](https://discord.js.org)
 [![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](docker-compose.laptop.yml)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](CONTRIBUTING.md)
-[![GitHub Stars](https://img.shields.io/github/stars/ws-sam/Chopsticks?style=social)](https://github.com/ws-sam/Chopsticks/stargazers)
+[![GitHub Stars](https://img.shields.io/github/stars/madebymadhouse/chopsticks?style=social)](https://github.com/madebymadhouse/chopsticks/stargazers)
 
-> **Status — On hold:** Chopsticks is production-stable and fully self-hostable. Active feature development is paused while [ws-sam](https://github.com/ws-sam) focuses on other [WokSpec](https://github.com/WokSpec) projects. Community PRs are still reviewed and merged. Self-hosting is the recommended path.
+> **Status:** Chopsticks is the full-stack Mad House Discord bot. Community PRs are welcome, but the contribution path is branch-first and PR-first. Self-hosting is still the intended deployment model.
 
 ---
 
@@ -38,6 +38,12 @@ Chopsticks is a full-featured Discord bot built on [discord.js v14](https://disc
 The flagship feature is the **Agent Pool System**: a community model where multiple Discord bot tokens are pooled, encrypted, and dispatched to voice channels on demand. Servers never manage tokens directly; they consume from shared pools maintained by the community.
 
 **Self-hosting encouraged:** Chopsticks is built for community ownership. Self-hosting your own instance is the best path for reliability and control.
+
+---
+
+## Don't Feel Like Reading?
+
+Drop this repo into any AI assistant and ask it to explain the architecture, walk you through self-hosting, or help you make a scoped change. The repo now follows the same Mad House branch / PR / agent workflow as the rest of the org.
 
 ---
 
@@ -451,9 +457,36 @@ Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full g
 3. Commit using [Conventional Commits](https://www.conventionalcommits.org): `git commit -m 'feat: add your feature'`
 4. Push and open a pull request against `main`
 
-Issues labeled [`good first issue`](https://github.com/ws-sam/Chopsticks/labels/good%20first%20issue) are a good starting point.
+Issues labeled [`good first issue`](https://github.com/madebymadhouse/chopsticks/labels/good%20first%20issue) are a good starting point.
 
-Chopsticks is part of [WokSpec](https://github.com/WokSpec). Self-hosting is the intended deployment model.
+Shared workflow standard:
+
+https://github.com/madebymadhouse/bot-dev-playbook/blob/main/AGENTIC_GIT_WORKFLOW.md
+
+---
+
+## Agents
+
+The full Mad House fleet can be dropped into `.github/agents/` and invoked from VS Code or any compatible agent runtime.
+
+| Agent | What it does |
+|---|---|
+| `@delegator` | Single entry point — routes work to the right specialist agents |
+| `@orchestrator` | Coordinates large or cross-cutting work across the fleet |
+| `@context-keeper` | Writes session logs, handoffs, and decision records |
+| `@librarian` | Org-wide unification, repo sync, and standards enforcement |
+| `@git-keeper` | Branching, commits, PR descriptions, and merge hygiene |
+| `@coder` | Writes or changes production code |
+| `@debugger` | Finds root cause and verifies fixes |
+| `@reviewer` | Reviews changes before PR or merge |
+| `@security` | Security audit — secrets, auth, injection, deps |
+| `@auditor` | Structured repo audit |
+| `@updater` | Works through audit findings |
+| `@writer` | Humanizes docs and prose |
+| `@beautiful-readme` | README structure and presentation |
+| `@bot-dev-playbook` | Shared bot workflow and standards |
+| `@playbook-builder` | Turns repeated work into a durable playbook |
+| `@vps-maintenance-planner` | VPS and runtime planning |
 
 ---
 
@@ -461,7 +494,7 @@ Chopsticks is part of [WokSpec](https://github.com/WokSpec). Self-hosting is the
 
 Do not report security vulnerabilities through public GitHub issues.
 
-See the [WokSpec Security Policy](https://github.com/wokspec/.github/blob/main/SECURITY.md) for the responsible disclosure process, and the [Chopsticks Security Doc](./docs/security.md) for the agent token security model.
+See the [Mad House Security Policy](https://github.com/madebymadhouse/.github/blob/main/SECURITY.md) for the responsible disclosure process, and the [Chopsticks Security Doc](./docs/security.md) for the agent token security model.
 
 ---
 
@@ -477,6 +510,6 @@ See [LICENSE](LICENSE) for the full text.
 
 <div align="center">
 
-Maintained by [ws-sam](https://github.com/ws-sam) · Part of [WokSpec](https://github.com/WokSpec)
+Maintained under the [Mad House](https://github.com/madebymadhouse) org
 
 </div>

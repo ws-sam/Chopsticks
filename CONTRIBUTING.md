@@ -89,6 +89,10 @@ npm run bot
 
 5. **Push** your branch and **open a Pull Request** against `main`.
 
+Canonical Mad House workflow standard:
+
+https://github.com/madebymadhouse/bot-dev-playbook/blob/main/AGENTIC_GIT_WORKFLOW.md
+
 ---
 
 ## Commit Conventions
@@ -169,7 +173,7 @@ feat(economy): add /gamble command with server toggle
 
 ## Reporting Issues
 
-Use [GitHub Issues](https://github.com/wokspec/Chopsticks/issues) with the appropriate template:
+Use [GitHub Issues](https://github.com/madebymadhouse/chopsticks/issues) with the appropriate template:
 
 **Bug reports should include:**
 - Steps to reproduce
@@ -183,7 +187,7 @@ Use [GitHub Issues](https://github.com/wokspec/Chopsticks/issues) with the appro
 
 ## Feature Requests
 
-[Open a feature request](https://github.com/wokspec/Chopsticks/issues/new?template=feature_request.md) with:
+[Open a feature request](https://github.com/madebymadhouse/chopsticks/issues/new?template=feature_request.yml) with:
 
 - A clear description of the problem it solves
 - Any examples or prior art from other bots/projects
@@ -191,9 +195,18 @@ Use [GitHub Issues](https://github.com/wokspec/Chopsticks/issues) with the appro
 
 ---
 
+## Agent Shortcuts
+
+`@delegator` routes the job.
+`@git-keeper` handles branch, commit, and PR hygiene.
+`@reviewer` checks the diff before merge.
+`@security` checks auth, secrets, and injection surfaces.
+
+---
+
 ## Recognition
 
-All contributors are recognized in the repository. Thank you for making Chopsticks better! 🥢
+All contributors are recognized in the repository. Thank you for making Chopsticks better.
 
 ---
 

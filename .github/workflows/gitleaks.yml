@@ -28,4 +28,4 @@ jobs:
           docker run --rm \
             -v "$PWD:/repo" \
             ghcr.io/gitleaks/gitleaks:latest \
-            detect --source=/repo --verbose --redact --no-banner
+            detect --source=/repo --no-git --verbose --redact --no-banner

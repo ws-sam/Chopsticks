@@ -17,7 +17,7 @@ jobs:
           node-version: '22'
 
       - name: Install commitlint
-        run: npm install --save-dev @commitlint/cli @commitlint/config-conventional
+        run: npm install --no-save --legacy-peer-deps @commitlint/cli @commitlint/config-conventional
 
       - name: Validate commit messages
         run: |

@@ -34,6 +34,6 @@ jobs:
           docker run --rm \
             -v "$PWD:/repo" \
             ghcr.io/gitleaks/gitleaks:latest \
-            git --repo-path=/repo \
+            git /repo \
             --log-opts="$LOG_OPTS" \
             --verbose --redact --no-banner
